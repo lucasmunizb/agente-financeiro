@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# =====================================================================
+# REGRA INVIOLÁVEL: a IA NUNCA faz git push.
+# Este hook bloqueia qualquer push por padrão. O push só é permitido
+# quando o USUÁRIO autoriza explicitamente, definindo ALLOW_PUSH=1.
+# Ver CLAUDE.md (regra 1).
+# =====================================================================
+if [ "${ALLOW_PUSH:-}" = "1" ]; then
+	exit 0
+fi
+
+cat >&2 <<'MSG'
+==============================================================
+  PUSH BLOQUEADO (política do projeto — ver CLAUDE.md, regra 1)
+  Commits locais são permitidos; push ao remoto exige ordem
+  explícita do usuário.
+
+  Para autorizar manualmente nesta vez:
+      ALLOW_PUSH=1 git push ...
+==============================================================
+MSG
+exit 1

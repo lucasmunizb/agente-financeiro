@@ -1,0 +1,14 @@
+.git
+.gitignore
+.githooks
+node_modules
+vendor
+.env
+.env.*
+docs
+.claude
+_skeleton
+scratchpad
+*.docx
+storage/app/faturas
+storage/logs/*.log

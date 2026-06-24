@@ -1,0 +1,40 @@
+# --- Ambiente / segredos (NUNCA versionar) ---
+/.env
+.env.*
+!.env.example
+/run/secrets/
+*.secret
+
+# --- Documento de escopo (fonte de verdade, não versionado) ---
+*.docx
+
+# --- Dependências ---
+/vendor/
+/node_modules/
+
+# --- Laravel ---
+/.phpunit.cache
+/storage/*.key
+/storage/pail
+/public/build
+/public/hot
+/public/storage
+/bootstrap/cache/*.php
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+/.fleet
+/.idea
+/.vscode
+.DS_Store
+
+# --- Bootstrap / temporários ---
+/_skeleton/
+/scratchpad/
+*.tmp
+
+# --- PDFs e texto extraído de faturas (zero retenção — regra inviolável) ---
+/storage/app/faturas/
+*.pdf

@@ -1,0 +1,110 @@
+# =====================================================================
+# PRODUÇÃO — Docker Swarm. SEM .env: segredos via Docker Secrets em
+# /run/secrets/<nome>, lidos pelo entrypoint (padrão *_FILE).
+#
+# Uso (exemplo):
+#   printf '%s' "$APP_KEY"        | docker secret create app_key -
+#   printf '%s' "$DB_PASSWORD"    | docker secret create db_password -
+#   printf '%s' "$ANTHROPIC_KEY"  | docker secret create anthropic_api_key -
+#   printf '%s' "$TELEGRAM_TOKEN" | docker secret create telegram_bot_token -
+#   docker build -f docker/Dockerfile --target prod -t financeiro-app:prod .
+#   docker stack deploy -c docker-stack.yml financeiro
+#
+# Variáveis NÃO sensíveis ficam aqui; segredos NUNCA vão para imagem/log/git.
+# =====================================================================
+
+services:
+  app:
+    image: financeiro-app:prod
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_TIMEZONE: America/Sao_Paulo
+      APP_URL: https://seu-dominio.example
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_DATABASE: financeiro
+      DB_USERNAME: financeiro
+      QUEUE_CONNECTION: database
+      AI_PROVIDER: anthropic
+      # Segredos resolvidos pelo entrypoint a partir de /run/secrets:
+      APP_KEY_FILE: /run/secrets/app_key
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
+    secrets:
+      - app_key
+      - db_password
+      - anthropic_api_key
+      - telegram_bot_token
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+
+  worker:
+    image: financeiro-app:prod
+    command: sh -c "php artisan schedule:work & exec php artisan queue:work --tries=3 --timeout=120 --sleep=2"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_TIMEZONE: America/Sao_Paulo
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_DATABASE: financeiro
+      DB_USERNAME: financeiro
+      QUEUE_CONNECTION: database
+      AI_PROVIDER: anthropic
+      APP_KEY_FILE: /run/secrets/app_key
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
+    secrets:
+      - app_key
+      - db_password
+      - anthropic_api_key
+      - telegram_bot_token
+    # O worker não serve HTTP; desliga o healthcheck herdado da imagem.
+    healthcheck:
+      disable: true
+    depends_on:
+      - postgres
+    deploy:
+      # Worker escala independente do app.
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: financeiro
+      POSTGRES_USER: financeiro
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+secrets:
+  app_key:
+    external: true
+  db_password:
+    external: true
+  anthropic_api_key:
+    external: true
+  telegram_bot_token:
+    external: true
+
+volumes:
+  pgdata:

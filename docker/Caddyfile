@@ -1,0 +1,19 @@
+# FrankenPHP serve a aplicação Laravel (API + webhook do Telegram) na porta 8000.
+{
+	frankenphp
+	# Em dev não há TLS (o LB/Swarm cuida disso em produção).
+	auto_https off
+	# Logs estruturados (sem dados sensíveis) — ver docs/09-nfr-seguranca-lgpd.md
+	log {
+		output stdout
+		format json
+	}
+}
+
+:8000 {
+	root * /app/public
+	encode zstd br gzip
+
+	# Health endpoint nativo do Laravel 11/12 em /up (usado pelo healthcheck).
+	php_server
+}
