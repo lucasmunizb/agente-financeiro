@@ -1,21 +1,39 @@
 #!/usr/bin/env bash
 # =====================================================================
 # REGRA INVIOLÁVEL: a IA NUNCA faz git push.
-# Este hook bloqueia qualquer push por padrão. O push só é permitido
-# quando o USUÁRIO autoriza explicitamente, definindo ALLOW_PUSH=1.
+#
+# Este hook é um BACKSTOP contra push AUTOMATIZADO (IA / agentes / CI),
+# NÃO contra o desenvolvedor humano. O dono do projeto pode dar push a
+# qualquer momento, normalmente, pelo terminal.
+#
+# Como distingue humano de automação:
+#   - Push interativo (terminal com TTY anexado)  -> LIBERA.
+#   - Push não-interativo (saída capturada/pipe)  -> BLOQUEIA.
+#   - Override explícito: ALLOW_PUSH=1 git push ...
+#
 # Ver CLAUDE.md (regra 1).
 # =====================================================================
+
+# 1) Override manual explícito.
 if [ "${ALLOW_PUSH:-}" = "1" ]; then
 	exit 0
 fi
 
+# 2) Humano em terminal interativo pode dar push livremente.
+if [ -t 1 ] || [ -t 2 ]; then
+	exit 0
+fi
+
+# 3) Sem TTY = execução automatizada (IA/agente/CI). Bloqueia.
 cat >&2 <<'MSG'
 ==============================================================
-  PUSH BLOQUEADO (política do projeto — ver CLAUDE.md, regra 1)
-  Commits locais são permitidos; push ao remoto exige ordem
-  explícita do usuário.
+  PUSH AUTOMATIZADO BLOQUEADO (política do projeto — CLAUDE.md, regra 1)
 
-  Para autorizar manualmente nesta vez:
+  A IA nunca faz git push. Este bloqueio só vale para execução
+  não-interativa (sem terminal). O desenvolvedor humano pode dar
+  push normalmente pelo terminal.
+
+  Para forçar mesmo assim (não-interativo):
       ALLOW_PUSH=1 git push ...
 ==============================================================
 MSG

@@ -128,6 +128,7 @@ Runtime do MVP = **3 contêineres**: `app` (HTTP: API + webhook Telegram), `work
 ### Skills (`.claude/skills`)
 - **`skill-creator`** — como autorar novas skills com qualidade (reforça as regras invioláveis).
 - **`laravel-backend`** — convenções de backend deste projeto (TDD, domínio financeiro, IA via SDK).
+- **`dba-postgres`** — modelagem e operação do schema PostgreSQL 16 (tipos, FKs, índices, constraints, migrations); atua em par com `laravel-backend`.
 - **`devops`** — provisionar/operar a infra (compose, Makefile, Swarm + Secrets, escala).
 
 Skills adiadas (criar depois com a `skill-creator`): `governanca-ia`, `telegram`,
