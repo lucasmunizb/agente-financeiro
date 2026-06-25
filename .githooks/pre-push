@@ -7,9 +7,14 @@
 # qualquer momento, normalmente, pelo terminal.
 #
 # Como distingue humano de automação:
-#   - Push interativo (terminal com TTY anexado)  -> LIBERA.
-#   - Push não-interativo (saída capturada/pipe)  -> BLOQUEIA.
+#   - Push com terminal de controle (/dev/tty)    -> LIBERA (humano).
+#   - Push sem terminal de controle (IA/CI/pipe)  -> BLOQUEIA.
 #   - Override explícito: ALLOW_PUSH=1 git push ...
+#
+# IMPORTANTE: o Git NÃO conecta stdout/stderr do hook ao terminal — ele
+# captura/encana essa saída. Por isso `[ -t 1 ]`/`[ -t 2 ]` dão falso até
+# para o humano. A detecção confiável é o terminal de controle (/dev/tty),
+# herdado pelo hook independentemente de como o Git redireciona os fds.
 #
 # Ver CLAUDE.md (regra 1).
 # =====================================================================
@@ -20,7 +25,8 @@ if [ "${ALLOW_PUSH:-}" = "1" ]; then
 fi
 
 # 2) Humano em terminal interativo pode dar push livremente.
-if [ -t 1 ] || [ -t 2 ]; then
+#    Testa o terminal de controle; cai para os fds como reforço.
+if { : >/dev/tty; } 2>/dev/null || [ -t 1 ] || [ -t 2 ]; then
 	exit 0
 fi
 
