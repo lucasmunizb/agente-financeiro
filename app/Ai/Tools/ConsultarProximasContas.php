@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ai\Tools;
 
 use App\Domain\Calendar\RelativeDate;
+use App\Domain\IA\Consulta\ColetorDeConsultas;
 use App\Domain\ProximasContas\ConsultarProximasContas as ConsultarProximasContasDoUsuario;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -30,9 +31,10 @@ final class ConsultarProximasContas implements Tool
     /** Janela padrão (em dias) quando o modelo não a informa. */
     private const JANELA_PADRAO = 30;
 
-    public function __construct(private readonly User $user)
-    {
-    }
+    public function __construct(
+        private readonly User $user,
+        private readonly ?ColetorDeConsultas $coletor = null,
+    ) {}
 
     public function description(): Stringable|string
     {
@@ -48,11 +50,15 @@ final class ConsultarProximasContas implements Tool
             ? max(1, $request->integer('janela'))
             : self::JANELA_PADRAO;
 
-        return app(ConsultarProximasContasDoUsuario::class)->para(
+        $resultado = app(ConsultarProximasContasDoUsuario::class)->para(
             userId: $this->user->id,
             hoje: CarbonImmutable::now(RelativeDate::TIMEZONE),
             janelaDias: $janela,
-        )->paraPrompt();
+        );
+
+        $this->coletor?->registrar($resultado->payload(), $resultado->trace);
+
+        return $resultado->paraPrompt();
     }
 
     /**

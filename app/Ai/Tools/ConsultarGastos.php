@@ -6,6 +6,7 @@ namespace App\Ai\Tools;
 
 use App\Domain\Calendar\RelativeDate;
 use App\Domain\Gastos\ConsultarGastos as ConsultarGastosDoMes;
+use App\Domain\IA\Consulta\ColetorDeConsultas;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -26,7 +27,10 @@ use Stringable;
  */
 final class ConsultarGastos implements Tool
 {
-    public function __construct(private readonly User $user) {}
+    public function __construct(
+        private readonly User $user,
+        private readonly ?ColetorDeConsultas $coletor = null,
+    ) {}
 
     public function description(): Stringable|string
     {
@@ -42,13 +46,17 @@ final class ConsultarGastos implements Tool
             ? (string) $request->string('periodo')
             : CarbonImmutable::now(RelativeDate::TIMEZONE)->format('Y-m');
 
-        return app(ConsultarGastosDoMes::class)->para(
+        $resultado = app(ConsultarGastosDoMes::class)->para(
             userId: $this->user->id,
             periodo: $periodo,
             categoria: $request->filled('categoria') ? (string) $request->string('categoria') : null,
             cartao: $request->filled('cartao') ? (string) $request->string('cartao') : null,
             status: $request->filled('status') ? (string) $request->string('status') : null,
-        )->paraPrompt();
+        );
+
+        $this->coletor?->registrar($resultado->payload(), $resultado->trace);
+
+        return $resultado->paraPrompt();
     }
 
     /**

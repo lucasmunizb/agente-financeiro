@@ -6,9 +6,11 @@ namespace App\Ai\Tools;
 
 use App\Domain\Calendar\RelativeDate;
 use App\Domain\Disponivel\ConsultarDisponivelDoMes;
+use App\Domain\IA\Consulta\ColetorDeConsultas;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\JsonSchema\Types\Type;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Stringable;
@@ -24,9 +26,10 @@ use Stringable;
  */
 final class ConsultarDisponivelMes implements Tool
 {
-    public function __construct(private readonly User $user)
-    {
-    }
+    public function __construct(
+        private readonly User $user,
+        private readonly ?ColetorDeConsultas $coletor = null,
+    ) {}
 
     public function description(): Stringable|string
     {
@@ -41,13 +44,15 @@ final class ConsultarDisponivelMes implements Tool
             ? (string) $request->string('mes')
             : CarbonImmutable::now(RelativeDate::TIMEZONE)->format('Y-m');
 
-        return app(ConsultarDisponivelDoMes::class)
-            ->para($this->user->id, $mes)
-            ->paraPrompt();
+        $resultado = app(ConsultarDisponivelDoMes::class)->para($this->user->id, $mes);
+
+        $this->coletor?->registrar($resultado->payload(), $resultado->trace);
+
+        return $resultado->paraPrompt();
     }
 
     /**
-     * @return array<string, \Illuminate\JsonSchema\Types\Type>
+     * @return array<string, Type>
      */
     public function schema(JsonSchema $schema): array
     {

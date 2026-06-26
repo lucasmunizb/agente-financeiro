@@ -44,7 +44,7 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [ ] Instalar e configurar a Laravel AI SDK (`laravel/ai`); publicar `config/ai.php` e migrations; definir provedor padrão (Anthropic) e array de failover.
 - [x] Testes + implementação: Agents (`make:agent`) de intenção, extração e redação. _(`app/Ai/Agents/`: `ClassificadorDeIntencao` (papel 1, structured → enum `App\Domain\IA\Intencao`, fallback DESCONHECIDO), `ExtratorDeGasto` (papel 2, structured → `ResultadoDaExtracao`/`GastoExtraido` **crus**: valor/data como texto, IA não normaliza; barreira 1 = campo obrigatório ausente vira esclarecimento; crédito exige cartão §3.4), `RedatorDeResposta` (papel 3, texto a partir do payload já calculado). Testado com os fakes da SDK (`Ai::fakeAgent`/`assertAgentWasPrompted`), determinístico e offline. **Adiado:** normalização determinística + confirmação (item 3); guard pós-geração (barreira 4) no Bloco 6)_
 - [x] Testes + implementação: extração via `HasStructuredOutput` (schema validado) com confirmação. _(ponte **determinística** cru→confirmação, IA não participa: `app/Domain/IA/NormalizadorDeGastoExtraido` converte `GastoExtraido` → `DadosGastoManual` resolvendo valor→centavos (`Money`), data→fuso SP (`RelativeDate` + dd/mm[/aaaa] + aaaa-mm-dd), forma→`PaymentMethod::idFor`, cartão→id (só crédito, casado por token na descrição; 0/≥2 → esclarecimento), categoria via `LookupDeCategoria`; o que não resolve vira esclarecimento §3.4 (`ResultadoDaNormalizacao`). `PrepararConfirmacaoDeGasto` gera a `PreviaGastoManual` via `RegistrarGastoManual::preview()` **sem persistir** (regra 7) e carrega o `DadosGastoManual` para o "sim" (reusa `confirmar()`) — `ConfirmacaoDeGasto`. **Boleto** virou forma de 1ª classe ("fora de cartão"): model/seeder/migration do CHECK + docs 03§4.6/04 alinhados. **Adiado:** amarração `classificar→extrair→confirmar` ao roteador do Telegram e a mensagem de confirmação do bot = F5/FE)_
-- [ ] Testes + implementação: Tools (`make:tool`) de consulta com escopo por usuário + guard pós-geração.
+- [x] Testes + implementação: Tools (`make:tool`) de consulta com escopo por usuário + guard pós-geração. _(4 tools em `app/Ai/Tools/`; guard e orquestração no Bloco 6)_
 - [ ] Testes + implementação: histórico via `RemembersConversations` (expurgo 60 dias), `ai_usage_log` e failover. Usar fakes da SDK nos testes.
 
 ## Bloco 5 — Importação de PDF
@@ -57,13 +57,13 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 
 ## Bloco 6 — Chat financeiro
 
-- [ ] Testes + implementação: ferramentas de consulta com escopo por usuário (doc 02 §3.2).
+- [x] Testes + implementação: ferramentas de consulta com escopo por usuário (doc 02 §3.2).
   - [x] `consultar_gastos` (periodo, categoria?, cartao?, status?).
   - [x] `consultar_disponivel_mes` (mes).
   - [x] `consultar_proximas_contas` (janela em dias; contas a vencer a partir de hoje).
-  - [ ] `consultar_fatura_cartao` (cartao, competencia).
-- [ ] Testes + implementação: guard pós-geração (nenhum número fora do payload).
-- [ ] Testes + implementação: resposta com fonte/trace.
+  - [x] `consultar_fatura_cartao` (cartao, competencia).
+- [x] Testes + implementação: guard pós-geração (nenhum número fora do payload). _(`GuardPosGeracao` + orquestração `app/Domain/IA/Consulta/ResponderConsulta`: agente `AssistenteDeConsulta` chama as tools, o `ColetorDeConsultas` reúne o conjunto-verdade (payload + trace), o guard valida cada número/data; divergência regenera, esgotou cai em fallback sem números. `PayloadDeResposta::combinar` funde os payloads das tools chamadas)_
+- [x] Testes + implementação: resposta com fonte/trace. _(`RespostaDaConsulta` carrega as `fontes` (trace de cada tool) — barreira 5; apresentação = FE)_
 - [ ] **(Etapa separada)** Apresentação das respostas no bot/web.
 
 ## Bloco 7 — Dashboard e fechamento do MVP

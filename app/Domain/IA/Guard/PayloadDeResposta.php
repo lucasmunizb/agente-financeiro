@@ -32,6 +32,29 @@ final class PayloadDeResposta
     }
 
     /**
+     * Funde vários payloads num único conjunto-verdade — usado quando a resposta da IA
+     * se apoia em mais de uma tool numa mesma consulta (Bloco 6). Sem argumentos,
+     * devolve um payload vazio (não permite nenhum valor/data).
+     */
+    public static function combinar(self ...$payloads): self
+    {
+        $valores = [];
+        $datas = [];
+
+        foreach ($payloads as $payload) {
+            foreach ($payload->valoresEmCentavos as $cents) {
+                $valores[] = $cents;
+            }
+
+            foreach ($payload->datas as $data) {
+                $datas[] = $data;
+            }
+        }
+
+        return new self($valores, $datas);
+    }
+
+    /**
      * O payload permite este valor monetário (em centavos)?
      */
     public function permiteValor(int $cents): bool
