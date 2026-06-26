@@ -15,6 +15,5 @@ final class TokenDeVinculo
     public function __construct(
         public readonly string $token,
         public readonly CarbonImmutable $expiraEm,
-    ) {
-    }
+    ) {}
 }

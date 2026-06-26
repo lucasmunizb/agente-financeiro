@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Domain\Telegram\ClassificadorDeComando;
+use App\Domain\Telegram\ManipuladorInerte;
+use App\Domain\Telegram\RoteadorDeComandos;
 use App\Domain\Telegram\RoteadorDeMensagem;
-use App\Domain\Telegram\RoteadorInerte;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -13,8 +15,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Roteador default inerte até o roteamento de comandos (TODO Bloco 3).
-        $this->app->bind(RoteadorDeMensagem::class, RoteadorInerte::class);
+        // Roteador determinístico de comandos. Cada intenção ainda usa o manipulador
+        // inerte (padrão); os concretos (execução + IA no Bloco 4, mensagens do bot no
+        // frontend) substituem o mapa abaixo nas etapas posteriores.
+        $this->app->bind(RoteadorDeMensagem::class, function ($app) {
+            return new RoteadorDeComandos(
+                $app->make(ClassificadorDeComando::class),
+                $app->make(ManipuladorInerte::class),
+                manipuladores: [],
+            );
+        });
     }
 
     /**
