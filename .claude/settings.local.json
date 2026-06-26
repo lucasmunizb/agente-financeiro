@@ -7,7 +7,8 @@
       "Bash(unzip -o gestao_contas_ia_ESCOPO_FINAL.docx -d scratch_docx)",
       "Bash(chmod +x scripts/bootstrap.sh docker/entrypoint.sh .githooks/pre-push)",
       "Bash(docker compose *)",
-      "Bash(bash *)"
+      "Bash(bash *)",
+      "Bash(make up *)"
     ]
   }
 }
