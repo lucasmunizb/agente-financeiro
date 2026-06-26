@@ -1,0 +1,160 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\Gasto;
+
+use App\Domain\Calendar\RelativeDate;
+use App\Domain\Duplicidade\ChaveDeDuplicidade;
+use App\Domain\Duplicidade\DetectorDeDuplicidade;
+use App\Domain\Parcelamento\GeradorDeParcelas;
+use App\Domain\Shared\Money;
+use App\Domain\Vencimento\CalculadoraDeVencimento;
+use App\Models\AuditLog;
+use App\Models\Card;
+use App\Models\StatusPagamento;
+use App\Models\Transaction;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Cadastro de gasto manual (F2.3) — orquestra o motor determinístico do Bloco 1.
+ *
+ * Fluxo: resolve o vencimento (cartão usa o ciclo da fatura; fora de cartão vence
+ * na data da compra) → gera as parcelas (valor derivado) → deriva o status de cada
+ * parcela pela data → detecta duplicidade. O {@see self::preview()} apenas calcula
+ * (não grava); o {@see self::confirmar()} persiste de forma atômica a transaction,
+ * as installments e a auditoria. Origem sempre `manual`.
+ *
+ * A IA nunca passa por aqui: todo cálculo é determinístico.
+ */
+final class RegistrarGastoManual
+{
+    private const ORIGEM = 'manual';
+
+    public function preview(DadosGastoManual $dados, ?CarbonImmutable $hoje = null): PreviaGastoManual
+    {
+        $hoje ??= CarbonImmutable::now(RelativeDate::TIMEZONE);
+
+        return new PreviaGastoManual(
+            descricao: $dados->descricao,
+            valorTotal: Money::fromCents($dados->valorTotalCents),
+            origem: self::ORIGEM,
+            ehDuplicado: $this->ehDuplicado($dados),
+            parcelas: $this->montarParcelas($dados, $hoje),
+        );
+    }
+
+    public function confirmar(DadosGastoManual $dados, ?CarbonImmutable $hoje = null): Transaction
+    {
+        $hoje ??= CarbonImmutable::now(RelativeDate::TIMEZONE);
+        $parcelas = $this->montarParcelas($dados, $hoje);
+
+        return DB::transaction(function () use ($dados, $parcelas) {
+            $transaction = Transaction::create([
+                'user_id' => $dados->userId,
+                'descricao' => $dados->descricao,
+                'valor_total_cents' => $dados->valorTotalCents,
+                'data_compra' => $dados->dataCompra->toDateString(),
+                'payment_method_id' => $dados->paymentMethodId,
+                'card_id' => $dados->cardId,
+                'account_id' => $dados->accountId,
+                'categoria_id' => $dados->categoriaId,
+                'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+                'origem' => self::ORIGEM,
+                'moeda' => 'BRL',
+            ]);
+
+            foreach ($parcelas as $parcela) {
+                $transaction->installments()->create([
+                    'numero' => $parcela->numero,
+                    'total' => $parcela->total,
+                    'vencimento' => $parcela->vencimento->toDateString(),
+                    'status_id' => StatusPagamento::idFor($parcela->statusCodigo),
+                ]);
+            }
+
+            AuditLog::create([
+                'user_id' => $dados->userId,
+                'entidade' => 'transaction',
+                'entidade_id' => $transaction->id,
+                'acao' => AuditLog::ACAO_CRIAR,
+                'antes' => null,
+                'depois' => [
+                    'descricao' => $transaction->descricao,
+                    'valor_total_cents' => $transaction->valor_total_cents,
+                    'data_compra' => $transaction->data_compra->toDateString(),
+                    'payment_method_id' => $transaction->payment_method_id,
+                    'card_id' => $transaction->card_id,
+                    'account_id' => $transaction->account_id,
+                    'categoria_id' => $transaction->categoria_id,
+                    'parcelas' => count($parcelas),
+                ],
+                'origem' => self::ORIGEM,
+            ]);
+
+            return $transaction->load('installments');
+        });
+    }
+
+    /**
+     * Calcula as parcelas (vencimento + valor derivado + status por data).
+     *
+     * @return array<int, ParcelaPrevia>
+     */
+    private function montarParcelas(DadosGastoManual $dados, CarbonImmutable $hoje): array
+    {
+        $primeiroVencimento = $this->primeiroVencimento($dados);
+        $parcelas = GeradorDeParcelas::gerar($dados->valorTotalCents, $dados->parcelas, $primeiroVencimento);
+
+        return array_map(
+            fn ($parcela) => new ParcelaPrevia(
+                numero: $parcela->numero,
+                total: $parcela->total,
+                vencimento: $parcela->vencimento,
+                valor: $parcela->valor,
+                statusCodigo: StatusDaParcela::para($parcela->vencimento, $hoje),
+            ),
+            $parcelas,
+        );
+    }
+
+    /**
+     * Resolve o vencimento da 1ª parcela: cartão respeita o ciclo da fatura;
+     * fora de cartão vence na data da compra.
+     */
+    private function primeiroVencimento(DadosGastoManual $dados): CarbonImmutable
+    {
+        if ($dados->cardId !== null) {
+            $card = Card::findOrFail($dados->cardId);
+
+            return CalculadoraDeVencimento::cartao($dados->dataCompra, $card->dia_fechamento, $card->dia_vencimento);
+        }
+
+        return CalculadoraDeVencimento::foraDeCartao($dados->dataCompra);
+    }
+
+    private function ehDuplicado(DadosGastoManual $dados): bool
+    {
+        $candidato = ChaveDeDuplicidade::de(
+            $dados->valorTotalCents,
+            $dados->descricao,
+            $dados->dataCompra,
+            $dados->parcelas,
+        );
+
+        $existentes = Transaction::query()
+            ->where('user_id', $dados->userId)
+            ->with('installments')
+            ->get()
+            ->map(fn (Transaction $tx) => ChaveDeDuplicidade::de(
+                $tx->valor_total_cents,
+                $tx->descricao,
+                CarbonImmutable::parse($tx->data_compra->toDateString(), RelativeDate::TIMEZONE),
+                $tx->installments->count(),
+            ))
+            ->all();
+
+        return DetectorDeDuplicidade::ehDuplicado($candidato, $existentes);
+    }
+}
