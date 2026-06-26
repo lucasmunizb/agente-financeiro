@@ -17,7 +17,9 @@
       "Bash(rtk docker *)",
       "Bash(echo \"exit=$?\")",
       "Bash(rtk make *)",
-      "Bash(make test *)"
+      "Bash(make test *)",
+      "Bash(make artisan *)",
+      "Bash(make migrate *)"
     ]
   }
 }
