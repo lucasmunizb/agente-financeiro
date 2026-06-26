@@ -54,14 +54,19 @@ Conjunto inicial modelado como **tabela de referência** (`status_pagamento`) co
 
 ## 4.5 · Cálculo do "disponível do mês" (fórmula oficial)
 
-> **Disponível do mês = Receitas recebidas no mês − (Cartões com vencimento no mês) − (Gastos fora de cartão do mês: PIX e débito).**
+> **Disponível do mês = Receitas recebidas no mês − (Gastos em cartão com vencimento no mês) − (Gastos fora de cartão do mês: PIX e débito).**
+
+O componente de cartão é atribuído pelo **mês de vencimento** de cada gasto (calculado em §4.2), **independente de a fatura já ter fechado**:
+
+- **Cartão ainda em aberto (não fechado):** se o vencimento da fatura aberta cai no **mês corrente**, os gastos **já entram** no cálculo — é a visão antecipada de "quanto ainda tem para gastar" antes mesmo do fechamento.
+- **Gastos que caem na fatura de um mês futuro** (ex.: compras feitas após o fechamento) **não entram** no mês corrente; entram no **mês do seu vencimento** e aparecem como **"gastos previstos do próximo mês"** (previsão/alerta). Cada gasto pertence a **um único** mês de vencimento — nunca é contado duas vezes.
+- **No dia do vencimento**, registra-se o **pagamento do boleto** da fatura fechada.
 
 Ressalvas:
 
 - **Reseta mensalmente** (sempre mensal).
-- Considera **receita** (salário, PIX recebido, outros recebimentos).
-- **Contas futuras:** apenas o que está em aberto para o **mês corrente**.
-- **Cartão de crédito ainda não fechado:** entra **a partir do fechamento**.
+- **Duas visões:** o sistema mostra o **disponível do mês corrente** e os **gastos previstos para o próximo mês** (somatório de todas as cobranças com vencimento no mês seguinte).
+- Considera **receita** recebida no mês (salário, PIX recebido, outros recebimentos).
 - **Reserva financeira:** **não entra** no cálculo.
 - **Transferências entre contas:** **não contam** como gasto.
 
