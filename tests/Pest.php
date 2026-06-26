@@ -45,3 +45,23 @@ function something()
 {
     // ..
 }
+
+/**
+ * Constrói um GastoExtraido (saída crua do ExtratorDeGasto) para os testes da camada
+ * de normalização/confirmação. Por padrão: gasto simples no pix, hoje. Use `dataTexto`
+ * => null para simular data ausente.
+ *
+ * @param  array<string, mixed>  $over
+ */
+function gastoExtraidoFake(array $over = []): App\Domain\IA\GastoExtraido
+{
+    return new App\Domain\IA\GastoExtraido(
+        descricao: $over['descricao'] ?? 'mercado',
+        valorTexto: $over['valorTexto'] ?? '35',
+        formaPagamento: $over['formaPagamento'] ?? 'pix',
+        cartao: $over['cartao'] ?? null,
+        categoria: $over['categoria'] ?? null,
+        dataTexto: array_key_exists('dataTexto', $over) ? $over['dataTexto'] : 'hoje',
+        parcelas: $over['parcelas'] ?? null,
+    );
+}
