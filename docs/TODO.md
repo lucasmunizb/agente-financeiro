@@ -29,8 +29,8 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 ## Bloco 2 — Cadastro manual e receitas 🟡 em andamento
 
 - [ ] Testes + implementação: CRUD de gastos com status, origem e auditoria. _(parcial: schema `transactions`/`installments`, `audit_log` e registro de gasto manual prontos — `app/Domain/Gasto/RegistrarGastoManual.php`; falta editar/cancelar)_
-- [ ] Testes + implementação: categorias + palavras-chave + aliases. **← próximo passo**
-- [ ] Testes + implementação: receitas e orçamento mensal geral + alerta por categoria.
+- [x] Testes + implementação: categorias + palavras-chave + aliases. _(schema `categories`/`category_keywords`/`merchant_aliases` + FK em `transactions`; lookup determinístico `app/Domain/Categoria/` — classificador, lookup e aprendizado por correção)_
+- [ ] Testes + implementação: receitas e orçamento mensal geral + alerta por categoria. **← próximo passo**
 - [ ] **(Etapa separada)** Frontend web de gastos, categorias, receitas e orçamento.
 
 ## Bloco 3 — Telegram

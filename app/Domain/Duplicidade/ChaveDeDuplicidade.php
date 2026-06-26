@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Duplicidade;
 
+use App\Domain\Shared\Normalizador;
 use Carbon\CarbonImmutable;
 
 /**
@@ -49,14 +50,6 @@ final class ChaveDeDuplicidade
 
     private static function normalizarDescricao(string $descricao): string
     {
-        // Colapsa espaços e remove os das pontas.
-        $texto = trim((string) preg_replace('/\s+/', ' ', $descricao));
-
-        $texto = mb_strtolower($texto);
-
-        // Remove acentos de forma determinística (mesmo padrão do RelativeDate).
-        $map = ['á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a', 'ä' => 'a', 'é' => 'e', 'ê' => 'e', 'ë' => 'e', 'í' => 'i', 'ï' => 'i', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o', 'ú' => 'u', 'ü' => 'u', 'ç' => 'c'];
-
-        return strtr($texto, $map);
+        return Normalizador::texto($descricao);
     }
 }

@@ -72,6 +72,11 @@ class Transaction extends Model
         return $this->belongsTo(StatusPagamento::class, 'status_id');
     }
 
+    public function categoria(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'categoria_id');
+    }
+
     public function installments(): HasMany
     {
         return $this->hasMany(Installment::class);

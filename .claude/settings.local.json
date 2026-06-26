@@ -11,7 +11,13 @@
       "Bash(make up *)",
       "Bash(rtk git *)",
       "Bash(rtk ls *)",
-      "Bash(rtk find *)"
+      "Bash(rtk find *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk read *)",
+      "Bash(rtk docker *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(rtk make *)",
+      "Bash(make test *)"
     ]
   }
 }
