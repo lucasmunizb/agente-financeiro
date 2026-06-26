@@ -215,7 +215,7 @@ Comece por [`docs/00-visao-geral.md`](docs/00-visao-geral.md). Destaques:
 | **F2** | Cadastro manual de gastos (status, origem, auditoria) | 🟡 **em andamento** (registro, categorias e lookup prontos; falta editar/cancelar) |
 | **F3** | Receitas · orçamento mensal geral · consumo por categoria | ✅ **Pronto** (alerta por categoria adiado p/ pós-MVP) |
 | **F4–F6** | Telegram (vínculo, auth) · interpretação por IA · correção por conversa | ⬜ |
-| **F7–F9** | Importação de PDF (Itaú) · chat financeiro · dashboard | ⬜ |
+| **F7–F9** | Importação de PDF (Itaú) · chat financeiro · dashboard | 🟡 **em andamento** (tools de consulta com escopo por usuário: gastos, disponível do mês e próximas contas prontas; falta fatura do cartão + guard pós-geração) |
 
 > **Frontend é sempre etapa separada** — mensagens do bot e telas web nunca são construídas junto com a
 > feature de backend correspondente.

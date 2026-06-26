@@ -57,7 +57,11 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 
 ## Bloco 6 — Chat financeiro
 
-- [ ] Testes + implementação: ferramentas de consulta com escopo por usuário.
+- [ ] Testes + implementação: ferramentas de consulta com escopo por usuário (doc 02 §3.2).
+  - [x] `consultar_gastos` (periodo, categoria?, cartao?, status?).
+  - [x] `consultar_disponivel_mes` (mes).
+  - [x] `consultar_proximas_contas` (janela em dias; contas a vencer a partir de hoje).
+  - [ ] `consultar_fatura_cartao` (cartao, competencia).
 - [ ] Testes + implementação: guard pós-geração (nenhum número fora do payload).
 - [ ] Testes + implementação: resposta com fonte/trace.
 - [ ] **(Etapa separada)** Apresentação das respostas no bot/web.
