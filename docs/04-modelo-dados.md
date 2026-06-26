@@ -52,7 +52,7 @@
 ### payment_methods
 | Campos-chave | Notas |
 |---|---|
-| `id`, `tipo` (credito/debito/pix/dinheiro) | Tabela de referência. Toda cobrança tem vínculo com uma forma de pagamento. |
+| `id`, `tipo` (credito/debito/pix/dinheiro/boleto) | Tabela de referência. Toda cobrança tem vínculo com uma forma de pagamento. Só `credito` é em cartão; as demais são "fora de cartão". |
 
 ### status_pagamento
 | Campos-chave | Notas |

@@ -14,13 +14,15 @@ class PaymentMethod extends Model
     public const DEBITO = 'debito';
     public const PIX = 'pix';
     public const DINHEIRO = 'dinheiro';
+    public const BOLETO = 'boleto';
 
-    /** @var list<string> Conjunto fixo de tipos (doc 03 §4.6). */
+    /** @var list<string> Conjunto fixo de tipos (doc 03 §4.6). Boleto é "fora de cartão". */
     public const TIPOS = [
         self::CREDITO,
         self::DEBITO,
         self::PIX,
         self::DINHEIRO,
+        self::BOLETO,
     ];
 
     public $timestamps = false;

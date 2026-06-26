@@ -25,7 +25,7 @@ use Stringable;
  */
 class ExtratorDeGasto implements Agent, Conversational, HasStructuredOutput, HasTools
 {
-    /** Formas de pagamento suportadas (espelha a tabela de referência do domínio). */
+    /** Formas de pagamento suportadas — espelha a tabela de referência `PaymentMethod` (doc 03 §4.6). */
     private const FORMAS = ['credito', 'debito', 'pix', 'dinheiro', 'boleto'];
 
     use Promptable;

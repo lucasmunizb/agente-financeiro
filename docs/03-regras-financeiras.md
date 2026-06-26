@@ -21,7 +21,7 @@ Toda compra parcelada guarda: **valor total**, **valor por parcela**, **dia efet
 | Situação | Regra de vencimento |
 |----------|---------------------|
 | **Compra vinculada a cartão** | Respeita **SEMPRE o vencimento do cartão**. Registra a data da compra, mas o vencimento de cálculo/exibição é o do cartão. |
-| **Compra fora de cartão** (PIX, débito, dinheiro) | Vencimento = **data da parcela / data da compra**. |
+| **Compra fora de cartão** (PIX, débito, dinheiro, boleto) | Vencimento = **data da parcela / data da compra**. |
 | **Cadastro manual parcelado em cartão** | Aceitar **somente se for a 1ª parcela**. Demais linhas: `+1 mês` cada e `+1` na parcela atual. |
 
 ---
@@ -75,7 +75,7 @@ Ressalvas:
 ## 4.6 · Contas, cartões e formas de pagamento
 
 - **Cartões** identificados sempre pelos **4 dígitos finais + descrição** (ex.: "cartão pai"). Limite é **opcional**.
-- Toda cobrança tem vínculo com uma **forma de pagamento**. **Dinheiro não exige conta**; PIX e débito informam a conta (banco + descrição).
+- Toda cobrança tem vínculo com uma **forma de pagamento** (`credito`, `debito`, `pix`, `dinheiro`, `boleto`). **Crédito** é a única em cartão (usa o vencimento do cartão); as demais são **fora de cartão** (vencem na data da compra/parcela). **Dinheiro não exige conta**; PIX e débito informam a conta (banco + descrição).
 - **Datas separadas:** data da compra (sempre), data de vencimento (só cartão), data de pagamento (só ao confirmar pagamento).
 - **Recorrências/assinaturas:** tabela específica com status `ativo`/`cancelado`.
 - **Categoria única:** uma despesa **não** é dividida entre categorias.
