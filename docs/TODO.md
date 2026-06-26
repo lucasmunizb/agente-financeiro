@@ -33,9 +33,9 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [x] Testes + implementação: receitas e orçamento mensal geral + alerta por categoria. _(schema `incomes`/`budgets`; `app/Domain/Receita/ReceitasDoMes`, `app/Domain/Orcamento/` — `Orcamento` puro, `ConsumoDoMes` (total + por categoria), `OrcamentoMensal`; `Shared/PeriodoMensal`. **Alerta por categoria**: decidido entregar só o consumo por categoria; disparo/limiar fica pós-MVP — ver doc 04/08)_
 - [ ] **(Etapa separada)** Frontend web de gastos, categorias, receitas e orçamento.
 
-## Bloco 3 — Telegram
+## Bloco 3 — Telegram 🟡 em andamento
 
-- [ ] Testes + implementação: vínculo (token único), middleware de autenticação, dedupe por `update_id`.
+- [x] Testes + implementação: vínculo (token único), middleware de autenticação, dedupe por `update_id`. _(schema `telegram_links` (token só em hash + expiração; partial unique: 1 ativo por conta / 1 telegram_user_id ativo) e `telegram_updates` (unique `update_id`); `app/Domain/Telegram/`: `GerarTokenDeVinculo`, `VincularTelegram`, `AutenticarTelegram`, `DedupeDeUpdate` (insertOrIgnore). Falta: controller do webhook ligando middleware+dedupe — próximo passo)_
 - [ ] Testes + implementação: roteamento de comandos (registrar/editar/cancelar/buscar).
 - [ ] **(Etapa separada)** Mensagens formatadas do bot (curtas, sem botões).
 
