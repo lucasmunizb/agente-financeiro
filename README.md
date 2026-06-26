@@ -212,8 +212,8 @@ Comece por [`docs/00-visao-geral.md`](docs/00-visao-geral.md). Destaques:
 |---|---|---|
 | **F0** | Bootstrap DevOps (compose, esqueleto, fila, Makefile) | ✅ **Pronto** |
 | **F1** | Domínio financeiro + testes (parcelas, vencimentos, disponível, duplicidade) | ✅ **Pronto** |
-| **F2** | Cadastro manual de gastos (status, origem, auditoria) | 🟡 **em andamento** (schema + `audit_log` + registro prontos; falta categorias) |
-| **F3** | Receitas · orçamento mensal + alerta por categoria | ⬜ próximo |
+| **F2** | Cadastro manual de gastos (status, origem, auditoria) | 🟡 **em andamento** (registro, categorias e lookup prontos; falta editar/cancelar) |
+| **F3** | Receitas · orçamento mensal geral · consumo por categoria | ✅ **Pronto** (alerta por categoria adiado p/ pós-MVP) |
 | **F4–F6** | Telegram (vínculo, auth) · interpretação por IA · correção por conversa | ⬜ |
 | **F7–F9** | Importação de PDF (Itaú) · chat financeiro · dashboard | ⬜ |
 
