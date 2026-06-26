@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    // Telegram (doc 06). Em produção, *_FILE (Docker Secrets) são resolvidos
+    // para env pelo entrypoint antes do boot — aqui basta ler o env.
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+    ],
+
 ];

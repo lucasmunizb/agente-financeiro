@@ -35,7 +35,7 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 
 ## Bloco 3 — Telegram 🟡 em andamento
 
-- [x] Testes + implementação: vínculo (token único), middleware de autenticação, dedupe por `update_id`. _(schema `telegram_links` (token só em hash + expiração; partial unique: 1 ativo por conta / 1 telegram_user_id ativo) e `telegram_updates` (unique `update_id`); `app/Domain/Telegram/`: `GerarTokenDeVinculo`, `VincularTelegram`, `AutenticarTelegram`, `DedupeDeUpdate` (insertOrIgnore). Falta: controller do webhook ligando middleware+dedupe — próximo passo)_
+- [x] Testes + implementação: vínculo (token único), middleware de autenticação, dedupe por `update_id`. _(schema `telegram_links` (token só em hash + expiração; partial unique: 1 ativo por conta / 1 telegram_user_id ativo) e `telegram_updates` (unique `update_id`); `app/Domain/Telegram/`: `GerarTokenDeVinculo`, `VincularTelegram`, `AutenticarTelegram`, `DedupeDeUpdate` (insertOrIgnore). Webhook ligando segredo+dedupe+autenticação: `app/Http/Controllers/TelegramWebhookController.php` (adaptador fino, sempre 200), `app/Http/Middleware/VerificaSegredoTelegram.php` (header `X-Telegram-Bot-Api-Secret-Token`, CSRF isento), ponto de extensão `app/Domain/Telegram/RoteadorDeMensagem.php` + default inerte `RoteadorInerte`)_
 - [ ] Testes + implementação: roteamento de comandos (registrar/editar/cancelar/buscar).
 - [ ] **(Etapa separada)** Mensagens formatadas do bot (curtas, sem botões).
 

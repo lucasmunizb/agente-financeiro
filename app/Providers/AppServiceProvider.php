@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Domain\Telegram\RoteadorDeMensagem;
+use App\Domain\Telegram\RoteadorInerte;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +13,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Roteador default inerte até o roteamento de comandos (TODO Bloco 3).
+        $this->app->bind(RoteadorDeMensagem::class, RoteadorInerte::class);
     }
 
     /**
