@@ -19,7 +19,7 @@ O coração é um **domínio financeiro determinístico e auditável**. A IA int
 ![Laravel AI SDK](https://img.shields.io/badge/laravel%2Fai-Agents%20%7C%20Tools-FF2D20?style=flat-square)
 ![Tesseract](https://img.shields.io/badge/Tesseract-OCR-5C3EE8?style=flat-square)
 ![Swarm](https://img.shields.io/badge/Prod-Docker%20Swarm%20%2B%20Secrets-2496ED?style=flat-square)
-![Status](https://img.shields.io/badge/Fase-F0%20Bootstrap%20✓-success?style=flat-square)
+![Status](https://img.shields.io/badge/Fase-F2%20Cadastro%20manual%20🟡-blue?style=flat-square)
 
 </div>
 
@@ -211,8 +211,9 @@ Comece por [`docs/00-visao-geral.md`](docs/00-visao-geral.md). Destaques:
 | Fase | Entrega | Status |
 |---|---|---|
 | **F0** | Bootstrap DevOps (compose, esqueleto, fila, Makefile) | ✅ **Pronto** |
-| **F1** | Domínio financeiro + testes (parcelas, vencimentos, disponível, duplicidade) | ⬜ próximo |
-| **F2–F3** | Cadastro manual · receitas · orçamento + alerta | ⬜ |
+| **F1** | Domínio financeiro + testes (parcelas, vencimentos, disponível, duplicidade) | ✅ **Pronto** |
+| **F2** | Cadastro manual de gastos (status, origem, auditoria) | 🟡 **em andamento** (schema + `audit_log` + registro prontos; falta categorias) |
+| **F3** | Receitas · orçamento mensal + alerta por categoria | ⬜ próximo |
 | **F4–F6** | Telegram (vínculo, auth) · interpretação por IA · correção por conversa | ⬜ |
 | **F7–F9** | Importação de PDF (Itaú) · chat financeiro · dashboard | ⬜ |
 

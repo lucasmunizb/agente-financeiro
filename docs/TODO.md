@@ -6,30 +6,30 @@
 
 Sequência prática, **sempre test-first**. Cada item de backend só é dado como concluído com **testes passando e cobertura**. O frontend correspondente é tarefa separada, executada depois — marcado abaixo como **(Etapa separada)**.
 
-## Bloco 0 — Fundações e DevOps
+## Bloco 0 — Fundações e DevOps ✅
 
-- [ ] Rodar o bootstrap criando tudo por contêiner (esqueleto Laravel via contêiner; docker compose com `app`, `worker` e `postgres`; Makefile encapsulando `docker compose exec`). Nada instalado localmente além do `make`.
-- [ ] Configurar PostgreSQL, fila no driver `database`, worker dedicado, scheduler e healthchecks.
-- [ ] Configurar logs estruturados e `ai_usage_log` (sem dados sensíveis). Deixar `QUEUE_CONNECTION` e provedores trocáveis por env.
-- [ ] Preparar produção: `docker-stack.yml` (Docker Swarm) com Docker Secrets em `/run/secrets` e entrypoint que os carrega; sem `.env` em produção (`.env` só em dev).
-- [ ] Documentar o caminho de escala (Redis/Horizon, bot dedicado, Prometheus/Grafana) como perfil de produção, sem implementar agora.
-- [ ] Criar `CLAUDE.md`, docs separadas e as skills iniciais: `skill-creator`, `laravel-backend` e `devops` (as de IA/bot e frontend ficam para depois, criadas com a `skill-creator`).
-- [ ] Definir regra: a IA nunca faz push no GitHub; commits locais apenas, sem operações em remoto sem ordem explícita.
+- [x] Rodar o bootstrap criando tudo por contêiner (esqueleto Laravel via contêiner; docker compose com `app`, `worker` e `postgres`; Makefile encapsulando `docker compose exec`). Nada instalado localmente além do `make`.
+- [x] Configurar PostgreSQL, fila no driver `database`, worker dedicado, scheduler e healthchecks.
+- [ ] Configurar logs estruturados e `ai_usage_log` (sem dados sensíveis). Deixar `QUEUE_CONNECTION` e provedores trocáveis por env. _(`ai_usage_log` fica para o Bloco 4)_
+- [x] Preparar produção: `docker-stack.yml` (Docker Swarm) com Docker Secrets em `/run/secrets` e entrypoint que os carrega; sem `.env` em produção (`.env` só em dev).
+- [x] Documentar o caminho de escala (Redis/Horizon, bot dedicado, Prometheus/Grafana) como perfil de produção, sem implementar agora.
+- [x] Criar `CLAUDE.md`, docs separadas e as skills iniciais: `skill-creator`, `laravel-backend` e `devops` (as de IA/bot e frontend ficam para depois, criadas com a `skill-creator`).
+- [x] Definir regra: a IA nunca faz push no GitHub; commits locais apenas, sem operações em remoto sem ordem explícita.
 
-## Bloco 1 — Domínio financeiro (test-first)
+## Bloco 1 — Domínio financeiro (test-first) ✅
 
-- [ ] Testes + implementação: representação monetária (centavos inteiros) e formatação pt-BR.
-- [ ] Testes + implementação: resolução de datas relativas (fuso SP).
-- [ ] Testes + implementação: cartões, contas, formas de pagamento, status (tabela de referência).
-- [ ] Testes + implementação: parcelas e geração de parcelas futuras (regras da seção 4.1).
-- [ ] Testes + implementação: vencimentos (cartão vs. fora de cartão).
-- [ ] Testes + implementação: fórmula do disponível do mês.
-- [ ] Testes + implementação: detecção de duplicidade.
+- [x] Testes + implementação: representação monetária (centavos inteiros) e formatação pt-BR. _(`app/Domain/Shared/Money.php`)_
+- [x] Testes + implementação: resolução de datas relativas (fuso SP). _(`app/Domain/Calendar/RelativeDate.php`)_
+- [x] Testes + implementação: cartões, contas, formas de pagamento, status (tabela de referência). _(migrations + models + ajustes em `users`)_
+- [x] Testes + implementação: parcelas e geração de parcelas futuras (regras da seção 4.1). _(`app/Domain/Parcelamento/GeradorDeParcelas.php`)_
+- [x] Testes + implementação: vencimentos (cartão vs. fora de cartão). _(`app/Domain/Vencimento/CalculadoraDeVencimento.php`)_
+- [x] Testes + implementação: fórmula do disponível do mês. _(`app/Domain/Disponivel/DisponivelDoMes.php`)_
+- [x] Testes + implementação: detecção de duplicidade. _(`app/Domain/Duplicidade/DetectorDeDuplicidade.php`)_
 
-## Bloco 2 — Cadastro manual e receitas
+## Bloco 2 — Cadastro manual e receitas 🟡 em andamento
 
-- [ ] Testes + implementação: CRUD de gastos com status, origem e auditoria.
-- [ ] Testes + implementação: categorias + palavras-chave + aliases.
+- [ ] Testes + implementação: CRUD de gastos com status, origem e auditoria. _(parcial: schema `transactions`/`installments`, `audit_log` e registro de gasto manual prontos — `app/Domain/Gasto/RegistrarGastoManual.php`; falta editar/cancelar)_
+- [ ] Testes + implementação: categorias + palavras-chave + aliases. **← próximo passo**
 - [ ] Testes + implementação: receitas e orçamento mensal geral + alerta por categoria.
 - [ ] **(Etapa separada)** Frontend web de gastos, categorias, receitas e orçamento.
 

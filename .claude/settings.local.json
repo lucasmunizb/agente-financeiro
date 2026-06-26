@@ -8,7 +8,10 @@
       "Bash(chmod +x scripts/bootstrap.sh docker/entrypoint.sh .githooks/pre-push)",
       "Bash(docker compose *)",
       "Bash(bash *)",
-      "Bash(make up *)"
+      "Bash(make up *)",
+      "Bash(rtk git *)",
+      "Bash(rtk ls *)",
+      "Bash(rtk find *)"
     ]
   }
 }
