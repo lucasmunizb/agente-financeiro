@@ -26,9 +26,9 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [x] Testes + implementação: fórmula do disponível do mês. _(`app/Domain/Disponivel/DisponivelDoMes.php`)_
 - [x] Testes + implementação: detecção de duplicidade. _(`app/Domain/Duplicidade/DetectorDeDuplicidade.php`)_
 
-## Bloco 2 — Cadastro manual e receitas 🟡 em andamento
+## Bloco 2 — Cadastro manual e receitas ✅ (backend; frontend é etapa separada)
 
-- [ ] Testes + implementação: CRUD de gastos com status, origem e auditoria. _(parcial: schema `transactions`/`installments`, `audit_log` e registro de gasto manual prontos — `app/Domain/Gasto/RegistrarGastoManual.php`; falta editar/cancelar)_
+- [x] Testes + implementação: CRUD de gastos com status, origem e auditoria. _(`app/Domain/Gasto/`: `RegistrarGastoManual` (criar), `EditarGastoManual` (regenera parcelas; bloqueia se houver parcela paga), `CancelarGastoManual` (status `cancelado`, preserva pagas, mantém linha), `ExcluirGastoManual` (soft delete LGPD); montagem de parcelas extraída em `MontadorDeParcelas`; auditoria criar/editar/cancelar/excluir)_
 - [x] Testes + implementação: categorias + palavras-chave + aliases. _(schema `categories`/`category_keywords`/`merchant_aliases` + FK em `transactions`; lookup determinístico `app/Domain/Categoria/` — classificador, lookup e aprendizado por correção)_
 - [x] Testes + implementação: receitas e orçamento mensal geral + alerta por categoria. _(schema `incomes`/`budgets`; `app/Domain/Receita/ReceitasDoMes`, `app/Domain/Orcamento/` — `Orcamento` puro, `ConsumoDoMes` (total + por categoria), `OrcamentoMensal`; `Shared/PeriodoMensal`. **Alerta por categoria**: decidido entregar só o consumo por categoria; disparo/limiar fica pós-MVP — ver doc 04/08)_
 - [ ] **(Etapa separada)** Frontend web de gastos, categorias, receitas e orçamento.

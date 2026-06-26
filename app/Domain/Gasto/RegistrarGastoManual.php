@@ -7,11 +7,8 @@ namespace App\Domain\Gasto;
 use App\Domain\Calendar\RelativeDate;
 use App\Domain\Duplicidade\ChaveDeDuplicidade;
 use App\Domain\Duplicidade\DetectorDeDuplicidade;
-use App\Domain\Parcelamento\GeradorDeParcelas;
 use App\Domain\Shared\Money;
-use App\Domain\Vencimento\CalculadoraDeVencimento;
 use App\Models\AuditLog;
-use App\Models\Card;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use Carbon\CarbonImmutable;
@@ -104,34 +101,7 @@ final class RegistrarGastoManual
      */
     private function montarParcelas(DadosGastoManual $dados, CarbonImmutable $hoje): array
     {
-        $primeiroVencimento = $this->primeiroVencimento($dados);
-        $parcelas = GeradorDeParcelas::gerar($dados->valorTotalCents, $dados->parcelas, $primeiroVencimento);
-
-        return array_map(
-            fn ($parcela) => new ParcelaPrevia(
-                numero: $parcela->numero,
-                total: $parcela->total,
-                vencimento: $parcela->vencimento,
-                valor: $parcela->valor,
-                statusCodigo: StatusDaParcela::para($parcela->vencimento, $hoje),
-            ),
-            $parcelas,
-        );
-    }
-
-    /**
-     * Resolve o vencimento da 1ª parcela: cartão respeita o ciclo da fatura;
-     * fora de cartão vence na data da compra.
-     */
-    private function primeiroVencimento(DadosGastoManual $dados): CarbonImmutable
-    {
-        if ($dados->cardId !== null) {
-            $card = Card::findOrFail($dados->cardId);
-
-            return CalculadoraDeVencimento::cartao($dados->dataCompra, $card->dia_fechamento, $card->dia_vencimento);
-        }
-
-        return CalculadoraDeVencimento::foraDeCartao($dados->dataCompra);
+        return (new MontadorDeParcelas)->montar($dados, $hoje);
     }
 
     private function ehDuplicado(DadosGastoManual $dados): bool
