@@ -42,7 +42,7 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 ## Bloco 4 — IA de interpretação (Laravel AI SDK)
 
 - [ ] Instalar e configurar a Laravel AI SDK (`laravel/ai`); publicar `config/ai.php` e migrations; definir provedor padrão (Anthropic) e array de failover.
-- [ ] Testes + implementação: Agents (`make:agent`) de intenção, extração e redação.
+- [x] Testes + implementação: Agents (`make:agent`) de intenção, extração e redação. _(`app/Ai/Agents/`: `ClassificadorDeIntencao` (papel 1, structured → enum `App\Domain\IA\Intencao`, fallback DESCONHECIDO), `ExtratorDeGasto` (papel 2, structured → `ResultadoDaExtracao`/`GastoExtraido` **crus**: valor/data como texto, IA não normaliza; barreira 1 = campo obrigatório ausente vira esclarecimento; crédito exige cartão §3.4), `RedatorDeResposta` (papel 3, texto a partir do payload já calculado). Testado com os fakes da SDK (`Ai::fakeAgent`/`assertAgentWasPrompted`), determinístico e offline. **Adiado:** normalização determinística + confirmação (item 3); guard pós-geração (barreira 4) no Bloco 6)_
 - [ ] Testes + implementação: extração via `HasStructuredOutput` (schema validado) com confirmação.
 - [ ] Testes + implementação: Tools (`make:tool`) de consulta com escopo por usuário + guard pós-geração.
 - [ ] Testes + implementação: histórico via `RemembersConversations` (expurgo 60 dias), `ai_usage_log` e failover. Usar fakes da SDK nos testes.

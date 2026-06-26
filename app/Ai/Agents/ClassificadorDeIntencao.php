@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Ai\Agents;
+
+use App\Domain\IA\Intencao;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Contracts\HasTools;
+use Laravel\Ai\Messages\Message;
+use Laravel\Ai\Promptable;
+use Laravel\Ai\Responses\StructuredAgentResponse;
+use Stringable;
+
+/**
+ * Papel 1 da IA (doc 02 §3.1): classificar a intenção do usuário. Texto livre → uma
+ * intenção do enum `Intencao`. NÃO extrai valores nem calcula dinheiro; quando a saída
+ * não corresponde a uma intenção conhecida, cai em DESCONHECIDO (barreira 1, §3.3).
+ * Implementado via Laravel AI SDK (regra inviolável 8).
+ */
+class ClassificadorDeIntencao implements Agent, Conversational, HasStructuredOutput, HasTools
+{
+    use Promptable;
+
+    /**
+     * Classifica o texto do usuário em uma intenção. Saída desconhecida nunca vira chute.
+     */
+    public function classificar(string $texto): Intencao
+    {
+        /** @var StructuredAgentResponse $resposta */
+        $resposta = $this->prompt($texto);
+
+        $dados = $resposta->toArray();
+
+        return Intencao::tentar($dados['intencao'] ?? null);
+    }
+
+    public function instructions(): Stringable|string
+    {
+        return <<<'TXT'
+        Você classifica a intenção de uma mensagem sobre finanças pessoais, em português do Brasil.
+
+        Responda SOMENTE com a intenção, escolhendo um destes valores:
+        - registrar: o usuário quer registrar um gasto ou compra.
+        - consultar: o usuário quer saber saldos, gastos, faturas, disponível do mês, próximas contas.
+        - editar: o usuário quer alterar um lançamento já feito.
+        - cancelar: o usuário quer cancelar/estornar um lançamento.
+        - importar: o usuário quer importar uma fatura/PDF.
+        - desconhecido: a mensagem não corresponde claramente a nenhuma das anteriores.
+
+        Na dúvida, use "desconhecido" — NUNCA invente uma intenção.
+        Você apenas classifica: não extraia valores, não resolva datas e NÃO calcule nada.
+        TXT;
+    }
+
+    /**
+     * @return Message[]
+     */
+    public function messages(): iterable
+    {
+        return [];
+    }
+
+    /**
+     * @return \Laravel\Ai\Contracts\Tool[]
+     */
+    public function tools(): iterable
+    {
+        return [];
+    }
+
+    /**
+     * @return array<string, \Illuminate\JsonSchema\Types\Type>
+     */
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'intencao' => $schema->string()
+                ->enum(Intencao::valores())
+                ->required()
+                ->description('A intenção do usuário. Use "desconhecido" quando não for nenhuma das demais.'),
+        ];
+    }
+}
