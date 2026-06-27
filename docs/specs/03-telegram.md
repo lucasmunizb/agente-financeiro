@@ -11,7 +11,7 @@
 | Campo | Valor |
 |---|---|
 | **Bloco · Fase** | Bloco 3 · F4 |
-| **Status** | 🟡 Em andamento |
+| **Status** | ✅ Concluído (backend) — frontend movido para [[spec-FE-frontend-stitch]] |
 | **Depende de** | [[spec-00-fundacoes-devops]] |
 | **Habilita** | [[spec-04-ia-interpretacao]] · [[spec-05-chat-financeiro]] |
 | **Fonte de verdade** | seção 7 do escopo · [`docs/06-telegram.md`](../06-telegram.md) · [`docs/04-modelo-dados.md`](../04-modelo-dados.md) |
@@ -40,7 +40,7 @@ extensão — sem que nenhuma regra de negócio nem IA rode neste adaptador.
   - **Execução** de cada comando = extração via IA + confirmação → [[spec-04-ia-interpretacao]]
     (Bloco 4) e o chat de consulta → [[spec-05-chat-financeiro]].
   - **Mensagens formatadas do bot** (curtas, sem botões) e **vínculo via bot**
-    (token + `request_contact`) — **frontend**, etapa separada (regra 3).
+    (token + `request_contact`) — **frontend** consolidado em [[spec-FE-frontend-stitch]] (regra 3).
   - Anexos PDF, lembretes/alertas, preferências pelo bot — fora desta etapa / pós-MVP.
 
 ## 3. Cenários de aceite (Given-When-Then)
@@ -211,11 +211,14 @@ Borda HTTP:
 > IA**, logo nenhum fake da SDK é necessário; o determinismo é nativo.
 
 ## 8. Backend agora · Frontend depois
-| Backend (esta etapa) | Frontend (etapa separada e posterior) |
+> Todo o frontend desta etapa foi **consolidado** em [[spec-FE-frontend-stitch]] (regra 3).
+> A tabela abaixo é o registro do que foi adiado para lá.
+
+| Backend (esta etapa) | Frontend → [[spec-FE-frontend-stitch]] |
 |---|---|
 | Token de vínculo (hash + expiração), consumo atômico, um ativo por conta | **Fluxo de vínculo via bot**: receber o token, pedir telefone via `request_contact`, confirmar |
 | Webhook seguro (segredo, CSRF isento, sempre 200), dedupe, autenticação | **Mensagens formatadas do bot**: respostas **curtas, sem botões** (doc 06 §2) |
-| Classificação determinística + roteamento por intenção (manipuladores inertes) | Redação das respostas de cada comando (depende de Bloco 4/5) |
+| Classificação determinística + roteamento por intenção + ligação aos Blocos 4/5 (worker) | Redação das respostas de cada comando + tela web de vínculo do Telegram |
 
 ## 9. Definition of Done
 - [x] Cenários de §3 cobertos por testes que falhavam antes e agora passam.
@@ -223,13 +226,13 @@ Borda HTTP:
       zero IA) — com teste para cada uma crítica.
 - [x] Sem segredo/PDF/dado sensível persistido ou commitado (só telefone do vínculo).
 - [x] Commit local atômico, em português, separando backend de frontend.
-- [ ] **Mensagens do bot e vínculo via bot** (frontend) — pendente.
+- [x] **Frontend** (mensagens do bot + vínculo via bot) — **movido** para [[spec-FE-frontend-stitch]] (regra 3).
 - [x] §10 preenchida com os artefatos reais.
 
 ## 10. Estado atual / artefatos
-- **Status:** 🟡 Em andamento — backend de **vínculo + webhook + roteamento** concluído;
-  a **apresentação (mensagens do bot)** e o **fluxo de vínculo via bot** são frontend e
-  ficam pendentes.
+- **Status:** ✅ Concluído (backend) — vínculo + webhook + roteamento + ligação aos Blocos 4/5.
+  Toda a **apresentação** (mensagens do bot, fluxo de vínculo via bot, tela web de vínculo)
+  foi consolidada em [[spec-FE-frontend-stitch]] (regra 3).
 - **Entregue (✅):**
   - Migrations: `database/migrations/2026_06_26_000007_create_telegram_links_table.php`
     (token só em hash, expiração, partial uniques: 1 ativo por conta / 1 `telegram_user_id`

@@ -30,14 +30,20 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 | 00 | [Fundações e DevOps](00-fundacoes-devops.md) | ✅ | — | [`11-devops.md`](../11-devops.md) |
 | 01 | [Domínio financeiro](01-dominio-financeiro.md) | ✅ | 00 | [`03-regras-financeiras.md`](../03-regras-financeiras.md) |
 | 02 | [Cadastro manual + receitas + orçamento](02-cadastro-manual-receitas.md) | ✅ | 01 | [`08-categorias.md`](../08-categorias.md) |
-| 03 | [Telegram (vínculo, webhook, roteamento)](03-telegram.md) | 🟡 | 00 | [`06-telegram.md`](../06-telegram.md) |
+| 03 | [Telegram (vínculo, webhook, roteamento)](03-telegram.md) | ✅ | 00 | [`06-telegram.md`](../06-telegram.md) |
 | 04 | [IA de interpretação (Laravel AI SDK)](04-ia-interpretacao.md) | ✅ | 01, 02, 03 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
 | 05 | [Chat financeiro (tools + guard)](05-chat-financeiro.md) | ✅ | 01, 03, 04 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
 | 06 | [Dashboard (agregações do mês)](06-dashboard.md) | ⬜ | 02, 03 | [`05-arquitetura.md`](../05-arquitetura.md) |
+| **FE** | [**Frontend (Stitch) — todas as telas**](FE-frontend-stitch.md) | ⬜ | 02–06 | [`05-arquitetura.md`](../05-arquitetura.md) · [`06-telegram.md`](../06-telegram.md) |
 | 07 | [Importação de PDF (Itaú) — última feature](07-importacao-pdf.md) | ⬜ | 01 | [`07-importacao-pdf.md`](../07-importacao-pdf.md) |
 | 08 | [Segurança e LGPD — portão de fechamento](08-seguranca-lgpd.md) | ⬜ | todas | [`09-nfr-seguranca-lgpd.md`](../09-nfr-seguranca-lgpd.md) |
 
 **Legenda:** ✅ concluído · 🟡 em andamento · ⬜ planejado.
+
+> A **fase FE** consolida **todo o frontend** adiado das etapas anteriores (regra 3) em um
+> único spec orientado ao **Stitch** — um prompt por tela + design system comum. Roda
+> **depois** do backend das features (00–06) e **antes** da importação de PDF (07); as telas
+> da 07 ficam no mini-TODO da FE marcadas para gerar **após** o backend da 07.
 
 > O **spec 08** é **transversal**: não é uma feature, e sim o **portão de fechamento** —
 > code review de segurança, pen test e testes adversariais de prompt. Roda **depois** das

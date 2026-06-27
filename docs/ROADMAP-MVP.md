@@ -26,7 +26,7 @@
 | **F8** | Dashboard (dados agregados). | F2, F3 | Agregações do mês disponíveis. |
 | **F9** | Importação de PDF (Itaú): pré-importação, extração, descarte, duplicidade. **Movida para o fim** (alto valor/alto risco): entregue após todas as demais features. | F1 | Itens extraídos para revisão; PDF descartado. |
 | **F10** | **Segurança e LGPD — portão de fechamento** (transversal): code review de segurança, pen test e testes adversariais de prompt (injeção/jailbreak/exfiltração). | todas | Suíte adversarial verde; pen test sem achado crítico; LGPD verificada. |
-| **FE** | Frontends (web + formatação do bot) por feature — etapas separadas. | Backend da feature pronto | Apresentação construída após o backend. |
+| **FE** | Frontends (web + formatação do bot) — **consolidados** em um único spec orientado ao Stitch (um prompt por tela + design system): [`docs/specs/FE-frontend-stitch.md`](specs/FE-frontend-stitch.md). Executada **após** o backend das features (F1–F8) e **antes** da importação de PDF (F9); as telas da F9 são geradas após o backend dela. | Backend das features pronto | Telas geradas no Stitch a partir dos prompts. |
 
 ## MVP em 10 etapas (backend vs. frontend)
 

@@ -10,6 +10,11 @@
 
 Sequência prática, **sempre test-first**. Cada item de backend só é dado como concluído com **testes passando e cobertura**. O frontend correspondente é tarefa separada, executada depois — marcado abaixo como **(Etapa separada)**.
 
+> **Todo o frontend** (telas web + mensagens do bot) está **consolidado** na fase **FE**:
+> [`docs/specs/FE-frontend-stitch.md`](specs/FE-frontend-stitch.md) — um prompt de Stitch por
+> tela + design system. Executada após o backend das features e **antes** da importação de PDF
+> (Bloco 7). Os itens **(Etapa separada)** abaixo apontam para lá.
+
 ## Bloco 0 — Fundações e DevOps ✅
 
 - [x] Rodar o bootstrap criando tudo por contêiner (esqueleto Laravel via contêiner; docker compose com `app`, `worker` e `postgres`; Makefile encapsulando `docker compose exec`). Nada instalado localmente além do `make`.
@@ -37,11 +42,11 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [x] Testes + implementação: receitas e orçamento mensal geral + alerta por categoria. _(schema `incomes`/`budgets`; `app/Domain/Receita/ReceitasDoMes`, `app/Domain/Orcamento/` — `Orcamento` puro, `ConsumoDoMes` (total + por categoria), `OrcamentoMensal`; `Shared/PeriodoMensal`. **Alerta por categoria**: decidido entregar só o consumo por categoria; disparo/limiar fica pós-MVP — ver doc 04/08)_
 - [ ] **(Etapa separada)** Frontend web de gastos, categorias, receitas e orçamento.
 
-## Bloco 3 — Telegram 🟡 em andamento
+## Bloco 3 — Telegram ✅ (backend; frontend → fase FE)
 
 - [x] Testes + implementação: vínculo (token único), middleware de autenticação, dedupe por `update_id`. _(schema `telegram_links` (token só em hash + expiração; partial unique: 1 ativo por conta / 1 telegram_user_id ativo) e `telegram_updates` (unique `update_id`); `app/Domain/Telegram/`: `GerarTokenDeVinculo`, `VincularTelegram`, `AutenticarTelegram`, `DedupeDeUpdate` (insertOrIgnore). Webhook ligando segredo+dedupe+autenticação: `app/Http/Controllers/TelegramWebhookController.php` (adaptador fino, sempre 200), `app/Http/Middleware/VerificaSegredoTelegram.php` (header `X-Telegram-Bot-Api-Secret-Token`, CSRF isento), ponto de extensão `app/Domain/Telegram/RoteadorDeMensagem.php` + default inerte `RoteadorInerte`)_
 - [x] Testes + implementação: roteamento de comandos (registrar/editar/cancelar/buscar). _(roteamento **determinístico**, sem IA/sem FE: `app/Domain/Telegram/` — `Comando` (enum de intenção), `ComandoRecebido` (VO), `ClassificadorDeComando` (texto → intenção + argumentos brutos por slash-command/`@bot`/palavra-chave inicial; texto livre → DESCONHECIDO preservando o texto íntegro para a IA), `ManipuladorDeComando` (ponto de extensão por intenção) + `ManipuladorInerte`, `RoteadorDeComandos` (despacha por mapa de manipuladores, fallback no padrão; `naoVinculado` no-op). `RoteadorInerte` removido; rebind em `AppServiceProvider`. **Adiado:** execução de cada comando = extração via IA + confirmação (Bloco 4) e ligação ao domínio financeiro; mensagens do bot e vínculo via bot = FE)_
-- [ ] **(Etapa separada)** Mensagens formatadas do bot (curtas, sem botões).
+- [ ] **(Etapa separada → fase FE)** Mensagens formatadas do bot (curtas, sem botões) + tela web de vínculo do Telegram.
 
 ## Bloco 4 — IA de interpretação (Laravel AI SDK)
 
