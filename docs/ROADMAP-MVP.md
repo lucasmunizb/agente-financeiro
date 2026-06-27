@@ -1,6 +1,10 @@
 # Roadmap do MVP (backend-first)
 
 > Fonte de verdade: seções 13 e 14 do escopo final.
+>
+> **Cada fase tem um spec** (ponto de partida para implementar test-first) em
+> [`docs/specs/`](specs/README.md). A numeração dos specs segue os Blocos do
+> [`TODO.md`](TODO.md).
 
 ## Lembrete de processo (vale para todo o roadmap)
 

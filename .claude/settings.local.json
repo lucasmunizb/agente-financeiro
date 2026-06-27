@@ -19,7 +19,8 @@
       "Bash(rtk make *)",
       "Bash(make test *)",
       "Bash(make artisan *)",
-      "Bash(make migrate *)"
+      "Bash(make migrate *)",
+      "Bash(awk '/## Bloco 4/,/## Bloco 5/' docs/TODO.md)"
     ]
   }
 }

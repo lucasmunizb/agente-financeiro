@@ -1,6 +1,10 @@
 # TODO completo para iniciar o desenvolvimento
 
 > Fonte de verdade: seção 18 do escopo final.
+>
+> **Trabalhamos orientados a spec.** Cada Bloco abaixo tem um spec autocontido (ponto de
+> partida para implementar test-first) em [`docs/specs/`](specs/README.md). Este TODO é o
+> checklist de progresso; o spec é o "como começar".
 
 ## Como usar este TODO
 

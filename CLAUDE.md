@@ -110,6 +110,13 @@ Runtime do MVP = **3 contêineres**: `app` (HTTP: API + webhook Telegram), `work
 
 ## 5. Índice
 
+### Specs (`/docs/specs`) — ponto de partida de cada etapa
+Desenvolvimento **orientado a spec**: cada etapa (Bloco do roadmap) tem um spec
+autocontido (objetivo, cenários Given-When-Then, barreiras/invariantes, contratos do
+domínio, plano de testes test-first e Definition of Done). **Comece sempre por aqui**:
+[`docs/specs/README.md`](docs/specs/README.md). Os docs de referência abaixo continuam a
+**fonte de verdade detalhada** — o spec aponta para eles.
+
 ### Documentação (`/docs`)
 - [`00-visao-geral.md`](docs/00-visao-geral.md) — visão do produto e índice
 - [`01-decisoes-estruturais.md`](docs/01-decisoes-estruturais.md) — stack e fundações
