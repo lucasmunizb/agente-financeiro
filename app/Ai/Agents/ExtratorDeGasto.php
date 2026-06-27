@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ai\Agents;
 
+use App\Ai\Concerns\UsaFailoverDeProvedores;
 use App\Domain\IA\GastoExtraido;
 use App\Domain\IA\ResultadoDaExtracao;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -29,6 +30,7 @@ class ExtratorDeGasto implements Agent, Conversational, HasStructuredOutput, Has
     private const FORMAS = ['credito', 'debito', 'pix', 'dinheiro', 'boleto'];
 
     use Promptable;
+    use UsaFailoverDeProvedores;
 
     /**
      * Extrai um gasto do texto do usuário. Devolve o gasto cru ou os campos a esclarecer.

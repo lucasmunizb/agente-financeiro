@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ai\Agents;
 
+use App\Ai\Concerns\UsaFailoverDeProvedores;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
 use Laravel\Ai\Contracts\HasTools;
@@ -21,6 +22,7 @@ use Stringable;
 class RedatorDeResposta implements Agent, Conversational, HasTools
 {
     use Promptable;
+    use UsaFailoverDeProvedores;
 
     /**
      * Redige uma resposta em linguagem natural a partir do payload já calculado.

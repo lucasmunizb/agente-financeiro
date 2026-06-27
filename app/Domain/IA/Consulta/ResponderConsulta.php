@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Domain\IA\Consulta;
 
 use App\Ai\Agents\AssistenteDeConsulta;
+use App\Domain\IA\Custo\CalculadoraDeCustoIA;
+use App\Domain\IA\Custo\RegistrarUsoDeIA;
+use App\Domain\IA\Custo\TipoDeUsoIA;
+use App\Domain\IA\Custo\UsoDeIA;
 use App\Domain\IA\Guard\GuardPosGeracao;
 use App\Models\User;
 
@@ -27,7 +31,11 @@ final class ResponderConsulta
     /** Fallback seguro: não cita nenhum valor nem data. */
     private const FALLBACK = 'Não consegui confirmar os números com segurança agora. Pode reformular a pergunta?';
 
-    public function __construct(private readonly GuardPosGeracao $guard) {}
+    public function __construct(
+        private readonly GuardPosGeracao $guard,
+        private readonly RegistrarUsoDeIA $registrarUso,
+        private readonly CalculadoraDeCustoIA $custo,
+    ) {}
 
     public function responder(User $user, string $pergunta): RespostaDaConsulta
     {
@@ -37,7 +45,11 @@ final class ResponderConsulta
         for ($tentativa = 1; $tentativa <= self::MAX_TENTATIVAS; $tentativa++) {
             $coletor->limpar();
 
-            $texto = trim($agente->prompt($pergunta)->text);
+            $inicio = microtime(true);
+            $resposta = $agente->prompt($pergunta);
+            $this->registrarUsoDaChamada($user, $resposta, $inicio);
+
+            $texto = trim($resposta->text);
             $veredito = $this->guard->validar($texto, $coletor->payloadCombinado());
 
             if ($veredito->aprovado) {
@@ -56,5 +68,29 @@ final class ResponderConsulta
             fontes: $coletor->fontes(),
             tentativas: self::MAX_TENTATIVAS,
         );
+    }
+
+    /**
+     * Registra UMA chamada de IA do chat em ai_usage_log (doc 02 §3.6). Cada geração é uma
+     * chamada (logo, um custo): regenerar pelo guard gera mais de uma linha. Só metadados —
+     * tokens, custo estimado, latência —, nunca o conteúdo da mensagem.
+     */
+    private function registrarUsoDaChamada(User $user, object $resposta, float $inicio): void
+    {
+        $provider = $resposta->meta->provider ?? config('ai.default');
+        $model = $resposta->meta->model ?? '';
+        $tokensEntrada = $resposta->usage->promptTokens;
+        $tokensSaida = $resposta->usage->completionTokens;
+
+        $this->registrarUso->registrar(new UsoDeIA(
+            provider: $provider,
+            model: $model,
+            tokensEntrada: $tokensEntrada,
+            tokensSaida: $tokensSaida,
+            custoEstimadoCents: $this->custo->centavos($provider, $model, $tokensEntrada, $tokensSaida),
+            latenciaMs: (int) round((microtime(true) - $inicio) * 1000),
+            tipo: TipoDeUsoIA::MENSAGEM,
+            userId: $user->id,
+        ));
     }
 }

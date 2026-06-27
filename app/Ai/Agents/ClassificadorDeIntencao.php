@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ai\Agents;
 
+use App\Ai\Concerns\UsaFailoverDeProvedores;
 use App\Domain\IA\Intencao;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Agent;
@@ -24,6 +25,7 @@ use Stringable;
 class ClassificadorDeIntencao implements Agent, Conversational, HasStructuredOutput, HasTools
 {
     use Promptable;
+    use UsaFailoverDeProvedores;
 
     /**
      * Classifica o texto do usuário em uma intenção. Saída desconhecida nunca vira chute.

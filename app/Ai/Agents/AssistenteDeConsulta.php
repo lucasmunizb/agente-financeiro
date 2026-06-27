@@ -8,6 +8,7 @@ use App\Ai\Tools\ConsultarDisponivelMes;
 use App\Ai\Tools\ConsultarFaturaCartao;
 use App\Ai\Tools\ConsultarGastos;
 use App\Ai\Tools\ConsultarProximasContas;
+use App\Ai\Concerns\UsaFailoverDeProvedores;
 use App\Domain\IA\Consulta\ColetorDeConsultas;
 use App\Models\User;
 use Laravel\Ai\Contracts\Agent;
@@ -32,6 +33,7 @@ use Stringable;
 class AssistenteDeConsulta implements Agent, Conversational, HasTools
 {
     use Promptable;
+    use UsaFailoverDeProvedores;
 
     public function __construct(
         private readonly User $user,

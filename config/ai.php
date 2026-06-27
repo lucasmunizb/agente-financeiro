@@ -14,6 +14,24 @@ return [
     */
 
     'default' => env('AI_PROVIDER', 'anthropic'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Failover de provedores
+    |--------------------------------------------------------------------------
+    |
+    | Lista ordenada de provedores para failover automático (doc 02 §3.6 / regra
+    | inviolável 8). Indisponibilidade de um provedor cai no próximo — recurso nativo
+    | da Laravel AI SDK, exposto pelos agentes via provider(). Configurável por env
+    | (AI_FAILOVER="anthropic,openai"); o primeiro é o provedor padrão.
+    |
+    */
+
+    'failover' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', env('AI_FAILOVER', env('AI_PROVIDER', 'anthropic')))
+    ))),
+
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
