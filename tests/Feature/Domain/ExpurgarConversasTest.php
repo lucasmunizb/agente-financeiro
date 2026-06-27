@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\IA\Historico\ExpurgarConversas;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -114,4 +115,14 @@ it('o comando ai:expurgar-conversas apaga conversas antigas', function () {
     $this->artisan('ai:expurgar-conversas')->assertSuccessful();
 
     expect(DB::table('agent_conversations')->where('id', $velha)->exists())->toBeFalse();
+});
+
+it('o expurgo está agendado diariamente às 03:30 (spec 06 / C5)', function () {
+    $schedule = app(Schedule::class);
+
+    $evento = collect($schedule->events())
+        ->first(fn ($e) => str_contains($e->command ?? '', 'ai:expurgar-conversas'));
+
+    expect($evento)->not->toBeNull()
+        ->and($evento->expression)->toBe('30 3 * * *'); // dailyAt('03:30')
 });

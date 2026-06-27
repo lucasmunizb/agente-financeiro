@@ -12,7 +12,7 @@
 | Campo | Valor |
 |---|---|
 | **Bloco · Fase** | Bloco 6 · F8 |
-| **Status** | ⬜ Planejado |
+| **Status** | ✅ Concluído (backend) |
 | **Depende de** | [[spec-02-cadastro-manual-receitas]] · [[spec-03-telegram]] · [[spec-05-chat-financeiro]] |
 | **Habilita** | — |
 | **Fonte de verdade** | seção 6 do escopo · [`docs/05-arquitetura.md`](../05-arquitetura.md) · [`docs/03-regras-financeiras.md`](../03-regras-financeiras.md) |
@@ -168,27 +168,44 @@ Cada consulta já devolve um VO com `payload()`/`paraPrompt()` e um `TraceDaCons
 | Testes unitários + contrato | Testes de UI/e2e |
 
 ## 9. Definition of Done
-- [ ] Cenários de §3 cobertos por testes que falhavam antes e agora passam.
-- [ ] Barreiras de §4 garantidas (escopo por usuário, "hoje" injetado, centavos, IA ausente).
-- [ ] Agregador **reusa** as consultas existentes — sem SQL/fórmula duplicados (provado por teste).
-- [ ] Expurgo de mensagens (60 dias) verificado/ligado, sem duplicar comando/agendamento.
-- [ ] Sem segredo/PDF/dado sensível persistido ou commitado.
-- [ ] Commit local atômico, em português, separando backend de frontend.
-- [ ] §10 preenchida com os artefatos reais.
+- [x] Cenários de §3 cobertos por testes que falhavam antes e agora passam.
+- [x] Barreiras de §4 garantidas (escopo por usuário, "hoje" injetado, centavos, IA ausente).
+- [x] Agregador **reusa** as consultas existentes — sem SQL/fórmula duplicados (provado por teste).
+- [x] Expurgo de mensagens (60 dias) verificado/ligado, sem duplicar comando/agendamento.
+- [x] Sem segredo/PDF/dado sensível persistido ou commitado.
+- [ ] Commit local atômico, em português, separando backend de frontend. *(o usuário commita à mão)*
+- [x] §10 preenchida com os artefatos reais.
 
 ## 10. Estado atual / artefatos
-- **Status:** ⬜ Planejado — **a implementar** (nada de §6 "proposta" existe ainda).
-- **Já existe e será reusado (NÃO reimplementar):**
-  - `app/Domain/Gastos/ConsultarGastos.php` (+ `ResultadoConsultaGastos`).
-  - `app/Domain/ProximasContas/ConsultarProximasContas.php` (+ `ResultadoConsultaProximasContas`).
-  - `app/Domain/FaturaCartao/ConsultarFaturaCartao.php` (+ `ResultadoConsultaFaturaCartao`).
-  - `app/Domain/Disponivel/ConsultarDisponivelDoMes.php` / `DisponivelDoMes.php` (+ VOs).
-  - `app/Domain/IA/Historico/ExpurgarConversas.php`, `app/Console/Commands/ExpurgarConversasCommand.php`
-    e o agendamento em `routes/console.php` (diário 03:30) — **o "Job de expurgo (60 dias)"
-    do Bloco 6 já está coberto pelo Bloco 4**.
-- **A criar (test-first):** `app/Domain/Dashboard/ResumoDoMes.php` e
-  `app/Domain/Dashboard/ResumoDoMesResultado.php` (nomes propostos).
-- **Adiado para:** **frontend** (telas/gráficos do dashboard, §8) — etapa separada.
-- **Decisões de regra a registrar na implementação:** critério de "cartão atual" (todos os
-  cartões vs. só os com movimento na competência) e tamanho default da janela de próximas
-  contas no dashboard — citando a seção do escopo.
+- **Status:** ✅ **Backend concluído** (test-first). Frontend (§8) adiado, etapa separada.
+- **Criado nesta etapa:**
+  - `app/Domain/Dashboard/ResumoDoMes.php` — agregador read-only; delega às 4 consultas;
+    `para(int $userId, CarbonImmutable $hoje, int $janelaProximasContas = 30)`.
+  - `app/Domain/Dashboard/ResumoDoMesResultado.php` — VO imutável (carrega os 4 sub-VOs +
+    lista de faturas); acessores em centavos `totalGastosCents()`,
+    `totalProximasContasCents()`, `disponivelCents()`, `totalFaturasCents()` e `traces()`
+    (fontes para auditoria). Sem formatação pt-BR (frontend).
+  - `tests/Feature/Domain/ResumoDoMesTest.php` — C1 (agregação + escopo), C2 (reuso por
+    valor-idêntico às consultas isoladas), C3 (determinismo de "hoje"), C4 (borda zerada),
+    regra 5 (tudo `int`), decisão das faturas (todos os cartões, inclui zerada, ignora
+    soft-deleted).
+  - `tests/Feature/Domain/ExpurgarConversasTest.php` — **C5 acrescentado**: assert de que o
+    agendamento `ai:expurgar-conversas` está registrado às 03:30 (`30 3 * * *`).
+- **Reusado como está (NÃO reimplementado):**
+  - `ConsultarGastos`, `ConsultarProximasContas`, `ConsultarFaturaCartao`,
+    `ConsultarDisponivelDoMes` (+ seus VOs).
+  - `ExpurgarConversas` / `ExpurgarConversasCommand` + agendamento `routes/console.php`
+    (diário 03:30) — **o "Job de expurgo (60 dias)" do Bloco 6 já estava coberto pelo Bloco
+    4**; esta etapa só **confirmou** a cobertura (teste de schedule). Nada duplicado.
+- **Adiado para:** **frontend** (telas/gráficos do dashboard, régua do mês, formatação
+  pt-BR, endpoint HTTP que serve o VO — §8) — etapa separada.
+- **Decisões de regra registradas (eram os pontos em aberto do §6/§10):**
+  - **"Cartão atual" = TODOS os cartões ativos do usuário**, inclusive os de fatura **zero**
+    (lista previsível e estável; o frontend decide o que esconder; soft-deleted ficam de
+    fora). Decisão do usuário; o escopo §6 não fixa o critério.
+  - **Janela default de próximas contas = 30 dias** (proposta literal do spec §6; segue
+    **parâmetro injetável** — o frontend passa `7` p/ o card "A vencer (7 dias)" do mock FE
+    §7.5, ou outro horizonte).
+  - **"Reuso, não recálculo" (C2)** provado por **valor-idêntico** às consultas isoladas
+    (alternativa explícita do spec §7; a asserção por mock de colaboração não se aplica —
+    as consultas são `final` e não devem ser des-finalizadas só para teste).

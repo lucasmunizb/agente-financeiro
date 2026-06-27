@@ -1,0 +1,234 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Domain\Dashboard\ResumoDoMes;
+use App\Domain\Dashboard\ResumoDoMesResultado;
+use App\Domain\Disponivel\ConsultarDisponivelDoMes;
+use App\Domain\FaturaCartao\ConsultarFaturaCartao;
+use App\Domain\Gastos\ConsultarGastos;
+use App\Domain\ProximasContas\ConsultarProximasContas;
+use App\Models\Card;
+use App\Models\Income;
+use App\Models\Installment;
+use App\Models\StatusPagamento;
+use App\Models\Transaction;
+use App\Models\User;
+use Carbon\CarbonImmutable;
+use Database\Seeders\PaymentMethodSeeder;
+use Database\Seeders\StatusPagamentoSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+/*
+ * Spec 06 — Dashboard (agregações do mês). O `ResumoDoMes` é um orquestrador read-only
+ * que monta os números do mês corrente DELEGANDO às 4 consultas determinísticas já
+ * testadas (gastos, próximas contas, fatura, disponível) — NÃO recalcula nada (regra 4),
+ * tudo em centavos inteiros (regra 5), escopo ESTRITO por usuário e "hoje" INJETADO
+ * (nunca o relógio global). A IA não participa desta etapa.
+ *
+ * Decisões de regra registradas nesta implementação (spec §10):
+ *  - "cartão atual" = TODOS os cartões (ativos) do usuário, inclusive os de fatura zerada;
+ *  - janela default de próximas contas = 30 dias (parâmetro injetável).
+ */
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->seed([PaymentMethodSeeder::class, StatusPagamentoSeeder::class]);
+});
+
+/** Instante de referência fixo (fuso SP) usado como "hoje" no resumo. */
+function hojeSP(string $data = '2026-06-15'): CarbonImmutable
+{
+    return CarbonImmutable::parse($data.' 09:00:00', 'America/Sao_Paulo');
+}
+
+/** Receita recebida na data dada. */
+function resumoReceita(User $user, int $valorCents, string $data): Income
+{
+    return Income::factory()->for($user)->create(['valor_cents' => $valorCents, 'data' => $data]);
+}
+
+/**
+ * Gasto de parcela única vencendo na data dada. Opcionalmente em cartão (card_id) e com
+ * status específico. Devolve a transaction.
+ */
+function resumoParcela(
+    User $user,
+    int $valorCents,
+    string $vencimento,
+    ?Card $cartao = null,
+    string $statusCodigo = StatusPagamento::ABERTO,
+): Transaction {
+    $transaction = Transaction::factory()->for($user)->create([
+        'valor_total_cents' => $valorCents,
+        'card_id' => $cartao?->id,
+    ]);
+
+    Installment::factory()->for($transaction, 'transaction')->create([
+        'numero' => 1,
+        'total' => 1,
+        'vencimento' => $vencimento,
+        'status_id' => StatusPagamento::idFor($statusCodigo),
+    ]);
+
+    return $transaction;
+}
+
+it('agrega gastos, próximas contas, fatura e disponível do mês corrente (C1)', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+
+    resumoReceita($user, 400000, '2026-06-05');
+    resumoParcela($user, 120000, '2026-06-20', $cartao);  // gasto + próxima conta + fatura
+    resumoParcela($user, 20000, '2026-06-10');            // gasto fora de cartão (já venceu p/ próximas)
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    expect($resumo)->toBeInstanceOf(ResumoDoMesResultado::class)
+        ->and($resumo->mes)->toBe('2026-06')
+        ->and($resumo->totalGastosCents())->toBe(140000)            // 1200 + 200
+        ->and($resumo->totalProximasContasCents())->toBe(120000)    // só a de 2026-06-20 (futura)
+        ->and($resumo->disponivelCents())->toBe(260000)             // 4000 - 1200 - 200
+        ->and($resumo->faturas)->toHaveCount(1)
+        ->and($resumo->faturas[0]->totalCents)->toBe(120000);
+});
+
+it('não vaza dados de outro usuário (C1 — escopo)', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+    Card::factory()->for($outro)->create(['descricao' => 'Alheio', 'final_4' => '9999']);
+
+    resumoReceita($user, 100000, '2026-06-05');
+    resumoParcela($user, 30000, '2026-06-20');
+
+    resumoReceita($outro, 999900, '2026-06-05');
+    resumoParcela($outro, 555500, '2026-06-20');
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    expect($resumo->totalGastosCents())->toBe(30000)
+        ->and($resumo->disponivelCents())->toBe(70000)   // 1000 - 300, sem o do outro
+        ->and($resumo->faturas)->toHaveCount(0);          // o cartão é do outro usuário
+});
+
+it('reusa as consultas existentes — os números batem com elas isoladas, sem recálculo (C2)', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+
+    resumoReceita($user, 400000, '2026-06-05');
+    resumoParcela($user, 120000, '2026-06-20', $cartao);
+    resumoParcela($user, 20000, '2026-06-10');
+
+    $hoje = hojeSP();
+    $resumo = app(ResumoDoMes::class)->para($user->id, $hoje);
+
+    $gastos = app(ConsultarGastos::class)->para($user->id, '2026-06');
+    $proximas = app(ConsultarProximasContas::class)->para($user->id, $hoje, 30);
+    $disponivel = app(ConsultarDisponivelDoMes::class)->para($user->id, '2026-06');
+    $fatura = app(ConsultarFaturaCartao::class)->para($user->id, '1234', '2026-06');
+
+    expect($resumo->totalGastosCents())->toBe($gastos->totalCents)
+        ->and($resumo->totalProximasContasCents())->toBe($proximas->totalCents)
+        ->and($resumo->disponivelCents())->toBe($disponivel->disponivel->disponivel->cents())
+        ->and($resumo->faturas[0]->totalCents)->toBe($fatura->totalCents);
+});
+
+it('os recortes mudam de forma determinística com o "hoje" injetado (C3)', function () {
+    $user = User::factory()->create();
+
+    resumoParcela($user, 50000, '2026-06-20');
+    resumoParcela($user, 70000, '2026-07-20');
+
+    $junho = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
+    $julho = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-07-15'));
+
+    expect($junho->mes)->toBe('2026-06')
+        ->and($junho->totalGastosCents())->toBe(50000)
+        ->and($julho->mes)->toBe('2026-07')
+        ->and($julho->totalGastosCents())->toBe(70000);
+});
+
+it('é determinístico: o mesmo "hoje" produz o mesmo resultado (C3)', function () {
+    $user = User::factory()->create();
+    resumoParcela($user, 50000, '2026-06-20');
+
+    $a = app(ResumoDoMes::class)->para($user->id, hojeSP());
+    $b = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    expect($a->totalGastosCents())->toBe($b->totalGastosCents())
+        ->and($a->totalProximasContasCents())->toBe($b->totalProximasContasCents())
+        ->and($a->disponivelCents())->toBe($b->disponivelCents());
+});
+
+it('usuário sem cartão e sem movimento devolve um VO bem-formado com zeros e listas vazias (C4)', function () {
+    $user = User::factory()->create();
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    expect($resumo)->toBeInstanceOf(ResumoDoMesResultado::class)
+        ->and($resumo->mes)->toBe('2026-06')
+        ->and($resumo->totalGastosCents())->toBe(0)
+        ->and($resumo->totalProximasContasCents())->toBe(0)
+        ->and($resumo->disponivelCents())->toBe(0)
+        ->and($resumo->faturas)->toBe([])
+        ->and($resumo->proximasContas->contas)->toBe([])
+        ->and($resumo->gastos->porCategoria)->toBe([]);
+});
+
+it('lista uma fatura por cartão do usuário, inclusive a de total zero (decisão §10)', function () {
+    $user = User::factory()->create();
+    $comMovimento = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+    Card::factory()->for($user)->create(['descricao' => 'Inter', 'final_4' => '5678']); // sem movimento
+
+    resumoParcela($user, 90000, '2026-06-20', $comMovimento);
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    $totais = collect($resumo->faturas)->pluck('totalCents')->sort()->values()->all();
+
+    expect($resumo->faturas)->toHaveCount(2)
+        ->and($totais)->toBe([0, 90000]);
+});
+
+it('ignora cartões excluídos (soft delete) na lista de faturas', function () {
+    $user = User::factory()->create();
+    Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+    $excluido = Card::factory()->for($user)->create(['descricao' => 'Antigo', 'final_4' => '0000']);
+    $excluido->delete();
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    expect($resumo->faturas)->toHaveCount(1);
+});
+
+it('todo valor do VO é int de centavos — nada de float (regra 5)', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+
+    resumoReceita($user, 400000, '2026-06-05');
+    resumoParcela($user, 120000, '2026-06-20', $cartao);
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    expect($resumo->totalGastosCents())->toBeInt()
+        ->and($resumo->totalProximasContasCents())->toBeInt()
+        ->and($resumo->disponivelCents())->toBeInt()
+        ->and($resumo->totalFaturasCents())->toBeInt()
+        ->and($resumo->proximasContas->contas[0]['cents'])->toBeInt()
+        ->and($resumo->faturas[0]->totalCents)->toBeInt();
+});
+
+it('expõe os traces (fontes) de cada consulta para auditoria', function () {
+    $user = User::factory()->create();
+    Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    $ferramentas = collect($resumo->traces())->pluck('ferramenta')->all();
+
+    expect($ferramentas)->toContain('consultar_gastos')
+        ->toContain('consultar_proximas_contas')
+        ->toContain('consultar_disponivel_mes')
+        ->toContain('consultar_fatura_cartao');
+});
