@@ -250,12 +250,23 @@ Borda HTTP:
     `tests/Feature/Domain/DedupeDeUpdateTest.php`,
     `tests/Feature/Telegram/WebhookTest.php`,
     `tests/Feature/Telegram/RoteadorDeComandosTest.php`.
+  - **Ligação aos Blocos 4/5 (execução de comando — backend):** `app/Jobs/ProcessarMensagemDoBot.php`
+    (worker; resolve intenção forçada/classificada → registro via `ExtratorDeGasto` +
+    `PrepararConfirmacaoDeGasto`, ou consulta via `ResponderConsulta`; fallback "não entendi"),
+    `app/Domain/Telegram/ManipuladorQueEnfileira.php` (adaptador fino que só enfileira —
+    barreira §4), porta de saída `app/Domain/Telegram/Resposta/` (`RespostaAoUsuario`,
+    `ResultadoDaInteracao`, `TipoDeInteracao`, `RespostaInerte`), rebind do mapa em
+    `app/Providers/AppServiceProvider.php` (`/registrar`→REGISTRAR, `/buscar`→CONSULTAR,
+    texto livre→classificação no worker; editar/cancelar/ajuda seguem inertes). Testes:
+    `tests/Feature/Telegram/ManipuladorQueEnfileiraTest.php`,
+    `tests/Feature/Telegram/ProcessarMensagemDoBotTest.php`.
 - **Adiado para:**
-  - **Execução de cada comando** = extração via IA + confirmação → [[spec-04-ia-interpretacao]];
-    chat de consulta → [[spec-05-chat-financeiro]]. Os manipuladores concretos substituem
-    o mapa vazio do `RoteadorDeComandos` (rebind em `AppServiceProvider`).
+  - **Editar/cancelar via texto livre:** dependem de um extrator de IA para "qual lançamento"
+    (não entregue no [[spec-04-ia-interpretacao]]); por ora caem no fallback "não entendi".
+  - **Importar (PDF)** → [[spec-07-importacao-pdf]].
   - **Frontend:** mensagens formatadas do bot (curtas, sem botões) e fluxo de vínculo via
-    bot (token + `request_contact`); `RoteadorDeComandos::naoVinculado` é no-op até lá.
+    bot (token + `request_contact`); `RoteadorDeComandos::naoVinculado` é no-op até lá. A
+    porta de saída `RespostaAoUsuario` está inerte (`RespostaInerte`) até a redação/envio.
 - **Decisões de regra tomadas:**
   - Token persistido **só em hash** (sha-256), expiração de **15 min** (`EXPIRACAO_MINUTOS`);
     consumo zera o hash. "Agora" injetável (`CarbonImmutable`) para determinismo (regra 5).

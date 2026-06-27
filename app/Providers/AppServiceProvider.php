@@ -3,8 +3,13 @@
 namespace App\Providers;
 
 use App\Domain\IA\Custo\CalculadoraDeCustoIA;
+use App\Domain\IA\Intencao;
 use App\Domain\Telegram\ClassificadorDeComando;
+use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\ManipuladorInerte;
+use App\Domain\Telegram\ManipuladorQueEnfileira;
+use App\Domain\Telegram\Resposta\RespostaAoUsuario;
+use App\Domain\Telegram\Resposta\RespostaInerte;
 use App\Domain\Telegram\RoteadorDeComandos;
 use App\Domain\Telegram\RoteadorDeMensagem;
 use App\Listeners\LogarFailoverDeIA;
@@ -19,16 +24,25 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Roteador determinístico de comandos. Cada intenção ainda usa o manipulador
-        // inerte (padrão); os concretos (execução + IA no Bloco 4, mensagens do bot no
-        // frontend) substituem o mapa abaixo nas etapas posteriores.
+        // Roteador determinístico de comandos. Os slashes que já fixam a intenção e o
+        // texto livre são ligados aos Blocos 4/5 via ManipuladorQueEnfileira (enfileira o
+        // processamento no worker — barreira §4). Editar/cancelar/ajuda seguem inertes
+        // (padrão) até ganharem extrator de IA / frontend próprios.
         $this->app->bind(RoteadorDeMensagem::class, function ($app) {
             return new RoteadorDeComandos(
                 $app->make(ClassificadorDeComando::class),
                 $app->make(ManipuladorInerte::class),
-                manipuladores: [],
+                manipuladores: [
+                    Comando::REGISTRAR->value => new ManipuladorQueEnfileira(Intencao::REGISTRAR),
+                    Comando::BUSCAR->value => new ManipuladorQueEnfileira(Intencao::CONSULTAR),
+                    Comando::DESCONHECIDO->value => new ManipuladorQueEnfileira,
+                ],
             );
         });
+
+        // Porta de saída do bot: inerte por ora — a redação/envio das mensagens ao
+        // Telegram é frontend (regra 3), etapa separada e posterior.
+        $this->app->bind(RespostaAoUsuario::class, RespostaInerte::class);
 
         // Calculadora de custo de IA carregada com a tabela de preços (centavos/Mtok).
         $this->app->bind(CalculadoraDeCustoIA::class, function ($app) {
