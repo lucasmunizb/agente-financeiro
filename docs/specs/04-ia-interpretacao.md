@@ -123,7 +123,8 @@ Laravel AI SDK, com a IA interpretando e o sistema fazendo a aritmética.
   (descricao, valor, forma_pagamento, cartao, categoria, data, parcelas, todos **texto/cru**);
   monta `camposFaltantes` (inclui `cartao` quando forma = `credito`).
 - `RedatorDeResposta::redigir(string $payload): string` — formata payload já calculado.
-- trait `UsaFailoverDeProvedores::provider(): array` → `config('ai.failover')`.
+- trait `UsaFailoverDeProvedores::provider(): array` → `config('ai.failover')` (vive em
+  `app/Ai/Concerns/`, usado pelos 3 agentes acima).
 
 **Domínio IA (`app/Domain/IA`)**
 - enum `Intencao` (`registrar|consultar|editar|cancelar|importar|desconhecido`) —

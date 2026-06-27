@@ -11,7 +11,7 @@
 1. **Cada fase começa pelos testes (TDD)** e entrega **só o backend**. Nada é implementado antes dos testes que falham; implementa-se até passarem, com cobertura.
 2. **Frontend nunca é acoplado** à feature de backend. As mensagens formatadas do bot e as telas do webapp são **etapas separadas e posteriores** (fase FE), construídas só depois que o backend correspondente estiver testado e pronto.
 
-## Fases (F0–F9 + FE)
+## Fases (F0–F10 + FE)
 
 | Fase | Entrega | Pré-requisito | Critério de conclusão |
 | --- | --- | --- | --- |
@@ -24,7 +24,8 @@
 | **F6** | Correção por conversa. | F5 | Usuário corrige sem web. |
 | **F7** | Chat financeiro de consulta + guard determinístico. | F1, F3 | Respostas só com dados consultados. |
 | **F8** | Dashboard (dados agregados). | F2, F3 | Agregações do mês disponíveis. |
-| **F9** | Importação de PDF (Itaú): pré-importação, extração, descarte, duplicidade. **Movida para o fim** (alto valor/alto risco): entregue após todas as demais etapas. | F1 | Itens extraídos para revisão; PDF descartado. |
+| **F9** | Importação de PDF (Itaú): pré-importação, extração, descarte, duplicidade. **Movida para o fim** (alto valor/alto risco): entregue após todas as demais features. | F1 | Itens extraídos para revisão; PDF descartado. |
+| **F10** | **Segurança e LGPD — portão de fechamento** (transversal): code review de segurança, pen test e testes adversariais de prompt (injeção/jailbreak/exfiltração). | todas | Suíte adversarial verde; pen test sem achado crítico; LGPD verificada. |
 | **FE** | Frontends (web + formatação do bot) por feature — etapas separadas. | Backend da feature pronto | Apresentação construída após o backend. |
 
 ## MVP em 10 etapas (backend vs. frontend)

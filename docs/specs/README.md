@@ -34,9 +34,14 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 | 04 | [IA de interpretação (Laravel AI SDK)](04-ia-interpretacao.md) | ✅ | 01, 02, 03 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
 | 05 | [Chat financeiro (tools + guard)](05-chat-financeiro.md) | ✅ | 01, 03, 04 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
 | 06 | [Dashboard (agregações do mês)](06-dashboard.md) | ⬜ | 02, 03 | [`05-arquitetura.md`](../05-arquitetura.md) |
-| 07 | [Importação de PDF (Itaú) — última etapa](07-importacao-pdf.md) | ⬜ | 01 | [`07-importacao-pdf.md`](../07-importacao-pdf.md) |
+| 07 | [Importação de PDF (Itaú) — última feature](07-importacao-pdf.md) | ⬜ | 01 | [`07-importacao-pdf.md`](../07-importacao-pdf.md) |
+| 08 | [Segurança e LGPD — portão de fechamento](08-seguranca-lgpd.md) | ⬜ | todas | [`09-nfr-seguranca-lgpd.md`](../09-nfr-seguranca-lgpd.md) |
 
 **Legenda:** ✅ concluído · 🟡 em andamento · ⬜ planejado.
+
+> O **spec 08** é **transversal**: não é uma feature, e sim o **portão de fechamento** —
+> code review de segurança, pen test e testes adversariais de prompt. Roda **depois** das
+> features e **antes** de declarar o MVP entregue. Acione a skill `seguranca-ia` ao executá-lo.
 
 ## Regras que todo spec herda
 

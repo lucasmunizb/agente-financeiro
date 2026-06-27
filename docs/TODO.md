@@ -78,3 +78,15 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [ ] Testes + implementação: parser Itaú, pré-importação, duplicidade, descarte de PDF/texto.
 - [ ] Testes + implementação: `pdf_parse_errors` para evolução do parser.
 - [ ] **(Etapa separada)** Tela web de revisão em lote + resumo no bot.
+
+## Bloco 8 — Segurança e LGPD (portão de fechamento)
+
+> Spec: [`docs/specs/08-seguranca-lgpd.md`](specs/08-seguranca-lgpd.md). **Transversal**:
+> roda ao final, depois das features. Acione a skill `seguranca-ia`.
+
+- [ ] Code review de segurança (webhook, escopo por usuário, segredos, retenção, borda de IA, auditoria).
+- [ ] Pen test (webhook 403/200 + idempotência, comando sem vínculo, auditoria de segredos no repo/imagem/log).
+- [ ] Testes adversariais de prompt (determinísticos): guard sob injeção, tools ignoram `user_id` injetado, classificação defensiva, saída sem trace, sem escrita sem confirmação.
+- [ ] Hardening: bloco "Segurança" no `instructions()` de todos os agentes; delimitar texto não confiável.
+- [ ] Conformidade LGPD (consentimento, minimização, retenção, exclusão lógica, transparência de IA).
+- [ ] **(Etapa separada)** Mensagens de recusa do bot, aviso de transparência de IA e fluxo de consentimento.

@@ -99,7 +99,7 @@ Assinaturas reais (PHP 8.3). A IA entra só para **decidir tools e redigir**; o 
 validação são determinísticos.
 
 **Tools (Laravel AI SDK — `App\Ai\Tools\`)** — cada uma `implements Tool`, construída
-`__construct(User $user, ?ColetorDeConsultas $coletor = null)`, com `handle(Request): string`
+`__construct(User $user, ?ColetorDeConsultas $coletor = null)`, com `handle(Request): Stringable|string`
 (devolve `paraPrompt()` e registra `payload()` + `trace` no coletor) e `schema(JsonSchema)`:
 - `ConsultarGastos` — schema `periodo? (YYYY-MM), categoria?, cartao?, status?`.
 - `ConsultarDisponivelMes` — schema `mes? (YYYY-MM)`.
