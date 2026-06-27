@@ -42,20 +42,12 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 ## Bloco 4 — IA de interpretação (Laravel AI SDK)
 
 - [x] Instalar e configurar a Laravel AI SDK (`laravel/ai`); publicar `config/ai.php` e migrations; definir provedor padrão (Anthropic) e array de failover. _(`laravel/ai ^0.8.1`; `config/ai.php` + `config/ai_custos.php` publicados; migration `agent_conversations`; `ai.default=anthropic`; `ai.failover` (array, env `AI_FAILOVER`))_
-- [x] Testes + implementação: Agents (`make:agent`) de intenção, extração e redação. _(`app/Ai/Agents/`: `ClassificadorDeIntencao` (papel 1, structured → enum `App\Domain\IA\Intencao`, fallback DESCONHECIDO), `ExtratorDeGasto` (papel 2, structured → `ResultadoDaExtracao`/`GastoExtraido` **crus**: valor/data como texto, IA não normaliza; barreira 1 = campo obrigatório ausente vira esclarecimento; crédito exige cartão §3.4), `RedatorDeResposta` (papel 3, texto a partir do payload já calculado). Testado com os fakes da SDK (`Ai::fakeAgent`/`assertAgentWasPrompted`), determinístico e offline. **Adiado:** normalização determinística + confirmação (item 3); guard pós-geração (barreira 4) no Bloco 6)_
+- [x] Testes + implementação: Agents (`make:agent`) de intenção, extração e redação. _(`app/Ai/Agents/`: `ClassificadorDeIntencao` (papel 1, structured → enum `App\Domain\IA\Intencao`, fallback DESCONHECIDO), `ExtratorDeGasto` (papel 2, structured → `ResultadoDaExtracao`/`GastoExtraido` **crus**: valor/data como texto, IA não normaliza; barreira 1 = campo obrigatório ausente vira esclarecimento; crédito exige cartão §3.4), `RedatorDeResposta` (papel 3, texto a partir do payload já calculado). Testado com os fakes da SDK (`Ai::fakeAgent`/`assertAgentWasPrompted`), determinístico e offline. **Adiado:** normalização determinística + confirmação (item 3); guard pós-geração (barreira 4) no Bloco 5)_
 - [x] Testes + implementação: extração via `HasStructuredOutput` (schema validado) com confirmação. _(ponte **determinística** cru→confirmação, IA não participa: `app/Domain/IA/NormalizadorDeGastoExtraido` converte `GastoExtraido` → `DadosGastoManual` resolvendo valor→centavos (`Money`), data→fuso SP (`RelativeDate` + dd/mm[/aaaa] + aaaa-mm-dd), forma→`PaymentMethod::idFor`, cartão→id (só crédito, casado por token na descrição; 0/≥2 → esclarecimento), categoria via `LookupDeCategoria`; o que não resolve vira esclarecimento §3.4 (`ResultadoDaNormalizacao`). `PrepararConfirmacaoDeGasto` gera a `PreviaGastoManual` via `RegistrarGastoManual::preview()` **sem persistir** (regra 7) e carrega o `DadosGastoManual` para o "sim" (reusa `confirmar()`) — `ConfirmacaoDeGasto`. **Boleto** virou forma de 1ª classe ("fora de cartão"): model/seeder/migration do CHECK + docs 03§4.6/04 alinhados. **Adiado:** amarração `classificar→extrair→confirmar` ao roteador do Telegram e a mensagem de confirmação do bot = F5/FE)_
-- [x] Testes + implementação: Tools (`make:tool`) de consulta com escopo por usuário + guard pós-geração. _(4 tools em `app/Ai/Tools/`; guard e orquestração no Bloco 6)_
+- [x] Testes + implementação: Tools (`make:tool`) de consulta com escopo por usuário + guard pós-geração. _(4 tools em `app/Ai/Tools/`; guard e orquestração no Bloco 5)_
 - [x] Testes + implementação: histórico via `RemembersConversations` (expurgo 60 dias), `ai_usage_log` e failover. Usar fakes da SDK nos testes. _(**Expurgo**: `app/Domain/IA/Historico/ExpurgarConversas` apaga conversas+mensagens com `updated_at` além de 60 dias ("agora" injetado, fuso SP — determinismo regra 4/5); comando `ai:expurgar-conversas` agendado diário 03:30. **Custo**: tabela `ai_usage_log` (append-only, sem dado sensível, custo em centavos BIGINT) + `AiUsageLog` + enum `TipoDeUsoIA` (mensagem/importacao/resumo) + `UsoDeIA` (VO) + `RegistrarUsoDeIA` (recorder) + `CalculadoraDeCustoIA` (tokens × `config/ai_custos.php` → centavos); ligado em `ResponderConsulta` (1 linha por geração: tipo mensagem, escopo por usuário, provider/model/tokens/latência da resposta da SDK). **Failover**: `config('ai.failover')` (array, env `AI_FAILOVER`) exposto pelos 4 agentes via trait `UsaFailoverDeProvedores::provider()` → failover nativo da SDK; listener `LogarFailoverDeIA` no evento `AgentFailedOver` loga a instabilidade sem dado sensível. **Adiado:** mensagem "instabilidade, tentando novamente" + re-enfileirar/degradar p/ comandos = F5/FE; registro de uso de importação/resumo entra com os Blocos 5/7)_
 
-## Bloco 5 — Importação de PDF
-
-- [ ] Testes + implementação: recepção, validação de nome, bloqueio de PDF com senha.
-- [ ] Testes + implementação: extração de texto + OCR fallback (Tesseract) — efêmero.
-- [ ] Testes + implementação: parser Itaú, pré-importação, duplicidade, descarte de PDF/texto.
-- [ ] Testes + implementação: `pdf_parse_errors` para evolução do parser.
-- [ ] **(Etapa separada)** Tela web de revisão em lote + resumo no bot.
-
-## Bloco 6 — Chat financeiro
+## Bloco 5 — Chat financeiro
 
 - [x] Testes + implementação: ferramentas de consulta com escopo por usuário (doc 02 §3.2).
   - [x] `consultar_gastos` (periodo, categoria?, cartao?, status?).
@@ -66,8 +58,19 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [x] Testes + implementação: resposta com fonte/trace. _(`RespostaDaConsulta` carrega as `fontes` (trace de cada tool) — barreira 5; apresentação = FE)_
 - [ ] **(Etapa separada)** Apresentação das respostas no bot/web.
 
-## Bloco 7 — Dashboard e fechamento do MVP
+## Bloco 6 — Dashboard
 
 - [ ] Testes + implementação: agregações do mês (gastos, próximas contas, cartão atual).
 - [ ] Job de expurgo de mensagens (60 dias).
 - [ ] **(Etapa separada)** Telas e gráficos do dashboard.
+
+## Bloco 7 — Importação de PDF (última etapa do MVP)
+
+> **Reordenado:** a importação de fatura (alto valor, alto risco) foi deliberadamente
+> movida para o fim do MVP. Todas as demais etapas de backend são entregues antes dela.
+
+- [ ] Testes + implementação: recepção, validação de nome, bloqueio de PDF com senha.
+- [ ] Testes + implementação: extração de texto + OCR fallback (Tesseract) — efêmero.
+- [ ] Testes + implementação: parser Itaú, pré-importação, duplicidade, descarte de PDF/texto.
+- [ ] Testes + implementação: `pdf_parse_errors` para evolução do parser.
+- [ ] **(Etapa separada)** Tela web de revisão em lote + resumo no bot.

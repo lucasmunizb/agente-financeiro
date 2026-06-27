@@ -18,9 +18,9 @@
 | **F4** | Telegram: vínculo, autenticação, recepção (backend + testes). | F0 | Mensagem recebida com usuário identificado. |
 | **F5** | Interpretação de mensagem (IA: intenção + extração) com confirmação. | F4 | Cadastro via Telegram validado por testes. |
 | **F6** | Correção por conversa. | F5 | Usuário corrige sem web. |
-| **F7** | Importação de PDF (Itaú): pré-importação, extração, descarte, duplicidade. | F1 | Itens extraídos para revisão; PDF descartado. |
-| **F8** | Chat financeiro de consulta + guard determinístico. | F1, F3 | Respostas só com dados consultados. |
-| **F9** | Dashboard (dados agregados). | F2, F3 | Agregações do mês disponíveis. |
+| **F7** | Chat financeiro de consulta + guard determinístico. | F1, F3 | Respostas só com dados consultados. |
+| **F8** | Dashboard (dados agregados). | F2, F3 | Agregações do mês disponíveis. |
+| **F9** | Importação de PDF (Itaú): pré-importação, extração, descarte, duplicidade. **Movida para o fim** (alto valor/alto risco): entregue após todas as demais etapas. | F1 | Itens extraídos para revisão; PDF descartado. |
 | **FE** | Frontends (web + formatação do bot) por feature — etapas separadas. | Backend da feature pronto | Apresentação construída após o backend. |
 
 ## MVP em 10 etapas (backend vs. frontend)
@@ -36,9 +36,9 @@ Cada etapa de backend é independente da sua apresentação. A coluna **Frontend
 | 5 | Vínculo e autenticação do Telegram. | Mensagens do bot de vínculo. |
 | 6 | Interpretação de mensagem (intenção + extração estruturada) com confirmação. | Respostas/confirmações formatadas no bot. |
 | 7 | Correção/cancelamento por conversa. | Fluxo de correção no bot. |
-| 8 | Importação de PDF: pré-importação, extração, descarte, duplicidade. | Tela web de revisão + resumo no bot. |
-| 9 | Chat financeiro: ferramentas de consulta + guard determinístico. | Apresentação das respostas (web/bot). |
-| 10 | Dashboard: agregações do mês (dados). | Telas e gráficos do dashboard. |
+| 8 | Chat financeiro: ferramentas de consulta + guard determinístico. | Apresentação das respostas (web/bot). |
+| 9 | Dashboard: agregações do mês (dados). | Telas e gráficos do dashboard. |
+| 10 | Importação de PDF: pré-importação, extração, descarte, duplicidade. **(Reordenada para última)** | Tela web de revisão + resumo no bot. |
 
 ## Entra no MVP
 
