@@ -130,6 +130,7 @@ Runtime do MVP = **3 contêineres**: `app` (HTTP: API + webhook Telegram), `work
 - **`laravel-backend`** — convenções de backend deste projeto (TDD, domínio financeiro, IA via SDK).
 - **`dba-postgres`** — modelagem e operação do schema PostgreSQL 16 (tipos, FKs, índices, constraints, migrations); atua em par com `laravel-backend`.
 - **`devops`** — provisionar/operar a infra (compose, Makefile, Swarm + Secrets, escala).
+- **`seguranca-ia`** — defesa adversarial da camada de IA: prompt injection, jailbreak, extração de instruções ("prompt manager"), injeção indireta via PDF, escopo por usuário. Complementa a `governanca-ia`.
 
 Skills adiadas (criar depois com a `skill-creator`): `governanca-ia`, `telegram`,
 `importacao-pdf` e as de frontend.
