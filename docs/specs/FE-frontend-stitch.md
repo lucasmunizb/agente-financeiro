@@ -129,13 +129,13 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 > Marque conforme gerar/aprovar. Telas de importação dependem do backend da [[spec-07-importacao-pdf]].
 
 **Tema**
-- [ ] 0. Prompt-base de tema aplicado no projeto Stitch
+- [x] 0. Prompt-base de tema aplicado no projeto Stitch
 
 **A. Entrada & onboarding**
-- [ ] 1. Login
-- [ ] 2. Criar conta
-- [ ] 3. Onboarding + consentimento LGPD
-- [ ] 4. Vínculo do Telegram
+- [x] 1. Login
+- [x] 2. Criar conta
+- [x] 3. Onboarding + consentimento LGPD
+- [x] 4. Vínculo do Telegram
 
 **B. Núcleo financeiro**
 - [ ] 5. Dashboard do mês *(tela-assinatura: a régua do mês)*
@@ -516,12 +516,13 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
 - [ ] Commit local atômico (regra 1: sem push); separado do backend (regra 3).
 
 ## 10. Estado atual / artefatos
-- **Status:** 🟡 Em andamento — **grupo A** (entrada & onboarding).
-- **Entregue:** prompts de Stitch **refinados e prontos para colar** do **tema (§7.0)** e do
-  **grupo A** — §7.1 Login, §7.2 Criar conta, §7.3 Onboarding+LGPD, §7.4 Vínculo do Telegram
-  (estados explícitos como variações, copy na voz da interface, conteúdo pt-BR realista,
-  acessibilidade embutida). Geração/aprovação visual no Stitch é ação externa do usuário —
-  marcar os itens 0–4 do §6 conforme gerar/aprovar.
+- **Status:** 🟡 Em andamento — **grupo A concluído** (tema + entrada & onboarding).
+- **Entregue:** **tema (§7.0)** e **grupo A geradas e aprovadas no Stitch** — §7.1 Login,
+  §7.2 Criar conta, §7.3 Onboarding+LGPD, §7.4 Vínculo do Telegram. Prompts refinados (estados
+  como variações, copy na voz da interface, conteúdo pt-BR realista, acessibilidade embutida).
+  _(Registrar aqui os nomes dos artefatos exportados do Stitch quando disponíveis.)_
+- **Próximo:** grupo B (núcleo financeiro) — §7.5 a §7.13. A ligação técnica das telas A ao
+  Laravel (Blade+Tailwind, rotas, auth, validação) fica para a etapa de implementação.
 - **Decisão de design aplicada:** token `papel` ajustado `#F3F4EF` → `#EDF0E8` (§4.2 e §7.0)
   para o fundo ler claramente como verde-acinzentado e fugir do "cream" (default de IA).
 - **Adiado para etapa técnica posterior:** ligação das telas ao Laravel (Inertia/Blade, dados
