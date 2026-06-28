@@ -152,6 +152,12 @@ estrito por `userId`, devolvendo um `Resultado…` com `payload(): PayloadDeResp
      payload; encaminha a pergunta íntegra; **regenera** descartando a divergente; cai no
      **fallback** após esgotar; aprova resposta sem números mesmo sem tool; bloqueia número
      inventado com payload vazio; expõe as 4 tools amarradas ao usuário e ao coletor.
+   - **Conjunto-verdade combinado (C7):** o guard aprova um texto cujos valores vêm de
+     **múltiplas** tools (gastos de um mês + disponível de outro, cada valor exclusivo de uma
+     tool), validando contra `coletor->payloadCombinado()`; contraprova: contra o payload de
+     uma tool só, o texto **reprova**. *Obs.: o `FakeTextGateway` da SDK executa no máximo
+     uma tool por turno do agente, então a combinação é exercitada no seu seam real (duas
+     tools reais + coletor único + guard real), não via `Ai::fakeAgent`.*
    - Registro de uso em `ai_usage_log` (uma linha por geração).
 
 > Cada item de backend só é "feito" com **testes verdes e cobertura**. A camada de IA usa os
@@ -188,7 +194,8 @@ estrito por `userId`, devolvendo um `Resultado…` com `payload(): PayloadDeResp
   - **Custo de IA:** uma linha em `ai_usage_log` por geração via
     `app/Domain/IA/Custo/RegistrarUsoDeIA.php` + `CalculadoraDeCustoIA.php`.
   - **Testes:** `tests/Unit/Domain/GuardPosGeracaoTest.php`, `ColetorDeConsultasTest.php`;
-    `tests/Feature/AI/ResponderConsultaTest.php`, `ConsultarGastosToolTest.php`,
+    `tests/Feature/AI/ResponderConsultaTest.php` (inclui o C7 — guard sobre o conjunto-verdade
+    **combinado** de várias tools, com contraprova contra uma só), `ConsultarGastosToolTest.php`,
     `ConsultarDisponivelMesToolTest.php`, `ConsultarProximasContasToolTest.php`,
     `ConsultarFaturaCartaoToolTest.php`, `ToolColetaPayloadTest.php`, `RegistroDeUsoNaConsultaTest.php`;
     `tests/Feature/Domain/ConsultarGastosTest.php`, `ConsultarDisponivelDoMesTest.php`,

@@ -198,7 +198,8 @@ Borda HTTP:
    - **Vínculo** (`TelegramVinculoTest`) — gera token único + pendência com hash/expiração;
      token em claro nunca persistido; re-geração substitui a pendência; consumo captura
      `telegram_user_id`+telefone e consome; recusa token inexistente/expirado/consumido;
-     um ativo por conta; autenticação resolve usuário; recusa sem vínculo.
+     um ativo por conta; **mesmo `telegram_user_id` não vincula a duas contas** (índice
+     parcial → `QueryException`); autenticação resolve usuário; recusa sem vínculo.
    - **Dedupe** (`DedupeDeUpdateTest`) — aceita `update_id` novo; rejeita repetido; aceita
      distintos.
    - **Webhook** (`WebhookTest`) — 403 sem header / com segredo errado; 200 + registra
@@ -249,7 +250,8 @@ Borda HTTP:
     CSRF isento em `bootstrap/app.php`, rebind em `app/Providers/AppServiceProvider.php`,
     config em `config/services.php` (`telegram.bot_token`, `telegram.webhook_secret`).
   - Testes: `tests/Unit/Domain/ClassificadorDeComandoTest.php`,
-    `tests/Feature/Domain/TelegramVinculoTest.php`,
+    `tests/Feature/Domain/TelegramVinculoTest.php` (inclui a barreira de unicidade global:
+    o mesmo `telegram_user_id` não vincula a duas contas — índice parcial → `QueryException`),
     `tests/Feature/Domain/DedupeDeUpdateTest.php`,
     `tests/Feature/Telegram/WebhookTest.php`,
     `tests/Feature/Telegram/RoteadorDeComandosTest.php`.
