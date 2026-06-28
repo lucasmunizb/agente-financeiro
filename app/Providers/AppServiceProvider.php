@@ -4,6 +4,12 @@ namespace App\Providers;
 
 use App\Domain\IA\Custo\CalculadoraDeCustoIA;
 use App\Domain\IA\Intencao;
+use App\Domain\Importacao\ExtratorDeTexto;
+use App\Domain\Importacao\ExtratorDeTextoPoppler;
+use App\Domain\Importacao\OcrFallback;
+use App\Domain\Importacao\OcrTesseract;
+use App\Domain\Importacao\ParserDeFatura;
+use App\Domain\Importacao\ParserItau;
 use App\Domain\Telegram\ClassificadorDeComando;
 use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\ManipuladorInerte;
@@ -48,6 +54,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CalculadoraDeCustoIA::class, function ($app) {
             return new CalculadoraDeCustoIA($app['config']->get('ai_custos.tabela', []));
         });
+
+        // Importação de fatura (spec 07): extração/OCR via binários do worker (poppler +
+        // Tesseract); parser do Itaú (a regra de identificar os lançamentos está pendente).
+        $this->app->bind(ExtratorDeTexto::class, ExtratorDeTextoPoppler::class);
+        $this->app->bind(OcrFallback::class, OcrTesseract::class);
+        $this->app->bind(ParserDeFatura::class, ParserItau::class);
     }
 
     /**

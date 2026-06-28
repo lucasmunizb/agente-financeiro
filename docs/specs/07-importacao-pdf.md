@@ -15,7 +15,7 @@
 | Campo | Valor |
 |---|---|
 | **Bloco · Fase** | Bloco 7 · F9 |
-| **Status** | ⬜ Planejado (última etapa — alto valor / alto risco, movida ao fim do MVP) |
+| **Status** | 🟡 Pipeline pronto e testado — **falta só a regra de extração** do `ParserItau` (deliberadamente adiada para depois do frontend) |
 | **Depende de** | [[spec-01-dominio-financeiro]] · [[spec-03-telegram]] |
 | **Habilita** | — (encerra o MVP) |
 | **Fonte de verdade** | seção 8 do escopo · [`docs/07-importacao-pdf.md`](../07-importacao-pdf.md) · [`docs/04-modelo-dados.md`](../04-modelo-dados.md) |
@@ -194,18 +194,51 @@ parser é **por banco** atrás de uma interface, para abrir caminho a outros ban
 - [ ] §10 preenchida com os artefatos reais e as decisões de regra tomadas.
 
 ## 10. Estado atual / artefatos
-- **Status:** ⬜ Planejado — **a implementar** (última etapa do MVP). Nada deste pipeline
-  existe ainda.
-- **Entregue:** —
-- **Dependências a adicionar (ainda ausentes no `composer.json`):**
-  - **Lib de PDF (camada de texto):** proposta `smalot/pdfparser` (PHP puro) — confirmar.
-  - **OCR fallback:** wrapper p/ **Tesseract** (proposta `thiagoalessio/tesseract_ocr` ou
-    `spatie/pdf-to-text`); **binário Tesseract (pt)** deve estar no `worker` (ver
-    [`docs/11-devops.md`](../11-devops.md) e [[spec-00-fundacoes-devops]]).
-- **Reuso já disponível (Bloco 1/2):** `App\Domain\Duplicidade\ChaveDeDuplicidade` +
-  `DetectorDeDuplicidade`; `App\Domain\Gasto\RegistrarGastoManual` (+ `DadosGastoManual`,
-  precisa aceitar `origem`); `App\Domain\Parcelamento\GeradorDeParcelas`;
-  `App\Domain\Categoria\LookupDeCategoria`.
-- **Adiado para:** frontend (tela de revisão + resumo no bot) e pós-MVP (juros/IOF/encargos,
-  moeda estrangeira, outros bancos).
-- **Decisões de regra tomadas:** —
+- **Status:** 🟡 **Pipeline completo e testado**; falta só a regra de extração do
+  `ParserItau` (a identificação dos lançamentos da fatura), adiada para **depois do
+  frontend**. Tudo o mais — leitura, OCR, dedupe, pré-importação, efetivação, notificação
+  e descarte — está pronto e verde (486 testes na suíte).
+- **Entregue:**
+  - **Reuso estendido:** `App\Domain\Gasto\DadosGastoManual` ganhou `origem` (default
+    `manual`); `RegistrarGastoManual` grava a origem informada (`pdf` na importação).
+  - **Schema:** `database/migrations/2026_06_28_000001_create_invoice_imports_table.php`
+    (metadados; índice `(user_id, hash_arquivo_nome)`; CHECK de status próprio) e
+    `2026_06_28_000002_create_banks_and_pdf_parse_errors_tables.php` (`banks`,
+    `pdf_parse_errors` + junção N:N `bank_pdf_parse_error`). Models `App\Models\InvoiceImport`,
+    `Bank`, `PdfParseError`. Seeder `BankSeeder` (Itaú) registrado no `DatabaseSeeder`.
+  - **Domínio `app/Domain/Importacao/`:** VOs `TextoExtraido`, `LancamentoExtraido`,
+    `ItemPreImportacao`, `PreImportacao`, `ResultadoValidacao`; contrato `ParserDeFatura`
+    (interface) + `ParserItau` (**stub** que lança `ParserNaoImplementadoException`);
+    serviços `ValidadorDeArquivo`, `ExtratorDeTexto`/`ExtratorDeTextoPoppler`,
+    `OcrFallback`/`OcrTesseract`, `DetectorDeDuplicidadeNaImportacao`,
+    `MontadorDePreImportacao`, `RegistradorDeErroDeParsing`, `EfetivarImportacao`.
+  - **Job/notificação:** `app/Jobs/ImportarFaturaJob.php` (fila/worker; `finally` apaga o
+    temporário inclusive em erro). Notificação reusa a porta `RespostaAoUsuario` com os
+    novos `TipoDeInteracao` IMPORTACAO_PRONTA / IMPORTACAO_PROTEGIDA_POR_SENHA /
+    IMPORTACAO_FALHOU (carregando a `PreImportacao`); redação/envio é frontend.
+  - **Bindings:** `AppServiceProvider` liga `ExtratorDeTexto`→Poppler, `OcrFallback`→Tesseract,
+    `ParserDeFatura`→`ParserItau`.
+  - **Testes:** `tests/Feature/Importacao/ImportarFaturaJobTest.php` (C2/C3/C4/C9/C10 com
+    parser fake), `tests/Feature/Domain/Importacao/*` (Validador, Dedupe, Montador, Efetivar,
+    RegistradorDeErro), `tests/Unit/Domain/Importacao/*` (VOs, stub do parser),
+    `tests/Feature/Domain/{InvoiceImport,PdfParseError}Test.php`.
+- **Sem dependências novas:** extração/OCR usam os binários `poppler-utils` + `tesseract`
+  (pt) já embutidos no `worker` (spec 00), envolvidos por `Symfony\Process` atrás das
+  interfaces — nada adicionado ao `composer.json`.
+- **Pendente (única peça):** a **regra do `ParserItau`** — identificar descrição/valor
+  (centavos)/data/parcelas no texto da fatura do Itaú, ignorando dado sensível (regras
+  4/5/6), e registrar trechos irreconhecíveis em `pdf_parse_errors` **sem abortar** os itens
+  válidos (C10, parte fina). Entra em `app/Domain/Importacao/ParserItau.php`; os testes de
+  fixture de texto de §7.1 são escritos junto dela.
+- **Adiado para frontend:** tela de revisão em lote, resumo/confirmação no bot, **upload web
+  e recepção do documento via Telegram** (quem grava o temporário e despacha o
+  `ImportarFaturaJob`), e as mensagens amigáveis dos novos `TipoDeInteracao`.
+- **Decisões de regra tomadas:**
+  - **Sem tabela `invoices`** (não existe no schema): itens efetivados ligam por `card_id` e
+    a fatura é **derivada** pela `CalculadoraDeVencimento`, como o gasto manual de cartão.
+  - **Dedupe (C1) é aviso, não bloqueio:** `(user_id, hash_arquivo_nome)` é **índice**, não
+    UNIQUE — o usuário pode reprocessar mediante confirmação explícita.
+  - **PDF com senha (C2):** não cria linha em `invoice_imports` ("nada é persistido") — só
+    notifica para reenviar sem senha.
+  - **Erro de parsing:** registra **apenas a classe do erro** em `pdf_parse_errors` (nunca o
+    trecho do PDF) e marca a importação como `erro`.

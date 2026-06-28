@@ -6,6 +6,7 @@ namespace App\Domain\Telegram\Resposta;
 
 use App\Domain\IA\ConfirmacaoDeGasto;
 use App\Domain\IA\Consulta\RespostaDaConsulta;
+use App\Domain\Importacao\PreImportacao;
 use App\Models\Transaction;
 
 /**
@@ -25,6 +26,7 @@ final readonly class ResultadoDaInteracao
         public ?ConfirmacaoDeGasto $registro = null,
         public ?RespostaDaConsulta $consulta = null,
         public ?Transaction $transacao = null,
+        public ?PreImportacao $preImportacao = null,
     ) {}
 
     public static function registro(ConfirmacaoDeGasto $confirmacao): self
@@ -60,5 +62,20 @@ final readonly class ResultadoDaInteracao
     public static function nadaParaConfirmar(): self
     {
         return new self(TipoDeInteracao::NADA_PARA_CONFIRMAR);
+    }
+
+    public static function importacaoPronta(PreImportacao $preImportacao): self
+    {
+        return new self(TipoDeInteracao::IMPORTACAO_PRONTA, preImportacao: $preImportacao);
+    }
+
+    public static function importacaoProtegidaPorSenha(): self
+    {
+        return new self(TipoDeInteracao::IMPORTACAO_PROTEGIDA_POR_SENHA);
+    }
+
+    public static function importacaoFalhou(): self
+    {
+        return new self(TipoDeInteracao::IMPORTACAO_FALHOU);
     }
 }

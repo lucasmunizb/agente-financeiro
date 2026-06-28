@@ -30,7 +30,8 @@
       "Bash(php -v)",
       "Bash(git config *)",
       "Bash(echo \"hooksPath agora: [$\\(rtk git config core.hooksPath 2>&1\\)]\")",
-      "Bash(echo \"[$\\(rtk git config core.hooksPath 2>&1\\)]\")"
+      "Bash(echo \"[$\\(rtk git config core.hooksPath 2>&1\\)]\")",
+      "Bash(rtk cat *)"
     ]
   }
 }

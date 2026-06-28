@@ -137,6 +137,35 @@ it('confirmar persiste as parcelas com numero/total/vencimento/status e valor de
         ->and($parcelas->first()->valor()->cents())->toBe(10000);
 });
 
+it('confirmar respeita a origem informada (ex.: pdf da importação de fatura)', function () {
+    $user = User::factory()->create();
+
+    $dados = new DadosGastoManual(
+        userId: $user->id,
+        descricao: 'Mercado',
+        valorTotalCents: 30000,
+        dataCompra: CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo'),
+        paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
+        parcelas: 1,
+        origem: 'pdf',
+    );
+
+    $tx = (new RegistrarGastoManual)->confirmar($dados, CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'));
+    $log = AuditLog::where('entidade', 'transaction')->where('entidade_id', $tx->id)->first();
+
+    expect($tx->origem)->toBe('pdf')
+        ->and($log->origem)->toBe('pdf');
+});
+
+it('preview e confirmar mantêm a origem manual por padrão', function () {
+    $user = User::factory()->create();
+    $servico = new RegistrarGastoManual;
+    $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
+
+    expect($servico->preview(dadosPix($user), $hoje)->origem)->toBe('manual')
+        ->and($servico->confirmar(dadosPix($user), $hoje)->origem)->toBe('manual');
+});
+
 it('confirmar registra a auditoria de criação', function () {
     $user = User::factory()->create();
 

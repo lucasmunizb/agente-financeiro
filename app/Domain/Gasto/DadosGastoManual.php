@@ -12,6 +12,10 @@ use Carbon\CarbonImmutable;
  * DTO imutável validado/traduzido na borda (Form Request) antes de chegar ao
  * domínio. `cardId` presente ⇒ compra em cartão (usa o vencimento do cartão);
  * ausente ⇒ fora de cartão (vence na data da compra).
+ *
+ * `origem` registra de onde veio o lançamento (`manual` por padrão; `telegram`
+ * via bot; `pdf` na importação de fatura). Não altera o cálculo — só a auditoria
+ * e a procedência gravada na transaction.
  */
 final class DadosGastoManual
 {
@@ -25,6 +29,7 @@ final class DadosGastoManual
         public readonly ?int $cardId = null,
         public readonly ?int $accountId = null,
         public readonly ?int $categoriaId = null,
+        public readonly string $origem = 'manual',
     ) {
     }
 }

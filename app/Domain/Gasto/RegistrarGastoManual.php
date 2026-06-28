@@ -21,14 +21,13 @@ use Illuminate\Support\Facades\DB;
  * na data da compra) → gera as parcelas (valor derivado) → deriva o status de cada
  * parcela pela data → detecta duplicidade. O {@see self::preview()} apenas calcula
  * (não grava); o {@see self::confirmar()} persiste de forma atômica a transaction,
- * as installments e a auditoria. Origem sempre `manual`.
+ * as installments e a auditoria. A origem vem do DTO
+ * ({@see DadosGastoManual::$origem}, `manual` por padrão; `pdf` na importação).
  *
  * A IA nunca passa por aqui: todo cálculo é determinístico.
  */
 final class RegistrarGastoManual
 {
-    private const ORIGEM = 'manual';
-
     public function preview(DadosGastoManual $dados, ?CarbonImmutable $hoje = null): PreviaGastoManual
     {
         $hoje ??= CarbonImmutable::now(RelativeDate::TIMEZONE);
@@ -36,7 +35,7 @@ final class RegistrarGastoManual
         return new PreviaGastoManual(
             descricao: $dados->descricao,
             valorTotal: Money::fromCents($dados->valorTotalCents),
-            origem: self::ORIGEM,
+            origem: $dados->origem,
             ehDuplicado: $this->ehDuplicado($dados),
             parcelas: $this->montarParcelas($dados, $hoje),
         );
@@ -58,7 +57,7 @@ final class RegistrarGastoManual
                 'account_id' => $dados->accountId,
                 'categoria_id' => $dados->categoriaId,
                 'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
-                'origem' => self::ORIGEM,
+                'origem' => $dados->origem,
                 'moeda' => 'BRL',
             ]);
 
@@ -87,7 +86,7 @@ final class RegistrarGastoManual
                     'categoria_id' => $transaction->categoria_id,
                     'parcelas' => count($parcelas),
                 ],
-                'origem' => self::ORIGEM,
+                'origem' => $dados->origem,
             ]);
 
             return $transaction->load('installments');
