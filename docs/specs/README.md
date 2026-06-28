@@ -32,6 +32,7 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 | 02 | [Cadastro manual + receitas + orçamento](02-cadastro-manual-receitas.md) | ✅ | 01 | [`08-categorias.md`](../08-categorias.md) |
 | 03 | [Telegram (vínculo, webhook, roteamento)](03-telegram.md) | ✅ | 00 | [`06-telegram.md`](../06-telegram.md) |
 | 04 | [IA de interpretação (Laravel AI SDK)](04-ia-interpretacao.md) | ✅ | 01, 02, 03 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
+| 04b | [Confirmação de gasto via bot (fecha o "sim/não")](04b-confirmacao-gasto-bot.md) | ✅ | 02, 03, 04 | [`06-telegram.md`](../06-telegram.md) |
 | 05 | [Chat financeiro (tools + guard)](05-chat-financeiro.md) | ✅ | 01, 03, 04 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
 | 06 | [Dashboard (agregações do mês)](06-dashboard.md) | ✅ | 02, 03 | [`05-arquitetura.md`](../05-arquitetura.md) |
 | **FE** | [**Frontend (Stitch) — todas as telas**](FE-frontend-stitch.md) | ⬜ | 02–06 | [`05-arquitetura.md`](../05-arquitetura.md) · [`06-telegram.md`](../06-telegram.md) |

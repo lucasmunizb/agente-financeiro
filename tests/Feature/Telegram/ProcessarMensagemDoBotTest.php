@@ -3,13 +3,19 @@
 use App\Ai\Agents\AssistenteDeConsulta;
 use App\Ai\Agents\ClassificadorDeIntencao;
 use App\Ai\Agents\ExtratorDeGasto;
+use App\Domain\Gasto\DadosGastoManual;
+use App\Domain\Gasto\RegistrarGastoManual;
+use App\Domain\IA\ConfirmacaoDeGasto;
 use App\Domain\IA\Intencao;
 use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\ComandoRecebido;
+use App\Domain\Telegram\Confirmacao\ConfirmacoesPendentes;
 use App\Domain\Telegram\Resposta\RespostaAoUsuario;
 use App\Domain\Telegram\Resposta\ResultadoDaInteracao;
 use App\Domain\Telegram\Resposta\TipoDeInteracao;
 use App\Jobs\ProcessarMensagemDoBot;
+use App\Models\PaymentMethod;
+use App\Models\Transaction;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\PaymentMethodSeeder;
@@ -46,6 +52,27 @@ function processar(int $userId, Comando $comando, string $argumentos, string $or
         $userId,
         new ComandoRecebido($comando, $argumentos, $original),
         $forcada,
+    );
+}
+
+function guardarPendente(User $user): void
+{
+    $dados = new DadosGastoManual(
+        userId: $user->id,
+        descricao: 'Mercado',
+        valorTotalCents: 9000,
+        dataCompra: CarbonImmutable::parse('2026-06-26', 'America/Sao_Paulo'),
+        paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
+        parcelas: 1,
+    );
+
+    $agora = CarbonImmutable::now('America/Sao_Paulo');
+    $previa = (new RegistrarGastoManual)->preview($dados, $agora);
+
+    app(ConfirmacoesPendentes::class)->guardar(
+        $user->id,
+        new ConfirmacaoDeGasto($previa, $dados, []),
+        $agora,
     );
 }
 
@@ -154,4 +181,81 @@ it('intenção ainda não suportada (editar): entrega "não entendi", sem rodar 
             && $r->registro === null
             && $r->consulta === null,
     );
+});
+
+/* -------- spec 04b: confirmação do gasto (sim/não), determinística -------- */
+
+it('registro confirmável: guarda a confirmação como pendente para o "sim" seguinte (§C6)', function () {
+    $user = User::factory()->create();
+
+    Ai::fakeAgent(ExtratorDeGasto::class, [[
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+    ]]);
+
+    processar($user->id, Comando::REGISTRAR, '90 no mercado pix', '/registrar 90 no mercado pix', Intencao::REGISTRAR);
+
+    $pendente = app(ConfirmacoesPendentes::class)->recuperar($user->id, CarbonImmutable::now('America/Sao_Paulo'));
+
+    expect($pendente)->not->toBeNull()
+        ->and($pendente->confirmavel())->toBeTrue();
+});
+
+it('com pendente e resposta "sim": grava o gasto e entrega GRAVADO (§C1)', function () {
+    $user = User::factory()->create();
+    guardarPendente($user);
+
+    // Com pendente, a confirmação é determinística: o classificador de IA NÃO é chamado
+    // (se fosse, sem fake, a SDK falharia) — prova do curto-circuito antes da intenção.
+    processar($user->id, Comando::DESCONHECIDO, '', 'sim', null);
+
+    $this->saida->shouldHaveReceived('entregar')->withArgs(
+        fn (User $u, ResultadoDaInteracao $r) => $u->is($user)
+            && $r->tipo === TipoDeInteracao::GRAVADO
+            && $r->transacao !== null,
+    );
+
+    expect(Transaction::where('user_id', $user->id)->count())->toBe(1)
+        ->and(app(ConfirmacoesPendentes::class)->recuperar($user->id, CarbonImmutable::now('America/Sao_Paulo')))->toBeNull();
+});
+
+it('com pendente e resposta "não": cancela sem gravar e descarta o pendente (§C2)', function () {
+    $user = User::factory()->create();
+    guardarPendente($user);
+
+    processar($user->id, Comando::DESCONHECIDO, '', 'não', null);
+
+    $this->saida->shouldHaveReceived('entregar')->withArgs(
+        fn (User $u, ResultadoDaInteracao $r) => $r->tipo === TipoDeInteracao::CONFIRMACAO_CANCELADA,
+    );
+
+    expect(Transaction::count())->toBe(0)
+        ->and(app(ConfirmacoesPendentes::class)->recuperar($user->id, CarbonImmutable::now('America/Sao_Paulo')))->toBeNull();
+});
+
+it('com pendente e resposta ambígua: mantém o pendente e não grava (§C7)', function () {
+    $user = User::factory()->create();
+    guardarPendente($user);
+
+    processar($user->id, Comando::DESCONHECIDO, '', 'talvez', null);
+
+    $this->saida->shouldHaveReceived('entregar')->withArgs(
+        fn (User $u, ResultadoDaInteracao $r) => $r->tipo === TipoDeInteracao::CONFIRMACAO_AMBIGUA,
+    );
+
+    expect(Transaction::count())->toBe(0)
+        ->and(app(ConfirmacoesPendentes::class)->recuperar($user->id, CarbonImmutable::now('America/Sao_Paulo')))->not->toBeNull();
+});
+
+it('sem pendente: "sim" solto nunca grava (§C6)', function () {
+    $user = User::factory()->create();
+
+    Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'desconhecido']]);
+
+    processar($user->id, Comando::DESCONHECIDO, '', 'sim', null);
+
+    $this->saida->shouldHaveReceived('entregar')->withArgs(
+        fn (User $u, ResultadoDaInteracao $r) => $r->tipo === TipoDeInteracao::NAO_ENTENDI,
+    );
+
+    expect(Transaction::count())->toBe(0);
 });

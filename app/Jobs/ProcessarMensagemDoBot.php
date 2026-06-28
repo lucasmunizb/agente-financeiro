@@ -12,6 +12,10 @@ use App\Domain\IA\Intencao;
 use App\Domain\IA\PrepararConfirmacaoDeGasto;
 use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\ComandoRecebido;
+use App\Domain\Telegram\Confirmacao\ConfirmacoesPendentes;
+use App\Domain\Telegram\Confirmacao\ConfirmarGastoPendente;
+use App\Domain\Telegram\Confirmacao\InterpretadorDeConfirmacao;
+use App\Domain\Telegram\Confirmacao\RespostaDeConfirmacao;
 use App\Domain\Telegram\Resposta\RespostaAoUsuario;
 use App\Domain\Telegram\Resposta\ResultadoDaInteracao;
 use App\Models\User;
@@ -55,20 +59,68 @@ final class ProcessarMensagemDoBot implements ShouldQueue
         PrepararConfirmacaoDeGasto $preparar,
         ResponderConsulta $responder,
         RespostaAoUsuario $saida,
+        ConfirmacoesPendentes $pendentes,
+        InterpretadorDeConfirmacao $interpretador,
+        ConfirmarGastoPendente $confirmar,
     ): void {
         $user = User::findOrFail($this->userId);
+        $agora = CarbonImmutable::now('America/Sao_Paulo');
+
+        // Confirmação tem precedência: havendo um pendente, a mensagem é a resposta sim/não
+        // (determinística, regra 4). Só assim "sim" grava — nunca por engano (regra 7, §6.d).
+        $pendente = $pendentes->recuperar($this->userId, $agora);
+        if ($pendente !== null) {
+            $saida->entregar($user, $this->resolverConfirmacao($pendente, $interpretador, $confirmar, $pendentes, $agora));
+
+            return;
+        }
+
         $texto = $this->textoParaIA();
 
         $intencao = $this->intencaoForcada
             ?? $classificador->classificar($this->comando->textoOriginal);
 
         $resultado = match ($intencao) {
-            Intencao::REGISTRAR => $this->registrar($extrator, $preparar, $texto),
+            Intencao::REGISTRAR => $this->registrar($extrator, $preparar, $pendentes, $texto, $agora),
             Intencao::CONSULTAR => ResultadoDaInteracao::consulta($responder->responder($user, $texto)),
             default => ResultadoDaInteracao::naoEntendi(),
         };
 
         $saida->entregar($user, $resultado);
+    }
+
+    /**
+     * Resolve a resposta a uma confirmação pendente: "sim" grava (reusa o domínio),
+     * "não" descarta, e o ambíguo mantém o pendente e pede de novo (barreira 1).
+     */
+    private function resolverConfirmacao(
+        ConfirmacaoDeGasto $pendente,
+        InterpretadorDeConfirmacao $interpretador,
+        ConfirmarGastoPendente $confirmar,
+        ConfirmacoesPendentes $pendentes,
+        CarbonImmutable $agora,
+    ): ResultadoDaInteracao {
+        return match ($interpretador->interpretar($this->comando->textoOriginal)) {
+            RespostaDeConfirmacao::SIM => $this->gravarConfirmado($confirmar, $agora),
+            RespostaDeConfirmacao::NAO => $this->descartar($pendentes),
+            RespostaDeConfirmacao::INDEFINIDO => ResultadoDaInteracao::confirmacaoAmbigua($pendente),
+        };
+    }
+
+    private function gravarConfirmado(ConfirmarGastoPendente $confirmar, CarbonImmutable $agora): ResultadoDaInteracao
+    {
+        $transaction = $confirmar->confirmar($this->userId, $agora);
+
+        return $transaction !== null
+            ? ResultadoDaInteracao::gravado($transaction)
+            : ResultadoDaInteracao::nadaParaConfirmar();
+    }
+
+    private function descartar(ConfirmacoesPendentes $pendentes): ResultadoDaInteracao
+    {
+        $pendentes->descartar($this->userId);
+
+        return ResultadoDaInteracao::confirmacaoCancelada();
     }
 
     /**
@@ -85,7 +137,9 @@ final class ProcessarMensagemDoBot implements ShouldQueue
     private function registrar(
         ExtratorDeGasto $extrator,
         PrepararConfirmacaoDeGasto $preparar,
+        ConfirmacoesPendentes $pendentes,
         string $texto,
+        CarbonImmutable $agora,
     ): ResultadoDaInteracao {
         $extracao = $extrator->extrair($texto);
 
@@ -95,11 +149,12 @@ final class ProcessarMensagemDoBot implements ShouldQueue
             );
         }
 
-        $confirmacao = $preparar->preparar(
-            $extracao->gasto,
-            $this->userId,
-            CarbonImmutable::now('America/Sao_Paulo'),
-        );
+        $confirmacao = $preparar->preparar($extracao->gasto, $this->userId, $agora);
+
+        // Prévia confirmável vira pendente: o próximo "sim" a persiste (regra 7, §6.b/§C6).
+        if ($confirmacao->confirmavel()) {
+            $pendentes->guardar($this->userId, $confirmacao, $agora);
+        }
 
         return ResultadoDaInteracao::registro($confirmacao);
     }
