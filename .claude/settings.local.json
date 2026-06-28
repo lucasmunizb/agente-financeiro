@@ -20,7 +20,17 @@
       "Bash(make test *)",
       "Bash(make artisan *)",
       "Bash(make migrate *)",
-      "Bash(awk '/## Bloco 4/,/## Bloco 5/' docs/TODO.md)"
+      "Bash(awk '/## Bloco 4/,/## Bloco 5/' docs/TODO.md)",
+      "Bash(git -C /home/lucas/agente-financeiro config core.hooksPath)",
+      "Bash(php artisan *)",
+      "Bash(awk *)",
+      "Bash(rtk curl *)",
+      "Bash(git -C /home/lucas/agente-financeiro hooks --list)",
+      "Bash(rtk wc *)",
+      "Bash(php -v)",
+      "Bash(git config *)",
+      "Bash(echo \"hooksPath agora: [$\\(rtk git config core.hooksPath 2>&1\\)]\")",
+      "Bash(echo \"[$\\(rtk git config core.hooksPath 2>&1\\)]\")"
     ]
   }
 }

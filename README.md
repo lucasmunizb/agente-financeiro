@@ -136,7 +136,6 @@ Todos os alvos encapsulam `docker compose` — nenhum comando roda no host.
 | `make tinker` | Abre o Tinker |
 | `make artisan c="..."` | Qualquer comando `artisan` |
 | `make composer c="..."` | Qualquer comando `composer` |
-| `make install-hooks` | Instala o hook que bloqueia `git push` |
 
 ---
 
@@ -181,7 +180,6 @@ Todos os alvos encapsulam `docker compose` — nenhum comando roda no host.
 ├── docker-stack.yml       # prod: Swarm + Docker Secrets
 ├── Makefile               # alvos finos que encapsulam o Docker
 ├── scripts/bootstrap.sh   # cria tudo por contêiner (idempotente)
-├── .githooks/pre-push     # bloqueia push (regra inviolável)
 ├── docs/                  # escopo destrinchado (00 → 11, ROADMAP, TODO)
 ├── CLAUDE.md              # regras invioláveis + fluxo de trabalho
 └── .claude/skills/        # skill-creator · laravel-backend · devops

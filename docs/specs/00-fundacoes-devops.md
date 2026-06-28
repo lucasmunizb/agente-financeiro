@@ -80,8 +80,9 @@ construídas.
   vão para imagem, log ou git.
 - **Regra 5 (fuso base).** `APP_TIMEZONE=America/Sao_Paulo` fixado no ambiente desde a
   fundação (datas relativas e vencimentos dependem disso).
-- **Regra 1 — nunca push.** Hook de `pre-push` em `.githooks` bloqueia push por padrão
-  (`make install-hooks`); commits locais permitidos.
+- **Regra 1 — nunca push.** Push ao remoto exige ordem explícita do usuário; só commits
+  locais são permitidos. A barreira é de disciplina (CLAUDE.md, regra inviolável 1) — não
+  há hook de git no projeto.
 - **Idempotência da fila** por unique constraint (driver `database`), preparando o dedupe
   de Telegram por `update_id` ([[spec-03]]).
 
@@ -101,7 +102,7 @@ Esta etapa não tem classes de domínio; seus "contratos" são **artefatos de in
 | Imagem | `docker/Dockerfile` | Multi-stage `base` (dev) / `prod`; FrankenPHP 1 · PHP 8.3; extensões `pdo_pgsql`, `pgsql`, `pdo_sqlite`, `intl`, `bcmath`, `opcache`, `pcntl`; Tesseract (pt) + poppler-utils; Composer 2. |
 | Servidor HTTP | `docker/Caddyfile` | FrankenPHP serve `/app/public` na `:8000`; `/up` para healthcheck; logs JSON; `auto_https off` (TLS no LB/Swarm). |
 | Entrypoint | `docker/entrypoint.sh` | Resolve `*_FILE` → exporta `VAR` (Docker Secrets); cria dirs graváveis; `exec "$@"`. |
-| Orquestração (dev) | `Makefile` | Alvos finos sobre `docker compose` (`up/down/build/test/migrate/fresh/seed/shell/logs/worker-shell/artisan/composer/install-hooks`). |
+| Orquestração (dev) | `Makefile` | Alvos finos sobre `docker compose` (`up/down/build/test/migrate/fresh/seed/shell/logs/worker-shell/artisan/composer`). |
 | Bootstrap | `scripts/bootstrap.sh` | Cria o esqueleto Laravel **por contêiner** e sobe o ambiente. |
 | Stack (prod) | `docker-stack.yml` | Swarm: imagem `prod`, `secrets` externos, `replicas`, `restart_policy`, `update_config: start-first`. |
 | Config (dev) | `.env.example` | Modelo versionado; `APP_TIMEZONE` SP, `QUEUE/CACHE/SESSION=database`, `AI_PROVIDER`, placeholders `*_FILE` comentados. |
@@ -148,7 +149,7 @@ Critérios verificáveis equivalentes aos cenários de §3:
   - `docker/Caddyfile` — FrankenPHP servindo `/app/public` na `:8000`, `/up`, logs JSON.
   - `docker/entrypoint.sh` — resolução `*_FILE` (Docker Secrets) + dirs graváveis.
   - `Makefile` — alvos finos sobre `docker compose` (incl. `bootstrap`, `test`,
-    `migrate`, `shell`, `worker-shell`, `install-hooks`).
+    `migrate`, `shell`, `worker-shell`).
   - `scripts/bootstrap.sh` — criação do esqueleto Laravel por contêiner.
   - `docker-stack.yml` — Swarm + Docker Secrets externos, réplicas, `restart_policy`.
   - `.env.example` — modelo de dev (fuso SP; `QUEUE/CACHE/SESSION=database`; placeholders

@@ -3,12 +3,13 @@
 use App\Domain\Telegram\AutenticarTelegram;
 use App\Domain\Telegram\GerarTokenDeVinculo;
 use App\Domain\Telegram\TokenDeVinculo;
-use App\Domain\Telegram\VinculoInexistenteException;
 use App\Domain\Telegram\TokenInvalidoException;
 use App\Domain\Telegram\VincularTelegram;
+use App\Domain\Telegram\VinculoInexistenteException;
 use App\Models\TelegramLink;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 /*
@@ -106,6 +107,23 @@ it('garante apenas um vínculo ativo por conta (novo vínculo revoga o anterior)
 
     expect(TelegramLink::where('user_id', $user->id)->where('status', TelegramLink::ATIVO)->count())->toBe(1)
         ->and(TelegramLink::where('user_id', $user->id)->where('status', TelegramLink::ATIVO)->value('telegram_user_id'))->toBe(999002);
+});
+
+it('impede o mesmo telegram_user_id de vincular a duas contas (índice parcial)', function () {
+    $userA = User::factory()->create();
+    $userB = User::factory()->create();
+
+    $tA = (new GerarTokenDeVinculo)->para($userA->id);
+    (new VincularTelegram)->confirmar($tA->token, 999001, '+5511999998888');
+
+    // userB tenta vincular o MESMO telegram_user_id, ainda ativo em userA.
+    $tB = (new GerarTokenDeVinculo)->para($userB->id);
+    expect(fn () => (new VincularTelegram)->confirmar($tB->token, 999001, '+5511999997777'))
+        ->toThrow(QueryException::class);
+
+    // userB não fica com vínculo ativo; o telegram_user_id continua resolvendo para userA.
+    expect(TelegramLink::where('user_id', $userB->id)->where('status', TelegramLink::ATIVO)->exists())->toBeFalse()
+        ->and((new AutenticarTelegram)->usuario(999001)->id)->toBe($userA->id);
 });
 
 /* -------- autenticação (middleware) -------- */

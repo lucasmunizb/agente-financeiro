@@ -40,16 +40,7 @@ else
 fi
 
 # ---------------------------------------------------------------------
-# 2. Hook de pré-push (bloqueia push — regra inviolável)
-# ---------------------------------------------------------------------
-if [ -d .git ]; then
-	log "Instalando git hook de pre-push (push bloqueado por padrão)"
-	chmod +x .githooks/pre-push 2>/dev/null || true
-	git config core.hooksPath .githooks || warn "Não foi possível setar core.hooksPath"
-fi
-
-# ---------------------------------------------------------------------
-# 3. Esqueleto Laravel 12 — criado por contêiner, SEM instalar deps
+# 2. Esqueleto Laravel 12 — criado por contêiner, SEM instalar deps
 #    (--no-install evita travar o lock no PHP 8.4 do composer:2).
 # ---------------------------------------------------------------------
 if [ ! -f composer.json ]; then
@@ -83,13 +74,13 @@ else
 fi
 
 # ---------------------------------------------------------------------
-# 4. Build da imagem da aplicação (PHP 8.3 + extensões + Tesseract)
+# 3. Build da imagem da aplicação (PHP 8.3 + extensões + Tesseract)
 # ---------------------------------------------------------------------
 log "Buildando a imagem da aplicação"
 docker compose build
 
 # ---------------------------------------------------------------------
-# 5. Dependências resolvidas DENTRO da nossa imagem (PHP 8.3)
+# 4. Dependências resolvidas DENTRO da nossa imagem (PHP 8.3)
 #    Fixa a plataforma para o composer resolver symfony/* na 7.x.
 # ---------------------------------------------------------------------
 if [ ! -d vendor ]; then
@@ -100,7 +91,7 @@ else
 fi
 
 # ---------------------------------------------------------------------
-# 6. Pest (TDD). Fallback automático para PHPUnit via 'php artisan test'.
+# 5. Pest (TDD). Fallback automático para PHPUnit via 'php artisan test'.
 # ---------------------------------------------------------------------
 if ! run_app "composer show pestphp/pest" >/dev/null 2>&1; then
 	log "Instalando Pest (TDD)"
@@ -110,7 +101,7 @@ if ! run_app "composer show pestphp/pest" >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------
-# 7. APP_KEY gerada ANTES do 'up' (senão os contêineres sobem com a
+# 6. APP_KEY gerada ANTES do 'up' (senão os contêineres sobem com a
 #    APP_KEY vazia do env_file e os testes falham com MissingAppKey).
 # ---------------------------------------------------------------------
 if grep -q '^APP_KEY=$' .env; then
@@ -119,19 +110,19 @@ if grep -q '^APP_KEY=$' .env; then
 fi
 
 # ---------------------------------------------------------------------
-# 8. Sobe os contêineres (já com a APP_KEY correta no env_file)
+# 7. Sobe os contêineres (já com a APP_KEY correta no env_file)
 # ---------------------------------------------------------------------
 log "Subindo os contêineres (postgres -> app -> worker)"
 docker compose up -d
 
 # ---------------------------------------------------------------------
-# 9. Migrations (cria tabelas, inclusive a de jobs da fila database)
+# 8. Migrations (cria tabelas, inclusive a de jobs da fila database)
 # ---------------------------------------------------------------------
 log "Rodando migrations"
 docker compose exec -T app php artisan migrate --force
 
 # ---------------------------------------------------------------------
-# 10. Conferência
+# 9. Conferência
 # ---------------------------------------------------------------------
 log "Status dos contêineres"
 docker compose ps

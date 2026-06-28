@@ -9,7 +9,7 @@ EXEC_T := $(DC) exec -T app
 
 .PHONY: help setup bootstrap up down build rebuild restart ps logs logs-app \
         logs-worker shell worker-shell test migrate fresh seed key artisan \
-        composer pest tinker stop install-hooks
+        composer pest pint pint-test tinker stop
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -77,12 +77,15 @@ tinker: ## Abre o tinker
 pest: ## Roda o Pest diretamente
 	$(EXEC_T) ./vendor/bin/pest
 
+pint: ## Formata o código (Laravel Pint)
+	$(EXEC_T) ./vendor/bin/pint
+
+pint-test: ## Checa o estilo sem alterar arquivos (CI)
+	$(EXEC_T) ./vendor/bin/pint --test
+
 # Uso: make artisan c="migrate:status"   |   make composer c="require pacote"
 artisan: ## Executa um comando artisan (c="...")
 	$(EXEC_T) php artisan $(c)
 
 composer: ## Executa um comando composer (c="...")
 	$(EXEC_T) composer $(c)
-
-install-hooks: ## Instala o git hook que bloqueia push
-	@git config core.hooksPath .githooks && echo "Hook de pre-push instalado (push bloqueado por padrão)."

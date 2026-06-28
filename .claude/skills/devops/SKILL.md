@@ -75,4 +75,4 @@ Mantenha **canais e processamento desacoplados no código** para que nada exija 
 ## Regra inviolável
 **NUNCA `git push`** nem qualquer operação em remoto (push, force-push, remote, PR, branch
 remota). Commits **locais** apenas. Remoto só com ordem explícita do usuário, por escrito,
-naquele momento. Considere reforçar com um hook local de `pre-push` que bloqueia/avisa.
+naquele momento. A barreira é de disciplina — o projeto não usa hook de git.

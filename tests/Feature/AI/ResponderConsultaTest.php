@@ -1,9 +1,13 @@
 <?php
 
 use App\Ai\Agents\AssistenteDeConsulta;
+use App\Ai\Tools\ConsultarDisponivelMes;
+use App\Ai\Tools\ConsultarGastos;
 use App\Domain\IA\Consulta\ColetorDeConsultas;
 use App\Domain\IA\Consulta\ResponderConsulta;
 use App\Domain\IA\Consulta\RespostaDaConsulta;
+use App\Domain\IA\Guard\GuardPosGeracao;
+use App\Models\Income;
 use App\Models\Installment;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
@@ -13,6 +17,7 @@ use Database\Seeders\StatusPagamentoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Responses\Data\ToolCall;
+use Laravel\Ai\Tools\Request;
 
 /*
  * Orquestração do chat de consulta (Bloco 6, F8). O agente decide chamar as tools (escopo
@@ -62,6 +67,42 @@ it('chama a ferramenta, redige só com números do payload e aprova', function (
         ->and($resposta->tentativas)->toBe(1)
         ->and($resposta->fontes)->toHaveCount(1)
         ->and($resposta->fontes[0]->ferramenta)->toBe('consultar_gastos');
+});
+
+it('o guard aprova o texto contra o conjunto-verdade COMBINADO de várias tools (C7)', function () {
+    // O fake da SDK executa no máximo UMA tool por turno do agente, então a combinação
+    // de múltiplas tools é exercitada no seu seam real: duas tools reais, um único coletor e
+    // o GuardPosGeracao real sobre o payload COMBINADO — exatamente o que ResponderConsulta
+    // usa em produção (responder() valida contra coletor->payloadCombinado()).
+    $user = User::factory()->create();
+
+    // Tool A — gastos de MAIO: R$ 800,00 (valor que SÓ existe no payload de gastos).
+    gastoConsulta($user, 80000, '2026-05-10');
+
+    // Tool B — disponível de JUNHO: receitas 4000 − gastos 1500 = R$ 2.500,00
+    // (valor que SÓ existe no payload do disponível, nunca no de gastos de maio).
+    gastoConsulta($user, 150000, '2026-06-10');
+    Income::factory()->for($user)->create(['valor_cents' => 400000, 'data' => '2026-06-05']);
+
+    $coletor = new ColetorDeConsultas;
+    (new ConsultarGastos($user, $coletor))->handle(new Request(['periodo' => '2026-05']));
+    (new ConsultarDisponivelMes($user, $coletor))->handle(new Request(['mes' => '2026-06']));
+
+    $texto = 'Em maio você gastou R$ 800,00 e em junho seu disponível é R$ 2.500,00.';
+    $guard = app(GuardPosGeracao::class);
+
+    // Aprovado SÓ porque o conjunto-verdade é a UNIÃO das duas tools.
+    expect($guard->validar($texto, $coletor->payloadCombinado())->aprovado)->toBeTrue()
+        ->and($coletor->fontes())->toHaveCount(2);
+
+    $ferramentas = collect($coletor->fontes())->map(fn ($f) => $f->ferramenta)->all();
+    expect($ferramentas)->toContain('consultar_gastos')->toContain('consultar_disponivel_mes');
+
+    // Prova de que a combinação é necessária: contra o payload de UMA tool só, o texto reprova
+    // — o R$ 2.500,00 da outra tool vira "número inventado".
+    $coletorSoGastos = new ColetorDeConsultas;
+    (new ConsultarGastos($user, $coletorSoGastos))->handle(new Request(['periodo' => '2026-05']));
+    expect($guard->validar($texto, $coletorSoGastos->payloadCombinado())->aprovado)->toBeFalse();
 });
 
 it('encaminha a pergunta do usuário, íntegra, ao agente', function () {
