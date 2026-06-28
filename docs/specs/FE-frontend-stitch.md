@@ -73,7 +73,7 @@ o resto da interface é arejado e humano.
 | Token | Hex | Uso |
 |---|---|---|
 | `tinta` | `#1C1B17` | texto principal (quase-preto **quente**) |
-| `papel` | `#F3F4EF` | fundo da aplicação (névoa pálida verde-acinzentada) |
+| `papel` | `#EDF0E8` | fundo da aplicação (névoa pálida verde-acinzentada) |
 | `superficie` | `#FBFBF8` | cartões e campos |
 | `cedula` | `#1F6E5A` | primária — saldo positivo, ações, marca (verde-cédula) |
 | `cedula-clara`| `#2E8B72` | hover/ativo da primária |
@@ -175,7 +175,7 @@ de um caderno.
 
 PALETA:
 - Texto/quase-preto quente: #1C1B17
-- Fundo (névoa pálida verde-acinzentada): #F3F4EF
+- Fundo (névoa pálida verde-acinzentada): #EDF0E8
 - Cartões/superfícies: #FBFBF8
 - Primária (verde-cédula): #1F6E5A  | hover: #2E8B72
 - Atenção / "a vencer": #C9852A
@@ -199,6 +199,12 @@ REGRAS DE CONTEÚDO:
 - Respostas de IA mostram a FONTE (período/filtros) e um selo "número conferido".
 - Acessível: contraste AA, foco de teclado visível (anel verde-cédula), alvos ≥ 44px.
 
+ESTADOS PADRÃO (valem para todas as telas): vazio (texto-guia que convida à ação, nunca
+um "nada aqui" seco), carregando (esqueleto sóbrio ou rótulo no próprio botão) e erro
+(mensagem direta — o que houve + como resolver — na voz da interface, sem desculpas vagas).
+TELAS PRÉ-LOGIN (login, criar conta, onboarding, vínculo): sem barra de navegação do app;
+um card calmo e centralizado, com bastante respiro.
+
 Use conteúdo de exemplo realista pt-BR (mercado, transporte, fatura do cartão, aluguel).
 Confirme que entendeu o tema e aguarde o pedido da primeira tela.
 ```
@@ -206,55 +212,92 @@ Confirme que entendeu o tema e aguarde o pedido da primeira tela.
 ### 7.1 Login
 **Objetivo:** entrar com calma e confiança. **Estados:** erro de credencial; carregando.
 ```text
-Tela de LOGIN do app (use o tema definido). Mobile-first.
-- Cabeçalho enxuto com a marca (texto "Caderno de contas" no verde-cédula).
-- Card central: campo "E-mail", campo "Senha" (com mostrar/ocultar), link "Esqueci a senha",
-  botão primário "Entrar" (verde-cédula, largura total).
-- Abaixo, divisor sutil e link "Criar conta".
-- Rodapé minúsculo: "Seus números vêm do seu banco de dados — a IA nunca os inventa."
-- Estado de erro inline (campo + mensagem direta: "E-mail ou senha incorretos.").
-Sem ilustração chamativa; a calma vem do espaço e da tipografia.
+Tela de LOGIN (use o tema). Mobile-first; no desktop, o card fica centralizado com bastante
+respiro, sem hero ilustrado.
+
+ESTRUTURA
+- Topo enxuto: a marca em texto, "Caderno de contas", no verde-cédula, com um hairline
+  (#DDE0D7) abaixo. Nada de logo genérico.
+- Card central (superfície #FBFBF8, cantos 12px, sombra difusa):
+  - Campo "E-mail".
+  - Campo "Senha" com botão mostrar/ocultar.
+  - Link discreto "Esqueci a senha" alinhado à direita.
+  - Botão primário "Entrar" (verde-cédula, largura total, alvo ≥ 44px).
+- Abaixo do card, divisor sutil e a linha "Novo por aqui? Criar conta" (link verde-cédula).
+- Rodapé minúsculo (texto secundário): "Seus números vêm do seu banco de dados — a IA nunca os inventa."
+
+ESTADOS (gere como variações)
+- Erro de credencial: mensagem inline direta sob os campos — "E-mail ou senha incorretos."
+- Carregando: botão com rótulo "Entrando…" e spinner sóbrio; campos desabilitados.
+
+A calma vem do espaço e da tipografia, não de ilustração. Foco de teclado visível (anel verde-cédula).
 ```
 
 ### 7.2 Criar conta
 **Objetivo:** cadastro mínimo. **Estados:** validação inline; carregando.
 ```text
-Tela CRIAR CONTA (use o tema). Mobile-first.
-- Card: "Nome", "E-mail", "Senha" (com regra de força simples), "Confirmar senha".
-- Checkbox "Li e aceito os termos e a política de privacidade" com links.
-- Botão primário "Criar conta"; abaixo "Já tenho conta — entrar".
-- Validação inline e direta. Nada de upsell. Tom acolhedor e breve.
+Tela CRIAR CONTA (use o tema). Mobile-first, um campo por linha; mesmo card calmo do login.
+
+ESTRUTURA
+- Card: "Nome", "E-mail", "Senha" (com medidor de força simples em 3 níveis — "fraca / ok /
+  forte"), "Confirmar senha".
+- Checkbox "Li e aceito os termos e a política de privacidade", com os dois links sublinhados.
+- Botão primário "Criar conta" (largura total). Abaixo: "Já tenho conta — entrar".
+
+ESTADOS (variações)
+- Validação inline: "Use um e-mail válido."; "As senhas não conferem."; consentimento
+  obrigatório com aviso "Aceite os termos para continuar."
+- Carregando: botão "Criando conta…".
+
+Tom acolhedor e breve, sem upsell. Sentence case.
 ```
 
 ### 7.3 Onboarding + consentimento LGPD
 **Objetivo:** explicar finalidades e obter consentimento (doc 09). **Estados:** —
 ```text
-Tela de ONBOARDING/CONSENTIMENTO (use o tema). Um passo, claro e honesto.
-- Título "Antes de começar".
-- Três blocos curtos com ícone e uma linha cada:
-  1) "Acompanhe seus gastos" — registro manual e pelo Telegram.
+Tela ONBOARDING / CONSENTIMENTO (use o tema). Um único passo, honesto e curto — primeira
+tela depois de criar a conta.
+
+ESTRUTURA
+- Título display "Antes de começar".
+- Três blocos curtos, cada um com um ícone simples (de linha, não preenchido) e uma frase:
+  1) "Acompanhe seus gastos" — registre na web ou direto no Telegram.
   2) "IA que interpreta, não inventa" — a IA classifica e redige; os números vêm do seu
-     banco de dados (cálculo determinístico).
-  3) "Privacidade" — PDFs de fatura são processados e descartados; conversas guardadas por
-     até 60 dias; nenhum dado sensível é armazenado.
-- Caixa de consentimento com checkbox "Concordo com o tratamento dos meus dados para as
-  finalidades acima" + link "política de privacidade".
-- Botão primário "Começar". Link discreto "Excluir dados" explicando o direito a qualquer momento.
+     banco de dados, calculados pelo sistema.
+  3) "Privacidade" — PDFs de fatura são processados e descartados na hora; conversas ficam
+     por até 60 dias; nenhum dado sensível é guardado.
+- Caixa de consentimento destacada (superfície, borda fina): checkbox "Concordo com o
+  tratamento dos meus dados para as finalidades acima" + link "política de privacidade".
+- Botão primário "Começar" (desabilitado até marcar o consentimento).
+- Link discreto ao final: "Você pode excluir seus dados quando quiser."
+
+Tom direto e tranquilo. Sem ilustração grande; os três ícones e o espaço bastam.
 ```
 
 ### 7.4 Vínculo do Telegram
 **Objetivo:** parear a conta ao bot. **Estados:** pendente (token válido); expirado; **vinculado**.
 ```text
-Tela VÍNCULO DO TELEGRAM (use o tema). Mobile-first.
+Tela VÍNCULO DO TELEGRAM (use o tema). Mobile-first. Aqui a ORDEM dos passos importa de
+verdade, então numere os passos.
+
+ESTRUTURA (estado PENDENTE, token válido)
 - Título "Conectar o Telegram" + uma linha: "Registre e consulte gastos direto no chat."
-- Card de passos numerados (a ordem importa aqui, então numere de verdade):
-  1) "Abra o bot" — botão "Abrir no Telegram" (deeplink t.me/seubot?start=TOKEN).
-  2) "Confirme o telefone" — explica que o bot pedirá o contato (request_contact).
-- Mostre o TOKEN em destaque monoespaçado e um contador "expira em 14:32" (em ocre quando
-  perto de expirar). Botão secundário "Gerar novo código".
-- Estado VINCULADO: card verde-cédula com selo "Conectado", o @usuário e botão "Desconectar".
-- Estado EXPIRADO: aviso direto "Este código expirou." + "Gerar novo código".
-O token é mostrado só nesta tela; deixe claro que ele é de uso único.
+- Card de passos numerados (1, 2):
+  1) "Abra o bot" — botão primário "Abrir no Telegram" (deeplink t.me/seubot?start=TOKEN).
+  2) "Confirme o telefone" — "O bot vai pedir para compartilhar seu contato. É assim que eu
+     confirmo que o número é seu."
+- TOKEN em destaque MONOESPAÇADO, grande e copiável (ícone copiar), com a etiqueta
+  "código de uso único".
+- Contador "expira em 14:32" em mono; vira ocre quando faltam menos de 2 minutos.
+- Botão secundário "Gerar novo código".
+
+ESTADOS (variações)
+- VINCULADO: card em verde-cédula suave, selo "Conectado ✓", o @usuário em mono e botão
+  secundário "Desconectar".
+- EXPIRADO: token esmaecido, aviso direto "Este código expirou." e botão primário
+  "Gerar novo código".
+
+Deixe claro que o token só aparece nesta tela e serve uma única vez.
 ```
 
 ### 7.5 Dashboard do mês — *tela-assinatura*
@@ -473,8 +516,14 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
 - [ ] Commit local atômico (regra 1: sem push); separado do backend (regra 3).
 
 ## 10. Estado atual / artefatos
-- **Status:** ⬜ Planejado.
-- **Entregue:** —
+- **Status:** 🟡 Em andamento — **grupo A** (entrada & onboarding).
+- **Entregue:** prompts de Stitch **refinados e prontos para colar** do **tema (§7.0)** e do
+  **grupo A** — §7.1 Login, §7.2 Criar conta, §7.3 Onboarding+LGPD, §7.4 Vínculo do Telegram
+  (estados explícitos como variações, copy na voz da interface, conteúdo pt-BR realista,
+  acessibilidade embutida). Geração/aprovação visual no Stitch é ação externa do usuário —
+  marcar os itens 0–4 do §6 conforme gerar/aprovar.
+- **Decisão de design aplicada:** token `papel` ajustado `#F3F4EF` → `#EDF0E8` (§4.2 e §7.0)
+  para o fundo ler claramente como verde-acinzentado e fugir do "cream" (default de IA).
 - **Adiado para etapa técnica posterior:** ligação das telas ao Laravel (Inertia/Blade, dados
   reais, validação server-side) e implementação do *sender* do bot (formatação via §8).
 - **Decisões de design tomadas:** conceito "caderno de contas"; assinatura "a régua do mês";
