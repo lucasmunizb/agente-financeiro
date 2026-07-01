@@ -10,6 +10,7 @@ export default defineConfig({
                 'resources/js/app.js',
                 'resources/js/pages/auth.js',
                 'resources/js/pages/onboarding.js',
+                'resources/js/pages/telegram.js',
             ],
             refresh: true,
         }),

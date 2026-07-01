@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\TelegramLinkController;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Middleware\VerificaSegredoTelegram;
 use Illuminate\Support\Facades\Route;
@@ -14,12 +15,18 @@ use Illuminate\Support\Facades\Route;
 // Laravel → route('login')). Novas rotas da aplicação entram neste grupo.
 // -------------------------------------------------------------------------
 Route::middleware('auth')->group(function () {
-    Route::get('/', fn () => view('welcome'))->name('home');
+    // Tela inicial provisória (destino do login) — mantém o shell do app até o
+    // Dashboard ("Visão Geral") ser desenvolvido. Apresentação (regra 3).
+    Route::get('/', fn () => view('home'))->name('home');
 
     // Onboarding + consentimento LGPD. O usuário chega aqui já autenticado
     // (logo após criar a conta); persistir o aceite (aceite_lgpd_em) é backend.
     Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
     Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.consent');
+
+    // Vínculo com o Telegram (apresentação). Próximo passo do fluxo após o
+    // consentimento; o backend do vínculo seguro é etapa posterior (doc 06).
+    Route::get('/telegram', [TelegramLinkController::class, 'show'])->name('telegram');
 
     Route::post('/logout', LogoutController::class)->name('logout');
 });
@@ -55,7 +62,7 @@ Route::get('/robots.txt', function () {
     $linhas = [
         'User-agent: *',
         'Disallow: /onboarding',
-        'Disallow: /telegram/',
+        'Disallow: /telegram',
         '',
         'Sitemap: '.url('/sitemap.xml'),
         '',

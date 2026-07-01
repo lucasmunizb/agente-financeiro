@@ -27,8 +27,16 @@
             drivers de dev. O DB fica SEM force de propósito: o schema é
             específico de PostgreSQL (timestamptz, softDeletesTz), então os
             testes continuam no Postgres do contêiner, não em sqlite :memory:.
+
+            O NOME do banco, porém, é forçado para um banco DEDICADO de teste
+            (financeiro_test). RefreshDatabase roda migrate:fresh (derruba todas
+            as tabelas) a cada suíte — se apontasse para o `financeiro` de dev,
+            apagaria seus dados. A conexão/host seguem os do .env (Postgres do
+            contêiner); só o database muda. Crie-o com `make db-test` (idempotente;
+            `make test`/`make pest` já garantem antes de rodar).
         -->
         <env name="APP_ENV" value="testing" force="true"/>
+        <env name="DB_DATABASE" value="financeiro_test" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

@@ -11,12 +11,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('registra o aceite LGPD do usuário autenticado e entra no app', function () {
+it('registra o aceite LGPD do usuário autenticado e segue para o vínculo do Telegram', function () {
     $user = User::factory()->create(['aceite_lgpd_em' => null]);
 
+    // Após o consentimento, o fluxo encaminha para conectar o Telegram.
     $this->actingAs($user)
         ->post('/onboarding', ['consent' => '1'])
-        ->assertRedirect('/');
+        ->assertRedirect(route('telegram'));
 
     expect($user->fresh()->aceite_lgpd_em)->not->toBeNull();
 });

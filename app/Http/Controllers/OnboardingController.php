@@ -27,6 +27,7 @@ class OnboardingController extends Controller
 
         $request->user()->forceFill(['aceite_lgpd_em' => now()])->save();
 
-        return redirect('/');
+        // Após o consentimento, o próximo passo do fluxo é conectar o Telegram.
+        return redirect()->route('telegram');
     }
 }

@@ -39,13 +39,20 @@
     /* Paleta — tokens do design system Stitch usados nas telas */
     --color-primary: #005543; /* verde escuro: títulos e links */
     --color-primary-container: #1f6e5a;
+    --color-primary-fixed: #a6f2d8; /* verde claro: superfícies afirmativas */
     --color-on-primary-container: #a2edd4;
     --color-on-surface: #1d1c18;
     --color-on-surface-variant: #3f4945;
     --color-outline: #6f7975;
     --color-outline-variant: #bec9c3;
     --color-surface-container-low: #f8f3ec;
+    --color-surface-container: #f2ede6;
+    --color-surface-container-high: #ece8e1;
     --color-surface-container-lowest: #ffffff;
+    --color-inverse-surface: #32302c; /* fundo do toast */
+    --color-inverse-on-surface: #f5f0e9;
+    --color-error-container: #ffdad6; /* selo "expirou" */
+    --color-on-error-container: #93000a;
 
     /* Tipografia — famílias por papel */
     --font-headline-lg: var(--font-display);
@@ -223,6 +230,61 @@ body {
 }
 .legal-callout p:last-child {
     margin-bottom: 0;
+}
+
+/* =====================================================================
+   Shell autenticado (barra lateral + navegação) — spec FE §4.6.
+   ===================================================================== */
+
+/* Item de navegação lateral: repouso, hover e ativo (página atual). */
+.nav-item {
+    color: var(--color-on-surface-variant);
+}
+.nav-item:hover {
+    background-color: var(--color-surface-container);
+    color: var(--color-on-surface);
+}
+.nav-item[aria-current='page'] {
+    background-color: var(--color-primary-container);
+    color: #fff;
+}
+/* Itens ainda sem tela: presentes, porém discretos (não enganam o clique). */
+.nav-item[aria-disabled='true'] {
+    opacity: 0.55;
+    cursor: default;
+}
+.nav-item[aria-disabled='true']:hover {
+    background-color: transparent;
+    color: var(--color-on-surface-variant);
+}
+/* Ação destrutiva (Sair) — argila, com moderação. */
+.nav-item--danger {
+    color: var(--color-argila);
+}
+.nav-item--danger:hover {
+    background-color: color-mix(in srgb, var(--color-argila) 10%, transparent);
+    color: var(--color-argila);
+}
+
+/* Passo numerado do fluxo de vínculo (círculo mono). */
+.step-number {
+    display: flex;
+    height: 32px;
+    width: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background-color: var(--color-primary-container);
+    color: var(--color-superficie);
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+/* Área do código de uso único — "recorte pontilhado" de caderno. */
+.token-display {
+    background-color: var(--color-surface-container);
+    border: 1px dashed var(--color-outline);
+    border-radius: var(--radius-control);
 }
 
 /* Spinner do estado "carregando". */

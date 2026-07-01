@@ -6,17 +6,20 @@
 DC := docker compose
 EXEC := $(DC) exec app
 EXEC_T := $(DC) exec -T app
-# Execução de testes: força APP_ENV=testing. O contêiner do app carrega o .env
-# (APP_ENV=local) como variável REAL do SO, que venceria os <env> do phpunit.xml
-# — deixando a suíte rodar em ambiente "local" (CSRF ativo em teste, drivers de
-# dev). Passar -e no exec fixa o ambiente correto na borda do processo.
-EXEC_TEST := $(DC) exec -T -e APP_ENV=testing app
+# Execução de testes: força APP_ENV=testing e DB_DATABASE=financeiro_test. O
+# contêiner do app carrega o .env (APP_ENV=local, DB_DATABASE=financeiro) como
+# variáveis REAIS do SO, que venceriam os <env> do phpunit.xml (mesmo com
+# force="true") — deixando a suíte rodar em ambiente "local" E, pior, contra o
+# banco de DEV: RefreshDatabase faz migrate:fresh e apagaria seus dados. Passar
+# -e no exec fixa ambiente e banco corretos na borda do processo. O banco de
+# teste é criado por `make db-test` (dependência de test/pest).
+EXEC_TEST := $(DC) exec -T -e APP_ENV=testing -e DB_DATABASE=financeiro_test app
 # Serviço de build de assets (profile tools): sobe sob demanda e some ao fim.
 RUN_NODE := $(DC) run --rm node
 
 .PHONY: help setup bootstrap up down build rebuild restart ps logs logs-app \
         logs-worker shell worker-shell test migrate fresh seed key artisan \
-        composer pest pint pint-test tinker stop npm assets vite
+        composer pest pint pint-test tinker stop npm assets vite db-test
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -63,7 +66,10 @@ shell: ## Abre bash no contêiner app
 worker-shell: ## Abre bash no contêiner worker
 	$(DC) exec worker bash
 
-test: ## Roda a suíte de testes (TDD) dentro do contêiner
+db-test: ## Cria o banco de teste dedicado (financeiro_test) se não existir
+	@$(DC) exec -T postgres sh -lc "psql -U $${POSTGRES_USER:-financeiro} -d $${POSTGRES_DB:-financeiro} -tc \"SELECT 1 FROM pg_database WHERE datname='financeiro_test'\" | grep -q 1 || createdb -U $${POSTGRES_USER:-financeiro} financeiro_test"
+
+test: db-test ## Roda a suíte de testes (TDD) dentro do contêiner
 	$(EXEC_TEST) php artisan test
 
 migrate: ## Roda as migrations
@@ -81,7 +87,7 @@ key: ## Gera a APP_KEY
 tinker: ## Abre o tinker
 	$(EXEC) php artisan tinker
 
-pest: ## Roda o Pest diretamente
+pest: db-test ## Roda o Pest diretamente
 	$(EXEC_TEST) ./vendor/bin/pest
 
 pint: ## Formata o código (Laravel Pint)
