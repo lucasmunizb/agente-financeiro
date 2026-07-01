@@ -47,7 +47,10 @@ return [
     |
     */
 
-    'encrypt' => env('SESSION_ENCRYPT', false),
+    // Criptografa o payload da sessão em repouso (no Postgres). Defesa em
+    // profundidade: além do cookie de id já cifrado (EncryptCookies), o
+    // conteúdo gravado no banco também fica cifrado. Padrão true — fail closed.
+    'encrypt' => env('SESSION_ENCRYPT', true),
 
     /*
     |--------------------------------------------------------------------------

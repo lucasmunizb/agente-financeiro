@@ -28,9 +28,18 @@ it('mantém a tela de login pública', function () {
     $this->get('/login')->assertOk();
 });
 
-it('mantém criar conta e onboarding públicos (guest precisa alcançá-los)', function () {
+it('mantém criar conta pública (guest precisa alcançá-la)', function () {
     $this->get('/criar-conta')->assertOk();
-    $this->get('/onboarding')->assertOk();
+});
+
+it('coloca o onboarding atrás do login (chega-se a ele já autenticado)', function () {
+    // Guest é redirecionado ao login; o usuário só alcança o onboarding após
+    // criar a conta (quando já está autenticado).
+    $this->get('/onboarding')->assertRedirect(route('login'));
+
+    $this->actingAs(User::factory()->create())
+        ->get('/onboarding')
+        ->assertOk();
 });
 
 it('não coloca o webhook do Telegram atrás do login de sessão', function () {

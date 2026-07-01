@@ -6,6 +6,11 @@
 DC := docker compose
 EXEC := $(DC) exec app
 EXEC_T := $(DC) exec -T app
+# Execução de testes: força APP_ENV=testing. O contêiner do app carrega o .env
+# (APP_ENV=local) como variável REAL do SO, que venceria os <env> do phpunit.xml
+# — deixando a suíte rodar em ambiente "local" (CSRF ativo em teste, drivers de
+# dev). Passar -e no exec fixa o ambiente correto na borda do processo.
+EXEC_TEST := $(DC) exec -T -e APP_ENV=testing app
 # Serviço de build de assets (profile tools): sobe sob demanda e some ao fim.
 RUN_NODE := $(DC) run --rm node
 
@@ -59,7 +64,7 @@ worker-shell: ## Abre bash no contêiner worker
 	$(DC) exec worker bash
 
 test: ## Roda a suíte de testes (TDD) dentro do contêiner
-	$(EXEC_T) php artisan test
+	$(EXEC_TEST) php artisan test
 
 migrate: ## Roda as migrations
 	$(EXEC_T) php artisan migrate
@@ -77,7 +82,7 @@ tinker: ## Abre o tinker
 	$(EXEC) php artisan tinker
 
 pest: ## Roda o Pest diretamente
-	$(EXEC_T) ./vendor/bin/pest
+	$(EXEC_TEST) ./vendor/bin/pest
 
 pint: ## Formata o código (Laravel Pint)
 	$(EXEC_T) ./vendor/bin/pint

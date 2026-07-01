@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Middleware\VerificaSegredoTelegram;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // -------------------------------------------------------------------------
@@ -12,48 +15,28 @@ use Illuminate\Support\Facades\Route;
 // -------------------------------------------------------------------------
 Route::middleware('auth')->group(function () {
     Route::get('/', fn () => view('welcome'))->name('home');
+
+    // Onboarding + consentimento LGPD. O usuário chega aqui já autenticado
+    // (logo após criar a conta); persistir o aceite (aceite_lgpd_em) é backend.
+    Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
+    Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.consent');
+
+    Route::post('/logout', LogoutController::class)->name('logout');
 });
 
 // -------------------------------------------------------------------------
-// Login (apresentação). A tela e seus estados (principal/erro/carregando)
-// vivem em resources/views/auth/login.blade.php. A AUTENTICAÇÃO real
-// (validação + guard, test-first) é a etapa de backend — o POST abaixo é um
-// placeholder que apenas dispara o estado de erro para revisão do design.
+// Autenticação (backend real). Rotas 'guest': quem já está logado não vê login
+// nem cadastro (é redirecionado). Login/registro validam na borda (Form
+// Request), autenticam pelo guard de sessão e regeneram a sessão (anti
+// fixation). A apresentação (telas) é etapa separada.
 // -------------------------------------------------------------------------
-Route::get('/login', fn () => view('auth.login'))->name('login');
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'create'])->name('login');
+    Route::post('/login', [LoginController::class, 'store'])->name('login.attempt');
 
-Route::post('/login', function (Request $request) {
-    $request->validate([
-        'email' => ['required', 'email'],
-        'password' => ['required'],
-    ]);
-
-    return back()
-        ->withInput($request->only('email'))
-        ->withErrors(['email' => 'E-mail ou senha incorretos.']);
-})->name('login.attempt');
-
-// -------------------------------------------------------------------------
-// Criar conta (apresentação). Público. A criação real do usuário (validação
-// server-side + persistência + login, test-first) é a etapa de backend — o
-// POST abaixo só valida o formato e encaminha para o onboarding.
-// -------------------------------------------------------------------------
-Route::get('/criar-conta', fn () => view('auth.register'))->name('register');
-
-Route::post('/criar-conta', function (Request $request) {
-    $request->validate([
-        'name' => ['required', 'string', 'max:255'],
-        'email' => ['required', 'email'],
-        'password' => ['required', 'string', 'min:8', 'confirmed'],
-        'terms' => ['accepted'],
-    ], [
-        'email.email' => 'Use um e-mail válido.',
-        'password.confirmed' => 'As senhas não conferem.',
-        'terms.accepted' => 'Aceite os termos para continuar.',
-    ]);
-
-    return redirect()->route('onboarding');
-})->name('register.attempt');
+    Route::get('/criar-conta', [RegisterController::class, 'create'])->name('register');
+    Route::post('/criar-conta', [RegisterController::class, 'store'])->name('register.attempt');
+});
 
 // -------------------------------------------------------------------------
 // Documentos legais (apresentação). Públicos e indexáveis. Conteúdo estático
@@ -62,22 +45,6 @@ Route::post('/criar-conta', function (Request $request) {
 // -------------------------------------------------------------------------
 Route::view('/termos', 'legal.termos')->name('terms');
 Route::view('/politica-de-privacidade', 'legal.privacidade')->name('privacy');
-
-// -------------------------------------------------------------------------
-// Onboarding e consentimento (apresentação). Público por ora; passará a
-// exigir o usuário recém-criado quando o backend de auth existir. Persistir
-// o aceite (aceite_lgpd_em) + efetivar o login é a etapa de backend.
-// -------------------------------------------------------------------------
-Route::get('/onboarding', fn () => view('onboarding'))->name('onboarding');
-
-Route::post('/onboarding', function (Request $request) {
-    $request->validate(
-        ['consent' => ['accepted']],
-        ['consent.accepted' => 'É preciso concordar para continuar.'],
-    );
-
-    return redirect('/');
-})->name('onboarding.consent');
 
 // -------------------------------------------------------------------------
 // SEO técnico (só rotas públicas). Servidos dinamicamente para que a URL
