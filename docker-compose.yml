@@ -50,6 +50,20 @@ services:
       app:
         condition: service_started
 
+  # Ferramenta de build de assets (Vite/Tailwind). Não faz parte do runtime:
+  # roda sob demanda (`make assets` / `make npm` / `make vite`) via `docker
+  # compose run`, mantendo a imagem `app` (FrankenPHP) enxuta, sem Node.
+  # O profile `tools` impede que suba junto com `make up`.
+  node:
+    image: node:22-alpine
+    profiles: ["tools"]
+    working_dir: /app
+    volumes:
+      - .:/app
+    # Vite dev server (HMR) quando rodar `make vite`; ignorado no build.
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped

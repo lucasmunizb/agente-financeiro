@@ -7,6 +7,9 @@
         "dev": "vite"
     },
     "devDependencies": {
+        "@fontsource-variable/bricolage-grotesque": "^5.0.0",
+        "@fontsource/ibm-plex-mono": "^5.0.0",
+        "@fontsource/ibm-plex-sans": "^5.0.0",
         "@tailwindcss/vite": "^4.0.0",
         "axios": "^1.11.0",
         "concurrently": "^9.0.1",

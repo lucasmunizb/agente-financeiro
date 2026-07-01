@@ -6,10 +6,12 @@
 DC := docker compose
 EXEC := $(DC) exec app
 EXEC_T := $(DC) exec -T app
+# Serviço de build de assets (profile tools): sobe sob demanda e some ao fim.
+RUN_NODE := $(DC) run --rm node
 
 .PHONY: help setup bootstrap up down build rebuild restart ps logs logs-app \
         logs-worker shell worker-shell test migrate fresh seed key artisan \
-        composer pest pint pint-test tinker stop
+        composer pest pint pint-test tinker stop npm assets vite
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -89,3 +91,15 @@ artisan: ## Executa um comando artisan (c="...")
 
 composer: ## Executa um comando composer (c="...")
 	$(EXEC_T) composer $(c)
+
+# ---------------------------------------------------------------------
+# Frontend (assets) — Node roda em contêiner sob demanda (regra 9).
+# ---------------------------------------------------------------------
+npm: ## Executa um comando npm no contêiner node (c="install")
+	$(RUN_NODE) npm $(c)
+
+assets: ## Instala deps e builda os assets (Vite/Tailwind) para produção
+	$(RUN_NODE) sh -lc "npm install && npm run build"
+
+vite: ## Sobe o Vite dev server (HMR) em contêiner
+	$(DC) run --rm --service-ports node sh -lc "npm install && npm run dev -- --host 0.0.0.0"

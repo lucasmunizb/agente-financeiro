@@ -8,12 +8,13 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * A raiz do app fica atrás de login: visitante não autenticado é
+     * redirecionado para /login (ver ProtecaoDeRotasTest).
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_the_application_redirects_guests_to_login(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        $response->assertRedirect(route('login'));
     }
 }
