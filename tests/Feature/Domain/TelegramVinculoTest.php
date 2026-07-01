@@ -126,6 +126,90 @@ it('impede o mesmo telegram_user_id de vincular a duas contas (índice parcial)'
         ->and((new AutenticarTelegram)->usuario(999001)->id)->toBe($userA->id);
 });
 
+/* -------- vínculo em dois passos (bot: /start então contato) -------- */
+
+it('iniciar guarda o telegram_user_id no pendente sem ativar ainda', function () {
+    $user = User::factory()->create();
+    $token = (new GerarTokenDeVinculo)->para($user->id);
+
+    $link = (new VincularTelegram)->iniciar($token->token, 999001);
+
+    expect($link->status)->toBe(TelegramLink::PENDENTE)
+        ->and($link->telegram_user_id)->toBe(999001)
+        ->and($link->telefone)->toBeNull();
+});
+
+it('iniciar recusa token inexistente ou expirado', function () {
+    $user = User::factory()->create();
+    $agora = CarbonImmutable::parse('2026-06-26 12:00:00', 'America/Sao_Paulo');
+    $token = (new GerarTokenDeVinculo)->para($user->id, $agora);
+
+    expect(fn () => (new VincularTelegram)->iniciar('naoexiste', 1))
+        ->toThrow(TokenInvalidoException::class);
+    expect(fn () => (new VincularTelegram)->iniciar($token->token, 1, $agora->addMinutes(16)))
+        ->toThrow(TokenInvalidoException::class);
+});
+
+it('iniciar de novo desvincula o telegram_user_id do pendente anterior (um por vez)', function () {
+    $userA = User::factory()->create();
+    $userB = User::factory()->create();
+    $svc = new VincularTelegram;
+
+    $tA = (new GerarTokenDeVinculo)->para($userA->id);
+    $svc->iniciar($tA->token, 999001);
+
+    // O mesmo telegram_user_id aponta o código de outra conta antes de confirmar.
+    $tB = (new GerarTokenDeVinculo)->para($userB->id);
+    $svc->iniciar($tB->token, 999001);
+
+    expect(TelegramLink::where('user_id', $userA->id)->value('telegram_user_id'))->toBeNull()
+        ->and(TelegramLink::where('user_id', $userB->id)->value('telegram_user_id'))->toBe(999001);
+});
+
+it('finalizar ativa capturando o telefone e consome o token', function () {
+    $user = User::factory()->create();
+    $svc = new VincularTelegram;
+    $token = (new GerarTokenDeVinculo)->para($user->id);
+    $svc->iniciar($token->token, 999001);
+
+    $link = $svc->finalizar(999001, '+5511999998888');
+
+    expect($link->user_id)->toBe($user->id)
+        ->and($link->status)->toBe(TelegramLink::ATIVO)
+        ->and($link->telefone)->toBe('+5511999998888')
+        ->and($link->vinculado_em)->not->toBeNull()
+        ->and($link->token_hash)->toBeNull();
+});
+
+it('finalizar recusa quando não há pendente aguardando aquele telegram_user_id', function () {
+    (new VincularTelegram)->finalizar(424242, '+5511999998888');
+})->throws(TokenInvalidoException::class);
+
+it('finalizar recusa quando o token expira entre iniciar e finalizar', function () {
+    $user = User::factory()->create();
+    $agora = CarbonImmutable::parse('2026-06-26 12:00:00', 'America/Sao_Paulo');
+    $svc = new VincularTelegram;
+    $token = (new GerarTokenDeVinculo)->para($user->id, $agora);
+    $svc->iniciar($token->token, 999001, $agora->addMinutes(1));
+
+    $svc->finalizar(999001, '+5511999998888', $agora->addMinutes(16));
+})->throws(TokenInvalidoException::class);
+
+it('finalizar revoga o vínculo ativo anterior da mesma conta', function () {
+    $user = User::factory()->create();
+    $svc = new VincularTelegram;
+
+    $t1 = (new GerarTokenDeVinculo)->para($user->id);
+    $svc->confirmar($t1->token, 999001, '+5511999998888');
+
+    $t2 = (new GerarTokenDeVinculo)->para($user->id);
+    $svc->iniciar($t2->token, 999002);
+    $svc->finalizar(999002, '+5511999997777');
+
+    expect(TelegramLink::where('user_id', $user->id)->where('status', TelegramLink::ATIVO)->count())->toBe(1)
+        ->and((new AutenticarTelegram)->usuario(999002)->id)->toBe($user->id);
+});
+
 /* -------- autenticação (middleware) -------- */
 
 it('resolve o usuário a partir do telegram_user_id vinculado', function () {

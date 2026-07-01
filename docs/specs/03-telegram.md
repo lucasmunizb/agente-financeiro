@@ -269,9 +269,26 @@ Borda HTTP:
   - **Editar/cancelar via texto livre:** dependem de um extrator de IA para "qual lançamento"
     (não entregue no [[spec-04-ia-interpretacao]]); por ora caem no fallback "não entendi".
   - **Importar (PDF)** → [[spec-07-importacao-pdf]].
-  - **Frontend:** mensagens formatadas do bot (curtas, sem botões) e fluxo de vínculo via
-    bot (token + `request_contact`); `RoteadorDeComandos::naoVinculado` é no-op até lá. A
-    porta de saída `RespostaAoUsuario` está inerte (`RespostaInerte`) até a redação/envio.
+  - **Frontend:** mensagens formatadas do bot (curtas, sem botões) do processamento de
+    comandos; a porta de saída `RespostaAoUsuario` segue inerte (`RespostaInerte`) até a
+    redação/envio dos Blocos 4/5.
+- **Entregue depois (frontend do vínculo — regra 3):**
+  - **Cliente de saída** `app/Domain/Telegram/Saida/`: `ClienteTelegram` (contrato),
+    `ClienteTelegramHttp` (Bot API: `sendMessage` + teclado `request_contact`),
+    `ClienteTelegramFake` (testes). Bind em `AppServiceProvider`; config
+    `services.telegram.bot_username`.
+  - **Vínculo via bot** `app/Domain/Telegram/FluxoDeVinculo.php`: `/start <token>` (ou token
+    cru) → `VincularTelegram::iniciar` → `pedirContato`; `message.contact` (contato próprio)
+    → `VincularTelegram::finalizar` → confirmação. `RoteadorDeComandos::naoVinculado` agora
+    delega ao fluxo. `VincularTelegram` ganhou `iniciar()`/`finalizar()` (vínculo em dois
+    passos: o contato não carrega o token).
+  - **Tela web** `TelegramLinkController` (show/gerar/desconectar): gera o código de uso
+    único (só o hash persiste; claro só na sessão), estado vinculado com telefone
+    mascarado, botões ligados (`POST /telegram/gerar`, `POST /telegram/desconectar`).
+  - **Operação** `app/Console/Commands/TelegramWebhookCommand.php` (`telegram:webhook`
+    URL / `--info` / `--delete`), passando o segredo no `setWebhook`.
+  - Testes: `ClienteTelegramTest`, `FluxoDeVinculoTest`, `TelaVinculoTelegramTest`,
+    `TelegramWebhookCommandTest` + casos novos em `TelegramVinculoTest` (iniciar/finalizar).
 - **Decisões de regra tomadas:**
   - Token persistido **só em hash** (sha-256), expiração de **15 min** (`EXPIRACAO_MINUTOS`);
     consumo zera o hash. "Agora" injetável (`CarbonImmutable`) para determinismo (regra 5).

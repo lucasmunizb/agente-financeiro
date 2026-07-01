@@ -52,11 +52,37 @@ if (countdown) {
     }
 }
 
-// Confirmação antes de ação destrutiva (regra 7). A gravação real é backend.
+// Polling do vínculo: enquanto a tela está no estado pendente, pergunta ao
+// backend se o vínculo já foi confirmado no bot. Quando vira ativo, recarrega —
+// a tela passa a renderizar o estado "conectado". Sem cálculo nem dado sensível
+// no cliente; só um booleano. Pausa quando a aba está oculta.
+const alvoPoll = document.querySelector('[data-poll-status]');
+if (alvoPoll) {
+    const url = alvoPoll.dataset.pollStatus;
+    let checando = false;
+    const verificar = async () => {
+        if (checando || document.hidden) return;
+        checando = true;
+        try {
+            const resposta = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (resposta.ok && (await resposta.json()).vinculado) {
+                window.location.reload();
+            }
+        } catch {
+            // silencioso: instabilidade de rede não deve quebrar a tela.
+        } finally {
+            checando = false;
+        }
+    };
+    setInterval(verificar, 3000);
+}
+
+// Confirmação antes de ação destrutiva (regra 7): cancela o envio do form se o
+// usuário desistir; caso contrário deixa o POST seguir para o backend.
 document.querySelectorAll('[data-confirm]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-        if (window.confirm(btn.dataset.confirm)) {
-            mostrarToast('Ação de backend ainda não disponível');
+    btn.addEventListener('click', (event) => {
+        if (!window.confirm(btn.dataset.confirm)) {
+            event.preventDefault();
         }
     });
 });

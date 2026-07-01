@@ -16,10 +16,13 @@ EXEC_T := $(DC) exec -T app
 EXEC_TEST := $(DC) exec -T -e APP_ENV=testing -e DB_DATABASE=financeiro_test app
 # Serviço de build de assets (profile tools): sobe sob demanda e some ao fim.
 RUN_NODE := $(DC) run --rm node
+# Caminho do webhook do Telegram (doc 06 §3), anexado à URL pública do túnel.
+WEBHOOK_PATH := /telegram/webhook
 
 .PHONY: help setup bootstrap up down build rebuild restart ps logs logs-app \
         logs-worker shell worker-shell test migrate fresh seed key artisan \
-        composer pest pint pint-test tinker stop npm assets vite db-test
+        composer pest pint pint-test tinker stop npm assets vite db-test \
+        webhook-up webhook-down
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -30,10 +33,12 @@ setup: bootstrap ## Alias de bootstrap (primeira instalação)
 bootstrap: ## Primeira instalação: cria esqueleto Laravel via contêiner e sobe tudo
 	@bash scripts/bootstrap.sh
 
-up: ## Sobe os 3 contêineres (app, worker, postgres)
+up: ## Sobe os 3 contêineres (app, worker, postgres) + webhook do Telegram
 	$(DC) up -d
+	@$(MAKE) --no-print-directory webhook-up
 
-down: ## Derruba os contêineres (mantém o volume do Postgres)
+down: ## Derruba os contêineres (mantém o volume do Postgres) + remove webhook
+	@$(MAKE) --no-print-directory webhook-down
 	$(DC) down
 
 stop: ## Para os contêineres sem removê-los
@@ -114,3 +119,41 @@ assets: ## Instala deps e builda os assets (Vite/Tailwind) para produção
 
 vite: ## Sobe o Vite dev server (HMR) em contêiner
 	$(DC) run --rm --service-ports node sh -lc "npm install && npm run dev -- --host 0.0.0.0"
+
+# ---------------------------------------------------------------------
+# Bot do Telegram (DEV) — túnel HTTPS público + webhook. Tudo em contêiner
+# (cloudflared no profile tools; regra 9). Guardado por TELEGRAM_BOT_TOKEN:
+# sem token no .env, `up`/`down` se comportam como antes (no-op silencioso).
+# Chamados automaticamente por `make up` / `make down`.
+# ---------------------------------------------------------------------
+webhook-up: ## Sobe o túnel e (re)registra o webhook do Telegram (se houver token)
+	@if ! grep -qE '^TELEGRAM_BOT_TOKEN=.+' .env 2>/dev/null; then \
+	  echo "› Telegram: sem TELEGRAM_BOT_TOKEN no .env — pulando webhook."; exit 0; fi; \
+	echo "› Telegram: (re)subindo o túnel cloudflared…"; \
+	$(DC) --profile tools rm -sf cloudflared >/dev/null 2>&1 || true; \
+	$(DC) --profile tools up -d cloudflared >/dev/null; \
+	url=""; \
+	for i in $$(seq 1 20); do \
+	  url=$$($(DC) logs cloudflared 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | head -1); \
+	  [ -n "$$url" ] && break; sleep 1; \
+	done; \
+	if [ -z "$$url" ]; then \
+	  echo "✗ Telegram: não obtive a URL do túnel. Veja: $(DC) logs cloudflared"; exit 0; fi; \
+	echo "› Telegram: túnel em $$url — aguardando ficar acessível…"; \
+	for i in $$(seq 1 30); do \
+	  $(EXEC_T) sh -lc "curl -fsS -o /dev/null $$url/up" >/dev/null 2>&1 && break; sleep 2; \
+	done; \
+	$(EXEC_T) php artisan telegram:webhook --delete >/dev/null 2>&1 || true; \
+	for i in $$(seq 1 4); do \
+	  if $(EXEC_T) php artisan telegram:webhook "$$url$(WEBHOOK_PATH)" >/dev/null 2>&1; then \
+	    echo "✓ Telegram: webhook registrado em $$url$(WEBHOOK_PATH)"; exit 0; fi; \
+	  echo "  … Telegram ainda resolvendo o DNS do túnel; nova tentativa em 15s ($$i/4)"; sleep 15; \
+	done; \
+	echo "✗ Telegram: webhook não registrou. Rode 'make artisan c=\"telegram:webhook --info\"' para ver o erro."
+
+webhook-down: ## Remove o webhook do Telegram e derruba o túnel
+	@if grep -qE '^TELEGRAM_BOT_TOKEN=.+' .env 2>/dev/null; then \
+	  echo "› Telegram: removendo o webhook…"; \
+	  $(EXEC_T) php artisan telegram:webhook --delete >/dev/null 2>&1 || true; \
+	fi; \
+	$(DC) --profile tools rm -sf cloudflared >/dev/null 2>&1 || true

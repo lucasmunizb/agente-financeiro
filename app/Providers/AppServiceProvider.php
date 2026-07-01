@@ -12,11 +12,14 @@ use App\Domain\Importacao\ParserDeFatura;
 use App\Domain\Importacao\ParserItau;
 use App\Domain\Telegram\ClassificadorDeComando;
 use App\Domain\Telegram\Comando;
+use App\Domain\Telegram\FluxoDeVinculo;
 use App\Domain\Telegram\ManipuladorInerte;
 use App\Domain\Telegram\ManipuladorQueEnfileira;
 use App\Domain\Telegram\Resposta\RespostaAoUsuario;
 use App\Domain\Telegram\Resposta\RespostaInerte;
 use App\Domain\Telegram\RoteadorDeComandos;
+use App\Domain\Telegram\Saida\ClienteTelegram;
+use App\Domain\Telegram\Saida\ClienteTelegramHttp;
 use App\Domain\Telegram\RoteadorDeMensagem;
 use App\Listeners\LogarFailoverDeIA;
 use Illuminate\Support\Facades\Event;
@@ -43,12 +46,20 @@ class AppServiceProvider extends ServiceProvider
                     Comando::BUSCAR->value => new ManipuladorQueEnfileira(Intencao::CONSULTAR),
                     Comando::DESCONHECIDO->value => new ManipuladorQueEnfileira,
                 ],
+                // Não vinculado: fluxo de vínculo via bot (token + request_contact).
+                vinculo: $app->make(FluxoDeVinculo::class),
             );
         });
 
         // Porta de saída do bot: inerte por ora — a redação/envio das mensagens ao
         // Telegram é frontend (regra 3), etapa separada e posterior.
         $this->app->bind(RespostaAoUsuario::class, RespostaInerte::class);
+
+        // Cliente de saída da Bot API do Telegram (envio de mensagens + pedido de
+        // contato no vínculo). Nos testes é trocado pelo ClienteTelegramFake.
+        $this->app->bind(ClienteTelegram::class, function ($app) {
+            return new ClienteTelegramHttp((string) $app['config']->get('services.telegram.bot_token'));
+        });
 
         // Calculadora de custo de IA carregada com a tabela de preços (centavos/Mtok).
         $this->app->bind(CalculadoraDeCustoIA::class, function ($app) {

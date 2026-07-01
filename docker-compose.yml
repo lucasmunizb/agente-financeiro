@@ -64,6 +64,20 @@ services:
     ports:
       - "${VITE_PORT:-5173}:5173"
 
+  # Túnel HTTPS público (Cloudflare Quick Tunnel) para expor o webhook do
+  # Telegram em DEV — sem instalar nada no host (regra 9). Fica no profile
+  # `tools`: não sobe com `make up` sozinho; é orquestrado por `make webhook-up`
+  # (quando há TELEGRAM_BOT_TOKEN) e derrubado por `make down`/`webhook-down`.
+  # Aponta direto para o app na rede do compose; a URL pública sai nos logs.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tools"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://app:8000
+    depends_on:
+      app:
+        condition: service_started
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped

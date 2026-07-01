@@ -1,17 +1,15 @@
 @php
-    // Estado da tela (apresentação). O backend do vínculo é etapa separada
-    // (regra 3): estes dados são de exemplo até a feature existir.
+    // Estado e dados vêm do TelegramLinkController (backend). Defaults defensivos
+    // para o caso de a view ser renderizada isolada.
     $estado ??= 'pendente';
     $expirado = $estado === 'expirado';
     $vinculado = $estado === 'vinculado';
 
-    // Dados de exemplo (borda). Token e prazo virão prontos do backend; a UI só
-    // exibe. O deep link já é a forma real de abrir o bot com o código.
-    $token = '482-913';
-    $botUsername = 'AgenteFinanceiroBot';
-    $deepLink = 'https://t.me/'.$botUsername.'?start='.str_replace('-', '', $token);
-    $expiraEmSegundos = 895; // ~14:55
-    $handle = '@usuario';
+    $token ??= '';
+    $botUsername ??= 'AgenteFinanceiroBot';
+    $deepLink ??= 'https://t.me/'.$botUsername.'?start='.$token;
+    $expiraEmSegundos ??= 0;
+    $handle ??= 'Conta conectada';
 
     $heading = $vinculado ? 'Telegram conectado' : 'Conectar o Telegram';
     $subheading = $vinculado
@@ -55,21 +53,27 @@
                 </li>
             </ul>
 
-            {{-- Ação destrutiva: desvincular. O efeito real (backend) é etapa
-                 posterior; exige confirmação antes de gravar (regra 7). --}}
+            {{-- Ação destrutiva: desvincular. Confirma antes de gravar (regra 7);
+                 o POST revoga o vínculo ativo no backend. --}}
             <div class="mt-10 w-full border-t border-linha pt-6">
-                <button type="button" data-confirm="Desconectar o Telegram? Você deixará de registrar gastos pelo chat."
-                    class="flex w-full items-center justify-center gap-2 rounded-lg border border-argila py-3 px-4 font-body-md text-body-md font-semibold text-argila transition-colors hover:bg-argila/10 active:scale-[0.98]">
-                    <x-icon name="unlink" class="h-5 w-5" />
-                    Desconectar Telegram
-                </button>
+                <form method="POST" action="{{ route('telegram.desconectar') }}">
+                    @csrf
+                    <button type="submit" data-confirm="Desconectar o Telegram? Você deixará de registrar gastos pelo chat."
+                        class="flex w-full items-center justify-center gap-2 rounded-lg border border-argila py-3 px-4 font-body-md text-body-md font-semibold text-argila transition-colors hover:bg-argila/10 active:scale-[0.98]">
+                        <x-icon name="unlink" class="h-5 w-5" />
+                        Desconectar Telegram
+                    </button>
+                </form>
             </div>
         </section>
     @else
         {{-- ---------------------------------------------------------------
              Estados: pendente / expirado (fluxo de dois passos)
+             data-poll-status: a tela consulta o status enquanto aguarda a
+             confirmação no bot e recarrega ao vincular (mostra "conectado").
         ---------------------------------------------------------------- --}}
-        <section class="notebook-card w-full max-w-md rounded-xl p-8 md:p-10">
+        <section class="notebook-card w-full max-w-md rounded-xl p-8 md:p-10"
+            data-poll-status="{{ route('telegram.status') }}">
             <ol class="space-y-12">
                 {{-- Passo 1 — abrir o bot --}}
                 <li class="flex items-start gap-6">
@@ -102,7 +106,7 @@
                             <p class="text-center font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Código de uso único</p>
 
                             <div @class([
-                                'token-display relative flex items-center justify-center overflow-hidden px-6 py-3',
+                                'token-display relative flex items-center gap-3 overflow-hidden px-6 py-3',
                                 'select-none' => $expirado,
                             ])>
                                 @if ($expirado)
@@ -113,14 +117,16 @@
                                         </span>
                                     </div>
                                 @endif
+                                {{-- Código completo, em mono menor que quebra em linha
+                                     (break-all) para caber no card sem estourar a div. --}}
                                 <span @class([
-                                    'font-value-display text-value-display tracking-[0.1em]',
+                                    'min-w-0 flex-1 break-all text-center font-mono text-body-md leading-relaxed tracking-wider',
                                     'text-outline' => $expirado,
                                     'text-primary' => ! $expirado,
                                 ]) data-token="{{ $token }}">{{ $token }}</span>
                                 @unless ($expirado)
                                     <button type="button" data-copy-token
-                                        class="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer text-outline transition-colors hover:text-primary"
+                                        class="shrink-0 cursor-pointer text-outline transition-colors hover:text-primary"
                                         aria-label="Copiar código">
                                         <x-icon name="copy" class="h-5 w-5" />
                                     </button>
@@ -137,15 +143,18 @@
                         </div>
 
                         {{-- Gerar novo código: primário quando expirado; secundário
-                             quando ainda válido. Efeito real é backend (etapa após). --}}
-                        <button type="button" @class([
-                            'flex w-full items-center justify-center gap-2 rounded-lg py-3.5 font-body-md text-body-md font-semibold transition-colors active:scale-[0.98]',
-                            'bg-cedula text-superficie shadow-sm hover:bg-cedula-clara' => $expirado,
-                            'border border-cedula text-cedula hover:bg-cedula/5' => ! $expirado,
-                        ])>
-                            <x-icon name="refresh-cw" class="h-5 w-5" />
-                            Gerar novo código
-                        </button>
+                             quando ainda válido. O POST emite outro token e revoga o anterior. --}}
+                        <form method="POST" action="{{ route('telegram.gerar') }}">
+                            @csrf
+                            <button type="submit" @class([
+                                'flex w-full items-center justify-center gap-2 rounded-lg py-3.5 font-body-md text-body-md font-semibold transition-colors active:scale-[0.98]',
+                                'bg-cedula text-superficie shadow-sm hover:bg-cedula-clara' => $expirado,
+                                'border border-cedula text-cedula hover:bg-cedula/5' => ! $expirado,
+                            ])>
+                                <x-icon name="refresh-cw" class="h-5 w-5" />
+                                Gerar novo código
+                            </button>
+                        </form>
                     </div>
                 </li>
             </ol>

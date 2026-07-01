@@ -24,9 +24,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
     Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.consent');
 
-    // Vínculo com o Telegram (apresentação). Próximo passo do fluxo após o
-    // consentimento; o backend do vínculo seguro é etapa posterior (doc 06).
+    // Vínculo com o Telegram (doc 06 §1). show exibe o código de uso único;
+    // gerar emite um novo; desconectar revoga o vínculo ativo. O consumo do
+    // token e a ativação acontecem pelo bot (FluxoDeVinculo).
     Route::get('/telegram', [TelegramLinkController::class, 'show'])->name('telegram');
+    Route::get('/telegram/status', [TelegramLinkController::class, 'status'])->name('telegram.status');
+    Route::post('/telegram/gerar', [TelegramLinkController::class, 'gerar'])->name('telegram.gerar');
+    Route::post('/telegram/desconectar', [TelegramLinkController::class, 'desconectar'])->name('telegram.desconectar');
 
     Route::post('/logout', LogoutController::class)->name('logout');
 });

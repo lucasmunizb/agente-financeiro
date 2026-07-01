@@ -3,8 +3,11 @@
 use App\Domain\Telegram\ClassificadorDeComando;
 use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\ComandoRecebido;
+use App\Domain\Telegram\FluxoDeVinculo;
 use App\Domain\Telegram\ManipuladorDeComando;
 use App\Domain\Telegram\RoteadorDeComandos;
+use App\Domain\Telegram\Saida\ClienteTelegramFake;
+use App\Domain\Telegram\VincularTelegram;
 use App\Models\User;
 
 /*
@@ -104,7 +107,21 @@ it('não quebra quando o update não traz texto (classifica como vazio)', functi
         ->and($padrao->comando->argumentos)->toBe('');
 });
 
-it('naoVinculado é no-op nesta etapa (vínculo via bot é frontend posterior)', function () {
+it('naoVinculado delega ao fluxo de vínculo (não aos manipuladores de comando)', function () {
+    $padrao = espiaoManipulador();
+    $cliente = new ClienteTelegramFake;
+    $vinculo = new FluxoDeVinculo(new VincularTelegram, $cliente);
+
+    $roteador = new RoteadorDeComandos(new ClassificadorDeComando, $padrao, [], $vinculo);
+
+    // Texto que não é token → o fluxo orienta como conectar, sem tocar os manipuladores.
+    $roteador->naoVinculado(424242, updateComTexto('quanto gastei?'));
+
+    expect($padrao->chamadas)->toBe(0)
+        ->and($cliente->mensagens)->toHaveCount(1);
+});
+
+it('naoVinculado é inerte sem um fluxo de vínculo injetado', function () {
     $padrao = espiaoManipulador();
 
     $roteador = new RoteadorDeComandos(new ClassificadorDeComando, $padrao, []);

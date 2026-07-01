@@ -13,8 +13,8 @@ use App\Models\User;
  * usa o padrão. Adaptador fino — não contém regra financeira; a execução de cada
  * comando vive nos manipuladores (etapas posteriores).
  *
- * naoVinculado (fluxo de vínculo via bot: token + request_contact) é etapa de
- * frontend posterior (doc 06 §1) e permanece inerte aqui.
+ * naoVinculado delega ao {@see FluxoDeVinculo} (token + request_contact, doc 06 §1);
+ * sem fluxo injetado, permanece inerte.
  */
 final class RoteadorDeComandos implements RoteadorDeMensagem
 {
@@ -25,6 +25,7 @@ final class RoteadorDeComandos implements RoteadorDeMensagem
         private ClassificadorDeComando $classificador,
         private ManipuladorDeComando $padrao,
         private array $manipuladores = [],
+        private ?FluxoDeVinculo $vinculo = null,
     ) {}
 
     public function autenticado(User $user, array $update): void
@@ -40,6 +41,7 @@ final class RoteadorDeComandos implements RoteadorDeMensagem
 
     public function naoVinculado(int $telegramUserId, array $update): void
     {
-        // Vínculo via bot é etapa de frontend posterior (doc 06 §1): no-op por ora.
+        // Candidato a vínculo: token via /start + telefone via request_contact (doc 06 §1).
+        $this->vinculo?->tratar($telegramUserId, $update);
     }
 }
