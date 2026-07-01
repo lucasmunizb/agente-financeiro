@@ -156,6 +156,75 @@ body {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
+/* Documentos legais (termos, política) — leitura longa, calma e legível.
+   Estiliza o HTML semântico do slot; nada de hex solto, só tokens. */
+.legal-prose {
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-sans);
+    font-size: var(--text-body-md);
+    line-height: 1.7;
+}
+.legal-prose > section + section {
+    margin-top: var(--spacing-section-gap);
+}
+.legal-prose h2 {
+    font-family: var(--font-display);
+    font-size: var(--text-headline-md);
+    line-height: var(--text-headline-md--line-height);
+    color: var(--color-on-surface);
+    margin-bottom: 12px;
+}
+.legal-prose h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    color: var(--color-on-surface);
+    margin: 20px 0 8px;
+}
+.legal-prose p {
+    margin-bottom: 16px;
+}
+.legal-prose :is(p, ul):last-child {
+    margin-bottom: 0;
+}
+.legal-prose ul {
+    margin: 0 0 16px;
+    padding-left: 20px;
+    list-style: disc;
+}
+.legal-prose li {
+    margin-bottom: 8px;
+}
+.legal-prose li::marker {
+    color: var(--color-outline-variant);
+}
+.legal-prose strong {
+    color: var(--color-on-surface);
+    font-weight: 600;
+}
+.legal-prose a {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.legal-prose a:hover {
+    color: var(--color-cedula-clara);
+}
+
+/* Destaque de transparência (o número vem do banco; a IA não inventa). */
+.legal-callout {
+    display: flex;
+    gap: 12px;
+    padding: 20px;
+    border: 1px solid var(--color-linha);
+    border-left: 3px solid var(--color-cedula);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-container-low);
+    margin-bottom: 16px;
+}
+.legal-callout p:last-child {
+    margin-bottom: 0;
+}
+
 /* Spinner do estado "carregando". */
 .loading-spinner {
     width: 20px;

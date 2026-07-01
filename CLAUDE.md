@@ -138,6 +138,7 @@ domínio, plano de testes test-first e Definition of Done). **Comece sempre por 
 - **`dba-postgres`** — modelagem e operação do schema PostgreSQL 16 (tipos, FKs, índices, constraints, migrations); atua em par com `laravel-backend`.
 - **`devops`** — provisionar/operar a infra (compose, Makefile, Swarm + Secrets, escala).
 - **`seguranca-ia`** — defesa adversarial da camada de IA: prompt injection, jailbreak, extração de instruções ("prompt manager"), injeção indireta via PDF, escopo por usuário. Complementa a `governanca-ia`.
+- **`lgpd`** — conformidade e proteção de dados que atravessa backend/frontend/devops: bases legais, finalidade, minimização, consentimento (`aceite_lgpd_em`), transparência sobre IA, direitos do titular (acesso/correção/exclusão/portabilidade), retenção/expurgo, soft delete com auditoria preservada e resposta a incidente. Define o requisito e aponta para a skill dona da implementação.
 - **`frontend`** — frontend deste projeto (Blade + Tailwind v4 + Vite): ligação das telas do Stitch, design system "caderno de contas", UX/UI, acessibilidade, desempenho/Core Web Vitals, SEO técnico (só páginas públicas) e LGPD na borda. Apresentação é etapa separada do backend (regra 3).
 
 Skills adiadas (criar depois com a `skill-creator`): `governanca-ia`, `telegram` e

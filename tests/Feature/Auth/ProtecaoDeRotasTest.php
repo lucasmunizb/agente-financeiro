@@ -28,6 +28,11 @@ it('mantém a tela de login pública', function () {
     $this->get('/login')->assertOk();
 });
 
+it('mantém criar conta e onboarding públicos (guest precisa alcançá-los)', function () {
+    $this->get('/criar-conta')->assertOk();
+    $this->get('/onboarding')->assertOk();
+});
+
 it('não coloca o webhook do Telegram atrás do login de sessão', function () {
     // Sem o segredo no header a guarda própria responde 403 — o importante é
     // que NÃO há redirecionamento para a tela de login (302 → /login).

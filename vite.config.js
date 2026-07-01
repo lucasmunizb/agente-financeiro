@@ -9,6 +9,7 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/js/app.js',
                 'resources/js/pages/auth.js',
+                'resources/js/pages/onboarding.js',
             ],
             refresh: true,
         }),

@@ -19,17 +19,18 @@ if (toggle) {
 }
 
 // Estado "carregando": ao enviar, desabilita e troca o rótulo do botão.
-// (A autenticação real — validação + guard — é a etapa de backend.)
-const form = document.querySelector('[data-login-form]');
+// (A autenticação/criação real — validação + guard — é a etapa de backend.)
+const form = document.querySelector('[data-loading-form]');
 if (form) {
     form.addEventListener('submit', () => {
         const btn = form.querySelector('[data-submit]');
-        if (!btn) return;
+        if (!btn || btn.disabled) return;
+        const label = btn.dataset.loadingLabel || 'Enviando…';
         form.setAttribute('aria-busy', 'true');
         btn.disabled = true;
         btn.classList.add('cursor-not-allowed');
-        btn.innerHTML =
-            '<span class="loading-spinner"></span><span>Entrando…</span>';
-        form.querySelectorAll('input').forEach((el) => (el.readOnly = true));
+        btn.innerHTML = `<span class="loading-spinner"></span><span>${label}</span>`;
+        // readOnly (não disabled) para os valores seguirem no POST.
+        form.querySelectorAll('input:not([type=checkbox])').forEach((el) => (el.readOnly = true));
     });
 }
