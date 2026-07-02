@@ -125,6 +125,13 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 4. **Exporte** o design/código e registre em §10. A **ligação ao Laravel** (Inertia/Blade,
    dados reais, validação) é a etapa técnica seguinte — fora do Stitch.
 
+> **Shell padrão (aside + header) — já criado.** Todas as telas **logadas** compartilham o
+> mesmo **shell**: uma **barra lateral (aside)** de navegação e um **cabeçalho (header)**. Ele
+> já foi **gerado no Stitch** e vira um **layout Blade** reutilizado. Por isso, os prompts das
+> telas logadas (§7.5–§7.17) pedem **apenas o conteúdo da área principal** — o Stitch **não**
+> deve redesenhar aside nem header nelas. As telas **pré-login** (§7.1–§7.4) não têm shell
+> (sem navegação do app).
+
 ## 6. Mini-TODO — telas a gerar
 > Marque conforme gerar/aprovar. Telas de importação dependem do backend da [[spec-07-importacao-pdf]].
 
@@ -138,7 +145,7 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 - [x] 4. Vínculo do Telegram
 
 **B. Núcleo financeiro**
-- [ ] 5. Dashboard do mês *(tela-assinatura: a régua do mês)*
+- [x] 5. Dashboard / Visão geral *(tela-assinatura: a régua do mês; shell aside + header já criado no Stitch — **gerado, não implementado**)*
 - [ ] 6. Lançamentos — lista
 - [ ] 7. Lançamento — criar/editar (com prévia de parcelas)
 - [ ] 8. Lançamento — detalhe (parcelas + status)
@@ -300,16 +307,22 @@ ESTADOS (variações)
 Deixe claro que o token só aparece nesta tela e serve uma única vez.
 ```
 
-### 7.5 Dashboard do mês — *tela-assinatura*
+### 7.5 Dashboard / Visão geral — *tela-assinatura*
 **Objetivo:** leitura instantânea do mês. **Estados:** vazio (primeiro mês); carregando.
+
+> **Shell já criado.** A barra lateral (aside) e o cabeçalho (header) padrão do app já foram
+> gerados no Stitch e serão o layout base reutilizado por todas as telas logadas — por isso
+> este prompt (e os §7.6–§7.17) pede **apenas o conteúdo** da área principal.
 ```text
-Tela DASHBOARD DO MÊS (use o tema). ESTA É A TELA-ASSINATURA. Mobile-first, vira grade no desktop.
+Tela DASHBOARD / VISÃO GERAL (use o tema). ESTA É A TELA-ASSINATURA. NÃO gere barra lateral
+(aside) nem cabeçalho (header) — eles já são o SHELL PADRÃO do app. Gere APENAS o conteúdo da
+área principal, que será encaixado dentro desse shell. Mobile-first, vira grade no desktop.
 
 ELEMENTO-ASSINATURA — "A RÉGUA DO MÊS": uma régua horizontal do dia 1 ao último dia do mês,
 com um marcador do "hoje", TICKS nas datas de vencimento (em ocre) e uma faixa sutil mostrando
 o "disponível" diminuindo ao longo do mês. Posicione logo abaixo do cabeçalho. É o herói visual.
 
-CABEÇALHO: seletor de mês ("Junho de 2026", com setas) à esquerda.
+SELETOR DE MÊS ("Junho de 2026", com setas ‹ ›) acima ou junto da régua.
 
 CARDS DE RESUMO (valores em mono, alinhados à direita):
 - "Disponível do mês" — destaque, R$ 2.480,00 (verde-cédula se positivo).
@@ -322,14 +335,18 @@ Lazer) — cada uma com sua cor/ícone de chip.
 
 LISTA: "Próximas contas" (3 linhas: descrição · valor mono · "vence 30 de junho" · selo status).
 
-Ação flutuante "Registrar gasto". Estado vazio: convite "Registre seu primeiro gasto" + dica
-de usar o Telegram. Nada pisca; a régua é a única coisa que se move (animação sutil de entrada).
+Estado vazio: convite "Registre seu primeiro gasto" + dica de usar o Telegram. Nada pisca; a
+régua é a única coisa que se move (animação sutil de entrada). A interface NUNCA calcula
+dinheiro — todos os valores chegam prontos do backend.
 ```
 
 ### 7.6 Lançamentos — lista
 **Objetivo:** ver/filtrar/agir sobre lançamentos. **Estados:** vazio; filtro sem resultado; carregando.
 ```text
-Tela LANÇAMENTOS (use o tema). Estilo EXTRATO: denso, legível, valores em mono à direita.
+Tela LANÇAMENTOS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) — eles
+são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área principal,
+que será encaixado dentro desse shell (título da página desta tela: "Lançamentos").
+Estilo EXTRATO: denso, legível, valores em mono à direita.
 - Barra de filtros (chips): período (mês), categoria, cartão/forma, status (aberto/pago/atraso/
   cancelado). Campo de busca por descrição.
 - Lista agrupada por dia. Cada linha: descrição · chip de categoria · valor (mono) · forma/
@@ -342,7 +359,10 @@ Tela LANÇAMENTOS (use o tema). Estilo EXTRATO: denso, legível, valores em mono
 ### 7.7 Lançamento — criar/editar (com prévia de parcelas)
 **Objetivo:** capturar um gasto e **confirmar** antes de gravar (regra 7). **Estados:** validação; crédito exige cartão; prévia de parcelas.
 ```text
-Tela CRIAR/EDITAR LANÇAMENTO (use o tema). Formulário calmo, um campo por linha no mobile.
+Tela CRIAR/EDITAR LANÇAMENTO (use o tema). NÃO gere barra lateral (aside) nem cabeçalho
+(header) — eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da
+área principal, que será encaixado dentro desse shell (título da página: "Novo lançamento").
+Formulário calmo, um campo por linha no mobile.
 Campos: "Descrição"; "Valor" (campo mono, prefixo R$); "Data" (date picker, default hoje);
 "Forma de pagamento" (crédito, débito, pix, dinheiro, boleto); "Cartão" (aparece e fica
 OBRIGATÓRIO só quando a forma é crédito); "Parcelas" (1 a 24, só faz sentido no crédito);
@@ -359,8 +379,11 @@ Validação inline e direta ("Crédito exige um cartão."). Sem auto-save.
 ### 7.8 Lançamento — detalhe (parcelas + status)
 **Objetivo:** ver um lançamento e suas parcelas. **Estados:** com parcela paga (edição bloqueada).
 ```text
-Tela DETALHE DO LANÇAMENTO (use o tema).
-- Cabeçalho: descrição, chip de categoria, valor total (mono) e selo de status.
+Tela DETALHE DO LANÇAMENTO (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header)
+do app — eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da
+área principal, que será encaixado dentro desse shell.
+- Cabeçalho do conteúdo (não confundir com o header do app): descrição, chip de categoria,
+  valor total (mono) e selo de status.
 - Metadados: forma/cartão, data, origem ("manual" ou "Telegram" ou "fatura PDF").
 - TABELA DE PARCELAS (mono): nº, valor, vencimento, status de cada uma (aberto/pago/atraso).
 - Ações: "Editar" e "Cancelar". Se houver parcela paga, "Editar" fica desabilitado com a
@@ -371,8 +394,11 @@ Tela DETALHE DO LANÇAMENTO (use o tema).
 ### 7.9 Confirmações pendentes — *espelho web do "Confirma?"*
 **Objetivo:** materializar a regra 7 na web (gastos interpretados aguardando "sim"). **Estados:** vazio.
 ```text
-Tela CONFIRMAÇÕES PENDENTES (use o tema). Lista de itens interpretados (ex.: vindos do
-Telegram) aguardando confirmação antes de gravar.
+Tela CONFIRMAÇÕES PENDENTES (use o tema). NÃO gere barra lateral (aside) nem cabeçalho
+(header) — eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da
+área principal, que será encaixado dentro desse shell (título da página: "Confirmações
+pendentes"). Lista de itens interpretados (ex.: vindos do Telegram) aguardando confirmação
+antes de gravar.
 - Cada item é um card com a PRÉVIA: descrição, valor (mono), categoria sugerida, forma/cartão,
   prévia de parcelas se houver, e a frase "Pronto para gravar — confirme".
 - Dois botões por card: "Confirmar" (primário) e "Ajustar" (abre o formulário 7.7).
@@ -384,7 +410,9 @@ Deixe claro que NADA foi gravado até o "Confirmar".
 ### 7.10 Receitas
 **Objetivo:** cadastrar/listar receitas (base do disponível). **Estados:** vazio.
 ```text
-Tela RECEITAS (use o tema).
+Tela RECEITAS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) — eles são
+o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área principal, que
+será encaixado dentro desse shell (título da página: "Receitas").
 - Resumo do mês: "Receitas de junho" R$ 6.500,00 (mono).
 - Filtro por tipo: fixa / variável.
 - Lista: descrição · tipo · valor (mono) · data/competência.
@@ -395,7 +423,9 @@ Tela RECEITAS (use o tema).
 ### 7.11 Orçamento do mês
 **Objetivo:** ver limite e consumo (total + por categoria). **Estados:** sem orçamento definido; estouro.
 ```text
-Tela ORÇAMENTO DO MÊS (use o tema).
+Tela ORÇAMENTO DO MÊS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) —
+eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área
+principal, que será encaixado dentro desse shell (título da página: "Orçamento do mês").
 - Card topo: "Limite do mês" R$ 4.000,00 e "Consumido" R$ 3.120,00 (mono), com uma barra de
   progresso calma; ao passar de 100%, a barra usa argila e mostra "acima do limite".
 - Lista por categoria: chip da categoria, barra consumo/limite, valores em mono. Categorias
@@ -407,7 +437,9 @@ Tela ORÇAMENTO DO MÊS (use o tema).
 ### 7.12 Categorias
 **Objetivo:** gerenciar categorias (cor, ícone, palavras-chave, arquivar). **Estados:** —
 ```text
-Tela CATEGORIAS (use o tema).
+Tela CATEGORIAS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) — eles são
+o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área principal, que
+será encaixado dentro desse shell (título da página: "Categorias").
 - Grade/lista de categorias, cada uma com seu chip (cor + ícone) e contagem de uso.
 - Editar: nome, cor (paleta restrita harmônica com o tema), ícone, "palavras-chave" (tags)
   e "apelidos de estabelecimento" (merchant aliases) para a classificação automática.
@@ -418,7 +450,9 @@ Tela CATEGORIAS (use o tema).
 ### 7.13 Cartões & faturas
 **Objetivo:** ver cartões e a fatura por competência. **Estados:** sem cartão; fatura fechada vs. aberta.
 ```text
-Tela CARTÕES & FATURAS (use o tema).
+Tela CARTÕES & FATURAS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) —
+eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área
+principal, que será encaixado dentro desse shell (título da página: "Cartões & faturas").
 - Topo: cartões cadastrados (apelido, bandeira, "fecha dia 28 / vence dia 5").
 - Selecionado um cartão: FATURA por competência (seletor de mês). Cabeçalho com total da
   fatura (mono), data de fechamento e vencimento, e selo "aberta"/"fechada".
@@ -429,7 +463,10 @@ Tela CARTÕES & FATURAS (use o tema).
 ### 7.14 Chat financeiro — *com fonte/trace + estados*
 **Objetivo:** perguntar sobre as finanças e receber resposta **rastreável**. **Estados:** pensando; instabilidade/re-tentativa; fallback sem números.
 ```text
-Tela CHAT FINANCEIRO (use o tema). Conversa calma, foco no conteúdo.
+Tela CHAT FINANCEIRO (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) —
+eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área
+principal, que será encaixado dentro desse shell (título da página: "Chat financeiro").
+Conversa calma, foco no conteúdo.
 - Banner discreto no topo: "Respostas geradas com IA. Os números vêm do seu banco de dados —
   a IA nunca os inventa."
 - Bolhas: do usuário (à direita, neutras) e do assistente (à esquerda). Na resposta do
@@ -447,6 +484,9 @@ Tela CHAT FINANCEIRO (use o tema). Conversa calma, foco no conteúdo.
 **Objetivo:** enviar o PDF da fatura. **Estados:** arrastando; arquivo inválido; **PDF com senha**; enviando.
 ```text
 Tela IMPORTAR FATURA (use o tema). [Gerar somente após o backend da importação de PDF.]
+NÃO gere barra lateral (aside) nem cabeçalho (header) — eles são o SHELL PADRÃO já definido no
+Dashboard (§7.5). Gere APENAS o conteúdo da área principal, que será encaixado dentro desse
+shell (título da página: "Importar fatura").
 - Área de upload (drag-drop + "Selecionar arquivo"), aceita SOMENTE PDF.
 - Aviso de privacidade em destaque: "Seu PDF é processado e descartado — nada do documento
   fica armazenado." (regra 6).
@@ -459,7 +499,10 @@ Tela IMPORTAR FATURA (use o tema). [Gerar somente após o backend da importaçã
 **Objetivo:** revisar itens extraídos e **confirmar** (regra 7), marcando duplicados. **Estados:** com duplicados; nada para importar.
 ```text
 Tela REVISÃO DA IMPORTAÇÃO (use o tema). [Gerar somente após o backend da importação de PDF.]
-- Cabeçalho: "Encontrados 18 lançamentos · R$ 4.210,00" (mono) e "selecionados 16".
+NÃO gere barra lateral (aside) nem cabeçalho (header) do app — eles são o SHELL PADRÃO já
+definido no Dashboard (§7.5). Gere APENAS o conteúdo da área principal, que será encaixado
+dentro desse shell (título da página: "Revisão da importação").
+- Cabeçalho do conteúdo: "Encontrados 18 lançamentos · R$ 4.210,00" (mono) e "selecionados 16".
 - Tabela/lista em lote: checkbox por item, descrição, valor (mono), data, parcela. Itens
   prováveis DUPLICADOS vêm desmarcados e sinalizados ("já existe nos seus lançamentos").
 - Filtro "ocultar duplicados". Seleção em massa (marcar/desmarcar todos).
@@ -471,7 +514,10 @@ Tela REVISÃO DA IMPORTAÇÃO (use o tema). [Gerar somente após o backend da im
 ### 7.17 Configurações & privacidade
 **Objetivo:** perfil, fuso, vínculo, transparência de IA, direitos LGPD. **Estados:** confirmação de exclusão.
 ```text
-Tela CONFIGURAÇÕES & PRIVACIDADE (use o tema). Seções claras:
+Tela CONFIGURAÇÕES & PRIVACIDADE (use o tema). NÃO gere barra lateral (aside) nem cabeçalho
+(header) — eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da
+área principal, que será encaixado dentro desse shell (título da página: "Configurações").
+Seções claras:
 - "Perfil": nome, e-mail, senha.
 - "Preferências": fuso (default America/São Paulo), mês de referência.
 - "Telegram": status do vínculo + atalho para a tela de vínculo.
@@ -521,8 +567,16 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
   §7.2 Criar conta, §7.3 Onboarding+LGPD, §7.4 Vínculo do Telegram. Prompts refinados (estados
   como variações, copy na voz da interface, conteúdo pt-BR realista, acessibilidade embutida).
   _(Registrar aqui os nomes dos artefatos exportados do Stitch quando disponíveis.)_
-- **Próximo:** grupo B (núcleo financeiro) — §7.5 a §7.13. A ligação técnica das telas A ao
-  Laravel (Blade+Tailwind, rotas, auth, validação) fica para a etapa de implementação.
+- **Dashboard / Visão geral (§7.5): 🟡 gerado no Stitch, ainda NÃO implementado.** O shell
+  padrão (aside + header) e a tela da Visão geral já foram desenhados no Stitch; falta a
+  **ligação técnica** ao Laravel (extrair o shell para um layout Blade reutilizável + montar o
+  conteúdo do dashboard com dados reais do backend — spec-06).
+- **Próximo:** grupo B (núcleo financeiro) — §7.6 a §7.13. A ligação técnica das telas A e do
+  Dashboard ao Laravel (Blade+Tailwind, rotas, auth, validação) fica para a etapa de
+  implementação.
+- **Decisão de arquitetura de UI:** o **shell (aside + header) é único** e reutilizado por
+  todas as telas logadas; os prompts §7.5–§7.17 pedem **apenas o conteúdo** da área principal
+  (ver nota do §5). Telas pré-login (§7.1–§7.4) não têm shell.
 - **Decisão de design aplicada:** token `papel` ajustado `#F3F4EF` → `#EDF0E8` (§4.2 e §7.0)
   para o fundo ler claramente como verde-acinzentado e fugir do "cream" (default de IA).
 - **Adiado para etapa técnica posterior:** ligação das telas ao Laravel (Inertia/Blade, dados
