@@ -84,6 +84,12 @@
 |---|---|
 | `id`, `user_id`, `card_id`, `competencia`, `vencimento` | Agrupa os lançamentos de um cartão por competência. |
 
+> **🟠 Pendente — hoje `invoices` NÃO existe como tabela.** A fatura é **derivada**
+> (`App\Domain\FaturaCartao\ConsultarFaturaCartao`). Há uma **proposta** de materializá-la
+> (com `data_pagamento`, status e vínculo parcela↔fatura) em
+> [`docs/specs/09-faturas-materializadas.md`](specs/09-faturas-materializadas.md) — **validar as
+> Questões em aberto (§4b) antes de modelar**. As colunas acima são o rascunho original do escopo.
+
 ### invoice_imports
 | Campos-chave | Notas |
 |---|---|

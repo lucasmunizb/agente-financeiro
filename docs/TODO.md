@@ -95,3 +95,15 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [ ] Hardening: bloco "Segurança" no `instructions()` de todos os agentes; delimitar texto não confiável.
 - [ ] Conformidade LGPD (consentimento, minimização, retenção, exclusão lógica, transparência de IA).
 - [ ] **(Etapa separada)** Mensagens de recusa do bot, aviso de transparência de IA e fluxo de consentimento.
+
+## Bloco 9 — Faturas materializadas 🟠 (pendente — proposta a validar)
+
+> Spec: [`docs/specs/09-faturas-materializadas.md`](specs/09-faturas-materializadas.md).
+> **Não iniciar:** hoje a fatura é derivada (sem tabela `invoices`). Proposta de materializá-la
+> (com `data_pagamento`, status e vínculo parcela↔fatura). **Fechar as Questões em aberto (§4b)
+> antes de escrever testes** — em especial vínculo N:1 vs N:N e valor derivado vs snapshot.
+
+- [ ] Decidir §4b (Q1–Q5) do spec 09 com o usuário.
+- [ ] Testes + implementação: tabela `invoices` + vínculo parcela↔fatura + find-or-create.
+- [ ] Testes + implementação: pagamento da fatura (boleto §4.5) sem regredir o disponível do mês.
+- [ ] **(Etapa separada)** Tela/mensagem de fatura e destaque de divergência importada.

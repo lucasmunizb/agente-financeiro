@@ -38,8 +38,13 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 | **FE** | [**Frontend (Stitch) — todas as telas**](FE-frontend-stitch.md) | ⬜ | 02–06 | [`05-arquitetura.md`](../05-arquitetura.md) · [`06-telegram.md`](../06-telegram.md) |
 | 07 | [Importação de PDF (Itaú) — última feature](07-importacao-pdf.md) | 🟡 | 01 | [`07-importacao-pdf.md`](../07-importacao-pdf.md) |
 | 08 | [Segurança e LGPD — portão de fechamento](08-seguranca-lgpd.md) | ⬜ | todas | [`09-nfr-seguranca-lgpd.md`](../09-nfr-seguranca-lgpd.md) |
+| 09 | [Faturas materializadas (ciclo de fatura)](09-faturas-materializadas.md) | 🟠 | 01, 02 | [`04-modelo-dados.md`](../04-modelo-dados.md) (`invoices`) |
 
-**Legenda:** ✅ concluído · 🟡 em andamento · ⬜ planejado.
+**Legenda:** ✅ concluído · 🟡 em andamento · ⬜ planejado · 🟠 pendente (proposta a validar — não iniciar).
+
+> **Spec 09** nasce **pendente**: registra uma **proposta** de materializar a fatura (hoje
+> derivada). Antes de escrever testes/feature é preciso fechar as **Questões em aberto (§4b)**
+> do próprio spec.
 
 > A **fase FE** consolida **todo o frontend** adiado das etapas anteriores (regra 3) em um
 > único spec orientado ao **Stitch** — um prompt por tela + design system comum. Roda
