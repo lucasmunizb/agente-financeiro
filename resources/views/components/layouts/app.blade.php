@@ -14,13 +14,15 @@
         ['key' => 'transacoes', 'label' => 'Transações', 'icon' => 'receipt', 'href' => '#', 'soon' => true],
         ['key' => 'relatorios', 'label' => 'Relatórios', 'icon' => 'bar-chart', 'href' => '#', 'soon' => true],
         ['key' => 'telegram', 'label' => 'Telegram', 'icon' => 'send', 'href' => route('telegram'), 'soon' => false],
+        ['key' => 'configuracoes', 'label' => 'Configurações', 'icon' => 'settings', 'href' => '#', 'soon' => true],
     ];
 
     // Iniciais para o avatar (fallback "AF"). Nome nunca é exposto em meta/OG.
     $nome = trim((string) (auth()->user()?->name ?? ''));
     $iniciais = collect(preg_split('/\s+/', $nome, -1, PREG_SPLIT_NO_EMPTY))
         ->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('') ?: 'AF';
-    $primeiroNome = $nome !== '' ? explode(' ', $nome)[0] : 'Minha conta';
+    $nomeExibicao = $nome !== '' ? $nome : 'Minha conta';
+    $email = (string) (auth()->user()?->email ?? '');
 @endphp
 
 <!DOCTYPE html>
@@ -38,41 +40,63 @@
     @stack('head')
 </head>
 
-<body class="min-h-screen flex text-on-surface">
+<body class="min-h-screen text-on-surface">
     <div class="paper-texture" aria-hidden="true"></div>
 
-    {{-- Barra lateral (desktop) --}}
-    <aside class="hidden md:flex w-64 shrink-0 flex-col h-screen sticky top-0 border-r border-linha bg-superficie">
-        <div class="p-6">
-            <span class="block font-headline-md text-headline-md text-primary tracking-tight">Agente Financeiro</span>
-            <span class="mt-1 block font-label-sm text-label-sm text-outline uppercase tracking-widest">Gestão com clareza</span>
+    {{-- Backdrop do drawer (só mobile, quando aberto) --}}
+    <div id="sidebar-backdrop" hidden
+        class="fixed inset-0 z-40 bg-inverse-surface/40 backdrop-blur-sm md:hidden"></div>
+
+    {{-- Barra lateral. Fixa no desktop; drawer off-canvas no mobile (abre pelo
+         hambúrguer do header). Um só padrão de navegação em ambas as larguras. --}}
+    <aside id="app-sidebar"
+        class="fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col bg-surface-container-low shadow-sm transition-transform duration-200 ease-out md:translate-x-0"
+        aria-label="Navegação principal">
+        {{-- Marca --}}
+        <div class="flex items-center justify-between px-6 pt-gutter pb-4">
+            <span class="font-headline-md text-headline-md text-primary tracking-tight">Agente Financeiro</span>
+            <button type="button" id="sidebar-close"
+                class="rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container md:hidden">
+                <x-icon name="x" class="h-5 w-5" />
+                <span class="sr-only">Fechar menu</span>
+            </button>
         </div>
 
-        <nav class="flex-1 px-4 space-y-1" aria-label="Navegação principal">
+        {{-- Perfil do usuário --}}
+        <div class="flex items-center gap-3 px-6 pb-4">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-container font-label-sm text-label-sm font-semibold text-white">{{ $iniciais }}</span>
+            <div class="min-w-0">
+                <p class="truncate font-body-sm text-body-sm font-semibold text-on-surface">{{ $nomeExibicao }}</p>
+                @if ($email !== '')
+                    <p class="truncate font-label-sm text-label-sm text-outline">{{ $email }}</p>
+                @endif
+            </div>
+        </div>
+
+        <nav class="flex-1 space-y-1 px-4">
             @foreach ($nav as $item)
                 <a href="{{ $item['href'] }}"
                     @if ($active === $item['key']) aria-current="page" @endif
                     @if ($item['soon']) aria-disabled="true" title="Em breve" @endif
-                    class="nav-item flex items-center gap-3 rounded-control px-4 py-3 font-body-md text-body-md transition-colors">
+                    @class([
+                        'nav-item group flex items-center gap-3 py-3 font-body-md text-body-md transition-colors',
+                        '-mx-4 px-6 font-semibold' => $active === $item['key'],
+                        'rounded-control px-3' => $active !== $item['key'],
+                    ])>
                     <x-icon :name="$item['icon']" class="h-5 w-5 shrink-0" />
                     <span>{{ $item['label'] }}</span>
                     @if ($item['soon'])
-                        <span class="ml-auto font-label-sm text-[10px] text-outline uppercase tracking-wide opacity-70">em breve</span>
+                        <span class="ml-auto font-label-sm text-[10px] uppercase tracking-wide opacity-70">em breve</span>
                     @endif
                 </a>
             @endforeach
         </nav>
 
-        <div class="p-4 border-t border-linha space-y-1">
-            <a href="#" aria-disabled="true" title="Em breve"
-                class="nav-item flex items-center gap-3 rounded-control px-4 py-3 font-body-md text-body-md transition-colors">
-                <x-icon name="settings" class="h-5 w-5 shrink-0" />
-                <span>Configurações</span>
-            </a>
+        <div class="px-4 pb-gutter">
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit"
-                    class="nav-item nav-item--danger flex w-full items-center gap-3 rounded-control px-4 py-3 font-body-md text-body-md transition-colors">
+                    class="nav-item nav-item--danger flex w-full items-center gap-3 rounded-control px-3 py-3 font-body-md text-body-md transition-colors">
                     <x-icon name="log-out" class="h-5 w-5 shrink-0" />
                     <span>Sair</span>
                 </button>
@@ -80,36 +104,32 @@
         </div>
     </aside>
 
-    {{-- Coluna de conteúdo --}}
-    <div class="flex-1 flex flex-col min-w-0 min-h-screen">
-        {{-- Barra superior --}}
-        <header class="sticky top-0 z-40 border-b border-linha bg-superficie/90 backdrop-blur">
-            <div class="flex items-center justify-between px-container-padding-mobile md:px-container-padding-desktop py-4">
-                <span class="font-headline-md text-headline-md text-primary md:hidden">Agente Financeiro</span>
-                <div class="ml-auto flex items-center gap-2">
-                    <button type="button" aria-disabled="true" title="Em breve"
-                        class="relative rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low">
-                        <x-icon name="bell" class="h-5 w-5" />
-                        <span class="sr-only">Notificações</span>
-                    </button>
-                    <div class="mx-1 h-6 w-px bg-linha" aria-hidden="true"></div>
-                    <div class="flex items-center gap-2 rounded-full p-1 pr-3">
-                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-primary-container font-label-sm text-label-sm font-semibold text-white">{{ $iniciais }}</span>
-                        <span class="hidden font-body-sm text-body-sm text-on-surface-variant sm:inline">{{ $primeiroNome }}</span>
-                    </div>
-                </div>
+    {{-- Coluna de conteúdo (desloca 16rem à direita no desktop) --}}
+    <div class="flex min-h-screen flex-col md:pl-64">
+        {{-- Barra superior: hambúrguer (mobile) + título da página + sino --}}
+        <header class="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-linha bg-superficie/90 px-container-padding-mobile backdrop-blur md:px-container-padding-desktop">
+            <div class="flex min-w-0 items-center gap-3">
+                <button type="button" id="sidebar-open"
+                    class="-ml-1 rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high md:hidden"
+                    aria-controls="app-sidebar" aria-expanded="false">
+                    <x-icon name="menu" class="h-6 w-6" />
+                    <span class="sr-only">Abrir menu</span>
+                </button>
+                <h1 class="truncate font-headline-md text-headline-md text-primary md:font-headline-lg md:text-headline-lg">{{ $heading ?? 'Agente Financeiro' }}</h1>
             </div>
+            <button type="button" aria-disabled="true" title="Em breve"
+                class="-mr-1 shrink-0 rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary">
+                <x-icon name="bell" class="h-5 w-5" />
+                <span class="sr-only">Notificações</span>
+            </button>
         </header>
 
         {{-- Canvas principal --}}
-        <main class="flex-1 bg-surface-container-low pb-24 md:pb-0">
+        <main class="flex-1 bg-surface-container-low">
             <div class="mx-auto flex max-w-4xl flex-col items-center px-container-padding-mobile md:px-container-padding-desktop py-section-gap">
-                @if ($heading)
+                @if ($subheading)
                     <div class="mb-10 w-full max-w-2xl text-center">
-                        <h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">{{ $heading }}</h1>
-                        @if ($subheading)
-                            <p class="font-body-md text-body-md text-on-surface-variant">{{ $subheading }}</p>
-                        @endif
+                        <p class="font-body-md text-body-md text-on-surface-variant">{{ $subheading }}</p>
                     </div>
                 @endif
 
@@ -118,27 +138,39 @@
         </main>
     </div>
 
-    {{-- Navegação inferior (mobile) --}}
-    <nav class="fixed bottom-0 left-0 z-50 flex h-16 w-full items-center justify-around border-t border-linha bg-superficie md:hidden"
-        aria-label="Navegação principal">
-        @foreach ($nav as $item)
-            <a href="{{ $item['href'] }}"
-                @if ($active === $item['key']) aria-current="page" @endif
-                @class([
-                    'flex flex-col items-center justify-center gap-0.5 px-3 py-1',
-                    'text-primary' => $active === $item['key'],
-                    'text-on-surface-variant' => $active !== $item['key'],
-                ])>
-                <x-icon :name="$item['icon']" class="h-5 w-5" />
-                <span class="font-label-sm text-[10px]">{{ $item['label'] }}</span>
-            </a>
-        @endforeach
-    </nav>
-
     {{-- Toast (feedback efêmero) --}}
     <div id="toast" role="status" aria-live="polite"
-        class="pointer-events-none fixed bottom-20 left-1/2 z-[100] -translate-x-1/2 translate-y-4 rounded-full bg-inverse-surface px-6 py-3 font-body-sm text-body-sm text-inverse-on-surface opacity-0 shadow-xl transition-all duration-300 md:bottom-10">
+        class="pointer-events-none fixed bottom-10 left-1/2 z-[100] -translate-x-1/2 translate-y-4 rounded-full bg-inverse-surface px-6 py-3 font-body-sm text-body-sm text-inverse-on-surface opacity-0 shadow-xl transition-all duration-300">
     </div>
+
+    {{-- Drawer do menu (mobile): abre/fecha o aside. JS mínimo, sem framework. --}}
+    <script>
+        (function () {
+            const aside = document.getElementById('app-sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            const openBtn = document.getElementById('sidebar-open');
+            const closeBtn = document.getElementById('sidebar-close');
+            if (!aside) return;
+
+            function setOpen(open) {
+                aside.classList.toggle('-translate-x-full', !open);
+                backdrop.hidden = !open;
+                document.body.classList.toggle('overflow-hidden', open);
+                openBtn?.setAttribute('aria-expanded', String(open));
+            }
+
+            openBtn?.addEventListener('click', () => setOpen(true));
+            closeBtn?.addEventListener('click', () => setOpen(false));
+            backdrop?.addEventListener('click', () => setOpen(false));
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') setOpen(false);
+            });
+            // Fecha ao navegar (mobile); no desktop o aside fica sempre visível.
+            aside.querySelectorAll('a[href]:not([aria-disabled])').forEach((a) =>
+                a.addEventListener('click', () => setOpen(false))
+            );
+        })();
+    </script>
 
     @stack('scripts')
 </body>
