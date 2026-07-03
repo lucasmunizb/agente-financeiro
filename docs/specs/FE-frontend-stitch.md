@@ -145,7 +145,7 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 - [x] 4. Vínculo do Telegram
 
 **B. Núcleo financeiro**
-- [x] 5. Dashboard / Visão geral *(tela-assinatura: a régua do mês; shell aside + header já criado no Stitch — **gerado, não implementado**)*
+- [x] 5. Dashboard / Visão geral *(tela-assinatura: a régua do mês; shell aside + header — **implementado em Blade com dados fake**; integração com o backend spec-06 pendente)*
 - [ ] 6. Lançamentos — lista
 - [ ] 7. Lançamento — criar/editar (com prévia de parcelas)
 - [ ] 8. Lançamento — detalhe (parcelas + status)
@@ -567,10 +567,20 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
   §7.2 Criar conta, §7.3 Onboarding+LGPD, §7.4 Vínculo do Telegram. Prompts refinados (estados
   como variações, copy na voz da interface, conteúdo pt-BR realista, acessibilidade embutida).
   _(Registrar aqui os nomes dos artefatos exportados do Stitch quando disponíveis.)_
-- **Dashboard / Visão geral (§7.5): 🟡 gerado no Stitch, ainda NÃO implementado.** O shell
-  padrão (aside + header) e a tela da Visão geral já foram desenhados no Stitch; falta a
-  **ligação técnica** ao Laravel (extrair o shell para um layout Blade reutilizável + montar o
-  conteúdo do dashboard com dados reais do backend — spec-06).
+- **Dashboard / Visão geral (§7.5): 🟢 implementado em Blade (dados fake).** Shell padrão já
+  extraído para o layout `x-layouts.app` (com prop `wide` para o canvas largo). O conteúdo da
+  Visão geral segue fielmente o design do Stitch, com componentes reutilizáveis:
+  `x-dashboard.month-ruler` (a régua do mês — ticks gerados server-side, sem JS para o layout),
+  `x-dashboard.summary-card`, `x-dashboard.bill-row` e `x-ui.status-badge`; donut e FAB inline
+  em `home.blade.php`. Material Symbols (CDN) do Stitch foi trocado por SVG inline no `x-icon`
+  (regra 6/LGPD: sem CDN de terceiros). Tokens novos no design system: `secondary`, `tertiary`,
+  `error`, `on-primary`, `surface-container-highest`. Os **três estados** do Stitch estão
+  implementados e prontos para ligar: `pronto` (dados), `x-dashboard.empty-state` (vazio,
+  primeiro mês) e `x-dashboard.loading` (skeleton). Hoje o estado sai da query
+  `?estado=vazio|carregando` (afordância de revisão na rota `home`); quando o backend existir,
+  o controller decide o estado a partir dos dados reais. **Pendente:** apenas ligar aos dados
+  reais do backend (spec-06) — os valores passam a chegar já formatados. O FAB "Registrar gasto"
+  aponta para §7.7 (ainda não existe) → marcado "em breve".
 - **Próximo:** grupo B (núcleo financeiro) — §7.6 a §7.13. A ligação técnica das telas A e do
   Dashboard ao Laravel (Blade+Tailwind, rotas, auth, validação) fica para a etapa de
   implementação.

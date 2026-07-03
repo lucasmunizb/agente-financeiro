@@ -15,9 +15,17 @@ use Illuminate\Support\Facades\Route;
 // Laravel → route('login')). Novas rotas da aplicação entram neste grupo.
 // -------------------------------------------------------------------------
 Route::middleware('auth')->group(function () {
-    // Tela inicial provisória (destino do login) — mantém o shell do app até o
-    // Dashboard ("Visão Geral") ser desenvolvido. Apresentação (regra 3).
-    Route::get('/', fn () => view('home'))->name('home');
+    // Dashboard ("Visão Geral") — destino do login. Apresentação com DADOS FAKE
+    // (regra 3); a integração com o backend (spec-06) vem depois. O estado da tela
+    // (pronto | vazio | carregando) hoje sai da query (?estado=…) só para revisar
+    // as três telas; quando o backend existir, o estado passa a vir dos dados reais.
+    Route::get('/', function () {
+        $estado = in_array(request('estado'), ['vazio', 'carregando'], true)
+            ? request('estado')
+            : 'pronto';
+
+        return view('home', ['estado' => $estado]);
+    })->name('home');
 
     // Onboarding + consentimento LGPD. O usuário chega aqui já autenticado
     // (logo após criar a conta); persistir o aceite (aceite_lgpd_em) é backend.

@@ -4,6 +4,7 @@
     'subheading' => null,
     'active' => null, // chave do item de navegação ativo
     'notificacoes' => null, // coleção pronta do backend; null → usa o demo do componente
+    'wide' => false, // canvas largo, alinhado à esquerda (dashboard/listas); padrão é a coluna estreita centrada
 ])
 
 @php
@@ -121,11 +122,16 @@
             <x-app.notifications :notificacoes="$notificacoes" />
         </header>
 
-        {{-- Canvas principal --}}
+        {{-- Canvas principal. Estreito e centrado por padrão (telas de card único);
+             largo e alinhado à esquerda no modo `wide` (dashboard, extratos). --}}
         <main class="flex-1 bg-surface-container-low">
-            <div class="mx-auto flex max-w-4xl flex-col items-center px-container-padding-mobile md:px-container-padding-desktop py-section-gap">
+            <div @class([
+                'mx-auto w-full px-container-padding-mobile md:px-container-padding-desktop py-section-gap',
+                'flex max-w-4xl flex-col items-center' => !$wide,
+                'max-w-[1200px]' => $wide,
+            ])>
                 @if ($subheading)
-                    <div class="mb-10 w-full max-w-2xl text-center">
+                    <div @class(['mb-10 w-full', 'max-w-2xl text-center' => !$wide])>
                         <p class="font-body-md text-body-md text-on-surface-variant">{{ $subheading }}</p>
                     </div>
                 @endif

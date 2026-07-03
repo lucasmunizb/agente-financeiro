@@ -48,11 +48,16 @@
     --color-surface-container-low: #f8f3ec;
     --color-surface-container: #f2ede6;
     --color-surface-container-high: #ece8e1;
+    --color-surface-container-highest: #e6e2db; /* skeleton de carregamento */
     --color-surface-container-lowest: #ffffff;
     --color-inverse-surface: #32302c; /* fundo do toast */
     --color-inverse-on-surface: #f5f0e9;
     --color-error-container: #ffdad6; /* selo "expirou" */
     --color-on-error-container: #93000a;
+    --color-on-primary: #ffffff; /* texto sobre a primária cheia (FAB) */
+    --color-error: #ba1a1a; /* em atraso / variação negativa */
+    --color-secondary: #875300; /* categoria (donut) — âmbar escuro */
+    --color-tertiary: #8a2714; /* categoria (donut) — terracota escuro */
 
     /* Tipografia — famílias por papel */
     --font-headline-lg: var(--font-display);
@@ -322,6 +327,67 @@ body {
     animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
+/* =====================================================================
+   Dashboard / Visão geral (spec FE §7.5) — a "régua do mês" é o único
+   elemento que se move; o resto entra com um fade+rise sóbrio.
+   ===================================================================== */
+
+/* Entrada suave das seções (fade + rise). */
+@keyframes enter-rise {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.animate-enter {
+    opacity: 0;
+    animation: enter-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Tick da régua do mês — cresce a partir da base e reage discretamente ao hover. */
+.ruler-tick {
+    transform-origin: bottom;
+    transition: transform 0.2s ease;
+}
+.ruler-tick:hover {
+    transform: scaleY(1.35);
+}
+
+/* Skeleton do estado "carregando" (spec FE §7.5). Pulsa entre dois tons de
+   superfície; blocos reaproveitam o .notebook-card como moldura. */
+@keyframes skeleton-pulse {
+    0%,
+    100% {
+        background-color: var(--color-surface-container-highest);
+    }
+    50% {
+        background-color: var(--color-surface-container);
+    }
+}
+.skeleton {
+    border-radius: 4px;
+    background-color: var(--color-surface-container-highest);
+    animation: skeleton-pulse 1.8s ease-in-out infinite;
+}
+
+/* Ruling do caderno: divisor que para 16px antes da borda do card (spec §4.6). */
+.notebook-line {
+    position: relative;
+}
+.notebook-line::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 16px;
+    height: 1px;
+    background-color: var(--color-linha);
+}
+
 /* Respeita quem pede menos movimento. */
 @media (prefers-reduced-motion: reduce) {
     .shake-horizontal {
@@ -329,5 +395,17 @@ body {
     }
     .loading-spinner {
         animation-duration: 1.6s;
+    }
+    .animate-enter {
+        opacity: 1;
+        animation: none;
+    }
+    .ruler-tick,
+    .ruler-tick:hover {
+        transition: none;
+        transform: none;
+    }
+    .skeleton {
+        animation-duration: 3.2s;
     }
 }
