@@ -3,6 +3,7 @@
     'heading' => null,
     'subheading' => null,
     'active' => null, // chave do item de navegação ativo
+    'notificacoes' => null, // coleção pronta do backend; null → usa o demo do componente
 ])
 
 @php
@@ -115,13 +116,9 @@
                     <x-icon name="menu" class="h-6 w-6" />
                     <span class="sr-only">Abrir menu</span>
                 </button>
-                <h1 class="truncate font-headline-md text-headline-md text-primary md:font-headline-lg md:text-headline-lg">{{ $heading ?? 'Agente Financeiro' }}</h1>
+                <h1 class="truncate font-headline-md text-headline-md text-primary md:font-headline-md md:text-headline-md">{{ $heading ?? 'Agente Financeiro' }}</h1>
             </div>
-            <button type="button" aria-disabled="true" title="Em breve"
-                class="-mr-1 shrink-0 rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary">
-                <x-icon name="bell" class="h-5 w-5" />
-                <span class="sr-only">Notificações</span>
-            </button>
+            <x-app.notifications :notificacoes="$notificacoes" />
         </header>
 
         {{-- Canvas principal --}}
