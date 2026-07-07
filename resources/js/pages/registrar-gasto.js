@@ -42,14 +42,17 @@ if (modal) {
     function abrir() {
         ultimoFoco = document.activeElement;
         modal.hidden = false;
-        document.body.classList.add('overflow-hidden');
+        // `modal-aberto` esconde a .paper-texture enquanto o modal está aberto:
+        // é um overlay fixo de tela cheia e some do caminho de composição da
+        // rolagem (~6% do custo de draw por frame — medido). Ver app.css.
+        document.body.classList.add('overflow-hidden', 'modal-aberto');
         mostrarPainel('form');
         modal.querySelector('#rg-descricao')?.focus({ preventScroll: true });
     }
 
     function fechar() {
         modal.hidden = true;
-        document.body.classList.remove('overflow-hidden');
+        document.body.classList.remove('overflow-hidden', 'modal-aberto');
         limparSalvandoStore();
         limparSalvandoReview();
         if (ultimoFoco instanceof HTMLElement) ultimoFoco.focus({ preventScroll: true });

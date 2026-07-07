@@ -168,6 +168,12 @@ body {
     z-index: 9999;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
+/* Com o modal aberto, tira a textura do caminho de composição da rolagem
+   (overlay fixo de tela cheia; ~6% do custo de draw/frame). O JS do modal
+   liga/desliga `modal-aberto` no <body>. */
+body.modal-aberto .paper-texture {
+    display: none;
+}
 
 /* Documentos legais (termos, política) — leitura longa, calma e legível.
    Estiliza o HTML semântico do slot; nada de hex solto, só tokens. */
@@ -398,10 +404,14 @@ body {
    prontos do backend.
    ===================================================================== */
 
-/* Backdrop esfumaçado (surface-dim a 70% + leve blur). */
+/* Backdrop esfumaçado. NÃO reintroduzir `backdrop-filter: blur()` aqui: ele é
+   re-rasterizado a cada frame enquanto o conteúdo do modal rola e dominava ~88%
+   do custo de desenho por frame (medido com Playwright + trace do Chromium:
+   ~1,70s → ~0,20s de draw+swap em 150 frames de rolagem; ~11,3 → ~1,2 ms/frame).
+   O overlay sólido semitransparente preserva o ar "esfumaçado" por uma fração do
+   custo. Promover o card a camada (contain/will-change) não muda nada — testado. */
 .modal-backdrop {
-    background-color: color-mix(in srgb, var(--color-surface-dim) 70%, transparent);
-    backdrop-filter: blur(4px);
+    background-color: color-mix(in srgb, var(--color-surface-dim) 82%, transparent);
     animation: modal-backdrop-in 0.2s ease-out;
 }
 @keyframes modal-backdrop-in {
