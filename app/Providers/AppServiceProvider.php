@@ -16,7 +16,7 @@ use App\Domain\Telegram\FluxoDeVinculo;
 use App\Domain\Telegram\ManipuladorInerte;
 use App\Domain\Telegram\ManipuladorQueEnfileira;
 use App\Domain\Telegram\Resposta\RespostaAoUsuario;
-use App\Domain\Telegram\Resposta\RespostaInerte;
+use App\Domain\Telegram\Resposta\RespostaTelegram;
 use App\Domain\Telegram\RoteadorDeComandos;
 use App\Domain\Telegram\RoteadorDeMensagem;
 use App\Domain\Telegram\Saida\ClienteTelegram;
@@ -53,9 +53,10 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        // Porta de saída do bot: inerte por ora — a redação/envio das mensagens ao
-        // Telegram é frontend (regra 3), etapa separada e posterior.
-        $this->app->bind(RespostaAoUsuario::class, RespostaInerte::class);
+        // Porta de saída do bot: entrega ao Telegram o resultado já calculado (redação
+        // determinística via RedatorDoChat + envio ao chat do vínculo ativo). A RespostaInerte
+        // permanece para os testes que só inspecionam o resultado de domínio.
+        $this->app->bind(RespostaAoUsuario::class, RespostaTelegram::class);
 
         // Cliente de saída da Bot API do Telegram (envio de mensagens + pedido de
         // contato no vínculo). Nos testes é trocado pelo ClienteTelegramFake.

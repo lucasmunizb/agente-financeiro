@@ -181,6 +181,23 @@ it('bloqueia número inventado quando nenhuma ferramenta foi chamada (payload va
         ->and($resposta->tentativas)->toBe(2);
 });
 
+it('cai no fallback seguro quando o provedor lança exceção em todas as tentativas', function () {
+    $user = User::factory()->create();
+    gastoConsulta($user, 150000, '2026-06-10');
+
+    // Todos os provedores indisponíveis: o failover da SDK esgota e a exceção escapa.
+    Ai::fakeAgent(AssistenteDeConsulta::class, [
+        fn () => throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: timeout'),
+        fn () => throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: timeout'),
+    ]);
+
+    $resposta = app(ResponderConsulta::class)->responder($user, 'quanto gastei?');
+
+    expect($resposta->aprovado)->toBeFalse()
+        ->and($resposta->texto)->not->toContain('R$')
+        ->and($resposta->tentativas)->toBe(2);
+});
+
 it('expõe as 4 ferramentas de consulta, amarradas ao usuário e ao coletor', function () {
     $agente = new AssistenteDeConsulta(User::factory()->create(), new ColetorDeConsultas);
 

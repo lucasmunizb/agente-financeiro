@@ -11,6 +11,7 @@ use App\Domain\IA\Custo\TipoDeUsoIA;
 use App\Domain\IA\Custo\UsoDeIA;
 use App\Domain\IA\Guard\GuardPosGeracao;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Orquestra o chat financeiro de consulta (Bloco 6, F8). Liga o agente (que decide e
@@ -46,7 +47,22 @@ final class ResponderConsulta
             $coletor->limpar();
 
             $inicio = microtime(true);
-            $resposta = $agente->prompt($pergunta);
+
+            // Todos os provedores do failover podem estar indisponíveis (timeout, 429, 503,
+            // 4xx de validação de tool). A SDK esgota o failover e a exceção escapa: aqui ela
+            // é tratada como tentativa falha — nunca deixa o job morrer sem resposta. O guard
+            // (barreira 4) continua garantindo que nada de número inventado saia.
+            try {
+                $resposta = $agente->prompt($pergunta);
+            } catch (\Throwable $e) {
+                Log::warning('IA: consulta falhou, tentando de novo', [
+                    'tentativa' => $tentativa,
+                    'excecao' => $e::class,
+                ]);
+
+                continue;
+            }
+
             $this->registrarUsoDaChamada($user, $resposta, $inicio);
 
             $texto = trim($resposta->text);
