@@ -52,6 +52,7 @@
     --color-surface-container-lowest: #ffffff;
     --color-inverse-surface: #32302c; /* fundo do toast */
     --color-inverse-on-surface: #f5f0e9;
+    --color-surface-dim: #ded9d3; /* backdrop esfumaçado do modal */
     --color-error-container: #ffdad6; /* selo "expirou" */
     --color-on-error-container: #93000a;
     --color-on-primary: #ffffff; /* texto sobre a primária cheia (FAB) */
@@ -388,6 +389,75 @@ body {
     background-color: var(--color-linha);
 }
 
+/* =====================================================================
+   Modal "Registrar gasto" (spec FE §7.7b) — reproduz fielmente a tela do
+   Stitch "Registrar gasto — Crédito". Card central calmo sobre um backdrop
+   esfumaçado; entra com fade+zoom sóbrio; campos condicionais deslizam.
+   Estilos de campo/botão reaproveitam .input-field e os tokens (nada de hex
+   solto). A UI nunca calcula dinheiro (regra 4): prévia e vencimento chegam
+   prontos do backend.
+   ===================================================================== */
+
+/* Backdrop esfumaçado (surface-dim a 70% + leve blur). */
+.modal-backdrop {
+    background-color: color-mix(in srgb, var(--color-surface-dim) 70%, transparent);
+    backdrop-filter: blur(4px);
+    animation: modal-backdrop-in 0.2s ease-out;
+}
+@keyframes modal-backdrop-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Card do modal — fade + zoom discreto na entrada. */
+@keyframes modal-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+.modal-card-enter {
+    animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Grupo de campos condicionais (crédito × à vista) — desliza de cima. */
+@keyframes field-reveal {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+.field-reveal {
+    animation: field-reveal 0.25s ease-out;
+}
+
+/* Interruptor "Repete todo mês?" — trilho e botão deslizante. */
+.rg-switch {
+    background-color: var(--color-outline-variant);
+    transition: background-color 0.2s ease;
+}
+.rg-switch[aria-checked='true'] {
+    background-color: var(--color-primary-container);
+}
+.rg-switch__knob {
+    transition: transform 0.2s ease;
+}
+.rg-switch[aria-checked='true'] .rg-switch__knob {
+    transform: translateX(24px);
+}
+
 /* Respeita quem pede menos movimento. */
 @media (prefers-reduced-motion: reduce) {
     .shake-horizontal {
@@ -407,5 +477,14 @@ body {
     }
     .skeleton {
         animation-duration: 3.2s;
+    }
+    .modal-backdrop,
+    .modal-card-enter,
+    .field-reveal {
+        animation: none;
+    }
+    .rg-switch,
+    .rg-switch__knob {
+        transition: none;
     }
 }

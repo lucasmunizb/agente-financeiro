@@ -7,7 +7,10 @@
 
 ## 4.1 · Parcelamento
 
-Toda compra parcelada guarda: **valor total**, **valor por parcela**, **dia efetivo da parcela** e **parcela atual/total**.
+Toda compra parcelada guarda: **valor total**, **dia efetivo da parcela** e a **estrutura N/total**.
+O **valor por parcela** e a **parcela vigente (atual/total)** **não são persistidos** — são
+**derivados** do valor total na exibição (`Money::allocate()` distribui sem perder centavo;
+soma das parcelas = total, sem drift). _(Decisão do spec 01/F1 — ver doc 04 · installments.)_
 
 - **Na primeira parcela (1/N):** gerar automaticamente **todas as N parcelas futuras**.
 - **Ao importar uma parcela ≥ 2/N:** verificar se já existem as parcelas; se não existirem, **registrar todas** (inclusive as já passadas).

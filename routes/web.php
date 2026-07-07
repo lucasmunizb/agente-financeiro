@@ -3,6 +3,8 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GastoController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\TelegramLinkController;
 use App\Http\Controllers\TelegramWebhookController;
@@ -19,13 +21,15 @@ Route::middleware('auth')->group(function () {
     // (regra 3); a integração com o backend (spec-06) vem depois. O estado da tela
     // (pronto | vazio | carregando) hoje sai da query (?estado=…) só para revisar
     // as três telas; quando o backend existir, o estado passa a vir dos dados reais.
-    Route::get('/', function () {
-        $estado = in_array(request('estado'), ['vazio', 'carregando'], true)
-            ? request('estado')
-            : 'pronto';
+    // Dashboard "Visão Geral" (spec 06). Compõe os números já calculados pelo
+    // domínio e apenas formata para a tela; carrega também cartões/categorias do
+    // usuário para o modal "Registrar gasto".
+    Route::get('/', [DashboardController::class, 'index'])->name('home');
 
-        return view('home', ['estado' => $estado]);
-    })->name('home');
+    // Cadastro de gasto manual (modal §7.7b). Dois passos (regra 7): a prévia
+    // calcula sem gravar; o store persiste após a confirmação.
+    Route::post('/gastos/previa', [GastoController::class, 'previa'])->name('gastos.previa');
+    Route::post('/gastos', [GastoController::class, 'store'])->name('gastos.store');
 
     // Onboarding + consentimento LGPD. O usuário chega aqui já autenticado
     // (logo após criar a conta); persistir o aceite (aceite_lgpd_em) é backend.

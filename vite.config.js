@@ -11,6 +11,7 @@ export default defineConfig({
                 'resources/js/pages/auth.js',
                 'resources/js/pages/onboarding.js',
                 'resources/js/pages/telegram.js',
+                'resources/js/pages/registrar-gasto.js',
             ],
             refresh: true,
         }),

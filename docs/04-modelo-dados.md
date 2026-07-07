@@ -67,7 +67,7 @@
 ### installments
 | Campos-chave | Notas |
 |---|---|
-| `id`, `transaction_id`, `numero`, `total`, `valor_cents`, `vencimento`, `status_id` | Parcelas. **A parcela atual é calculada, não fixada** — a coluna registra a estrutura N/total, mas a "parcela vigente" é derivada na exibição. |
+| `id`, `transaction_id`, `numero`, `total`, `vencimento`, `status_id` | Parcelas. **Sem coluna de valor:** o valor de cada parcela é **derivado** do `valor_total_cents` da transaction via `Money::allocate()` (resto nas primeiras, soma sempre = total) — nunca persistido, para não haver drift. **A parcela vigente também é calculada, não fixada** — a linha registra a estrutura N/total; a "parcela atual" é derivada na exibição. _(Decisão do spec 01/F1; revoga o `valor_cents` que constava aqui e o "valor por parcela" do doc 03 §4.1.)_ |
 
 ### recurrences
 | Campos-chave | Notas |

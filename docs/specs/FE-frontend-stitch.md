@@ -145,9 +145,10 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 - [x] 4. Vínculo do Telegram
 
 **B. Núcleo financeiro**
-- [x] 5. Dashboard / Visão geral *(tela-assinatura: a régua do mês; shell aside + header — **implementado em Blade com dados fake**; integração com o backend spec-06 pendente)*
+- [x] 5. Dashboard / Visão geral *(tela-assinatura: a régua do mês; shell aside + header — **implementado em Blade e ligado ao backend (spec-06)**: valores reais do domínio, estado vazio/pronto pelos dados, coberto por testes de feature)*
 - [ ] 6. Lançamentos — lista
 - [ ] 7. Lançamento — criar/editar (com prévia de parcelas)
+- [x] 7b. Registrar gasto — **modal rápido** (FAB do dashboard) *(valor, forma, cartão, vencimento, pagamento opcional, recorrente, categoria)* — **gerado no Stitch**, **implementado em Blade** e **ligado ao backend** (persiste de verdade): fluxo em dois passos (formulário → prévia calculada pelo backend → confirmar → grava, regra 7), cartões/categorias reais do usuário, validação server-side (Form Request), reuso de `RegistrarGastoManual`. Coberto por testes de borda web. **Deferido:** marcar como pago (data de pagamento) e recorrência (backend pós-MVP).
 - [ ] 8. Lançamento — detalhe (parcelas + status)
 - [ ] 9. Confirmações pendentes *(espelho web do "Confirma?" — regra 7)*
 - [ ] 10. Receitas
@@ -156,7 +157,7 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 - [ ] 13. Cartões & faturas
 
 **C. IA**
-- [ ] 14. Chat financeiro *(fonte/trace + estados)*
+- [ ] 14. Chat financeiro — **aside direito docado** *(histórico no topo · entrada de texto · anexo somente-PDF · fonte/trace + estados; substitui a versão de página cheia)*
 
 **D. Importação de PDF — gerar após o backend da [[spec-07-importacao-pdf]]**
 - [ ] 15. Importar fatura (upload)
@@ -376,6 +377,113 @@ Rodapé: botão primário "Revisar e confirmar" (NÃO grava direto — abre conf
 Validação inline e direta ("Crédito exige um cartão."). Sem auto-save.
 ```
 
+### 7.7b Registrar gasto — *modal rápido (FAB do dashboard)*
+**Objetivo:** registrar um gasto **sem sair da tela atual**, por um **modal** disparado pelo
+FAB "Registrar gasto" do Dashboard (§7.5, hoje "em breve"). É o **atalho de captura rápida**;
+o formulário completo com edição e histórico permanece na página §7.7. Ambos gravam o **mesmo**
+lançamento e obedecem às mesmas barreiras (regra 4: a tela não calcula; regra 7: confirmar
+antes de gravar).
+
+> **Campos e obrigatoriedade** derivam do domínio (doc 03 §4.6): forma de pagamento
+> ∈ {crédito, débito, pix, dinheiro, boleto}; **crédito** é a única em cartão. **Datas
+> separadas:** compra/vencimento/pagamento. **Vencimento é determinístico** — no crédito ele é
+> **calculado pelo cartão** (nunca digitado); fora de cartão, é a própria data. **Recorrência**
+> existe no modelo (assinaturas) mas o **backend é pós-MVP** — no design o switch já aparece;
+> a ligação real fica pendente. **Visibilidade do switch (decisão de design):** só nas formas
+> **à vista** (pix, débito, dinheiro, boleto); **oculto no crédito**, pois crédito usa parcelas
+> e recorrência/parcelamento não se combinam.
+
+> **Prompt fechado (anti-invenção).** O Stitch preenche buraco com invenção; a defesa é não
+> deixar buraco: cada campo, rótulo e valor literal, uma lista explícita do que é **proibido**
+> gerar, e os campos condicionais **separados por variação** (crédito × à vista). Cole do zero.
+
+```text
+Gere um COMPONENTE MODAL "Registrar gasto" de um app de finanças pessoais em pt-BR. Ignore
+qualquer versão anterior desta tela — comece do zero. Gere DUAS TELAS (variações) deste mesmo
+modal (detalhadas no fim). É só este modal: NÃO gere nenhuma outra tela, fluxo ou página.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo (backdrop atrás do modal): #EDF0E8
+- Superfície do card e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px no card, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), menu, abas, breadcrumb, logo, avatar,
+  ilustração, imagem, banner, gráfico, nem rodapé de página. Só o modal sobre o backdrop.
+- NÃO adicione, remova, renomeie nem reordene NENHUM campo além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, ícones decorativos, contadores,
+  "termos", social login, nem qualquer conteúdo que não esteja escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA DO MODAL (igual nas duas variações) ━━━
+- Backdrop escurecido cobrindo a tela; o modal é um card central #FBFBF8, cantos 12px, sombra
+  difusa; largura confortável no desktop, quase full-width no mobile (funciona a 360px).
+- Topo: título "Registrar gasto" (Bricolage Grotesque) à esquerda e botão "X" (fechar) à direita.
+- Uma nota discreta abaixo do título: "* obrigatório".
+- Campos empilhados, UM POR LINHA, cada um com seu rótulo acima. Obrigatórios com "*".
+- Rodapé fixo do card, com uma linha fina (#DDE0D7) acima: botão primário "Revisar e confirmar"
+  (verde-cédula, à direita) e botão secundário "Cancelar" (contorno verde-cédula, à esquerda).
+
+━━━ CAMPOS FIXOS (aparecem nas DUAS variações, nesta ordem) ━━━
+1. "Descrição" * — input de texto, valor: "Mercado do mês".
+2. "Valor" * — input MONO com prefixo "R$" e o número alinhado à direita, valor: "R$ 450,00".
+3. "Forma de pagamento" * — controle segmentado com EXATAMENTE 5 opções, nesta ordem:
+   "Crédito", "Débito", "Pix", "Dinheiro", "Boleto". (Se não couber numa linha, quebre em duas
+   linhas de segmentos de largura igual — NÃO junte nem remova opções.) O segmento selecionado
+   fica em verde-cédula #1F6E5A com texto claro; os demais neutros.
+… (aqui entram os campos condicionais, que MUDAM por variação — ver abaixo) …
+ÚLTIMO campo (sempre por último, nas duas variações):
+"Categoria" * — seletor de chips (pill) com ícone + rótulo, nesta ordem: "Mercado",
+   "Restaurante", "Transporte", "Moradia", "Lazer", "Outros". O chip "Mercado" está
+   SELECIONADO (fundo verde-cédula) e traz um selo pequeno "sugerido". Os demais neutros.
+
+━━━ VARIAÇÃO A — forma selecionada: "Crédito" ━━━
+Segmento "Crédito" selecionado. Entre o campo 3 e a Categoria, mostre NESTA ordem:
+- "Cartão" * — dropdown MONO, valor: "Nubank •••• 1234 — fecha dia 28".
+- "Parcelas" — seletor numérico, valor: "3". Logo abaixo, uma TABELA MONO rotulada
+  "Prévia — calculada pelo sistema (ainda não gravado)", com 3 linhas (colunas: nº · valor ·
+  vencimento), alinhadas à direita:
+      "1/3"  "R$ 150,00"  "vence 05/07"
+      "2/3"  "R$ 150,00"  "vence 05/08"
+      "3/3"  "R$ 150,00"  "vence 05/09"
+- "Data de vencimento" * — NÃO é um campo editável: mostre um CHIP somente-leitura, texto:
+  "vence 5 de julho · calculado pelo cartão".
+- "Data de pagamento" — rótulo "Data de pagamento (opcional)", campo de data VAZIO, com apoio
+  discreto: "vazio = em aberto".
+NESTA variação NÃO existe o switch de recorrência (crédito usa parcelas). Não o desenhe aqui.
+
+━━━ VARIAÇÃO B — forma selecionada: "Pix / Dinheiro" (à vista) ━━━
+Segmento "Pix" selecionado (o comportamento de "Dinheiro" é idêntico). Entre o campo 3 e a
+Categoria, mostre NESTA ordem — e NÃO mostre "Cartão", "Parcelas" nem a tabela de prévia:
+- "Data de vencimento" * — campo de DATA EDITÁVEL, valor: "05/07/2026".
+- "Data de pagamento" — rótulo "Data de pagamento (opcional)", campo de data VAZIO, com apoio
+  discreto: "vazio = em aberto".
+- "Gasto recorrente" — um SWITCH rotulado "Repete todo mês?", mostrado LIGADO, com apoio
+  discreto: "assinaturas e contas fixas". Por estar ligado, revela abaixo dois campos:
+      "Periodicidade" — dropdown, valor: "mensal".
+      "Dia" — seletor de dia do mês, valor: "5".
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro nem vencimento: o valor por parcela, a prévia e o vencimento
+do cartão chegam prontos do backend — a tela só exibe. Acessível: contraste AA, foco de teclado
+visível (anel verde-cédula), alvos de toque ≥ 44px, funciona a partir de 360px.
+
+Entregue as DUAS variações como telas separadas: "Registrar gasto — Crédito" e
+"Registrar gasto — Pix/Dinheiro".
+```
+
+> **Estados adicionais (gerar depois, como variações à parte — não no prompt principal):**
+> validação inline ("Informe uma descrição."; "Informe um valor."; "Escolha a forma de
+> pagamento."; "Crédito exige um cartão."; "Escolha uma categoria."); **crédito sem cartão
+> cadastrado** (aviso + link "cadastrar um cartão", "Revisar e confirmar" desabilitado);
+> **salvando** (botão "Salvando…", campos desabilitados). Ficam fora do prompt fechado acima
+> para não poluir as duas variações-base; gere um de cada vez, com o mesmo rigor literal.
+
 ### 7.8 Lançamento — detalhe (parcelas + status)
 **Objetivo:** ver um lançamento e suas parcelas. **Estados:** com parcela paga (edição bloqueada).
 ```text
@@ -460,25 +568,98 @@ principal, que será encaixado dentro desse shell (título da página: "Cartões
 - Deixe claro que o total é calculado pelo sistema. Botão "Adicionar cartão".
 ```
 
-### 7.14 Chat financeiro — *com fonte/trace + estados*
-**Objetivo:** perguntar sobre as finanças e receber resposta **rastreável**. **Estados:** pensando; instabilidade/re-tentativa; fallback sem números.
+### 7.14 Chat financeiro — *aside direito docado (histórico + entrada + anexo só-PDF)*
+**Objetivo:** conversar sobre as finanças na web — como no bot — por um **painel de chat docado
+à direita** (espelho do aside de navegação, do outro lado), com o **histórico no topo**, uma
+**entrada de texto** e um **anexo que aceita SOMENTE PDF**. Substitui a versão de página cheia:
+esta é **a** forma do chat na web. **Estados:** vazio; PDF anexado; anexo inválido; pensando;
+instabilidade/re-tentativa; fallback sem números.
+
+> **Por que "aside" e não página.** O chat é um **companheiro persistente** (como o bot está
+> sempre a um toque): fica docado à direita, sobre a tela em que o usuário está, sem tirá-lo do
+> contexto. Por isso o prompt **não** pede o conteúdo da área principal (como §7.6–§7.17), e sim
+> o **painel** sobre uma sugestão esmaecida do app.
+>
+> **Anexo PDF × importação (§7.15/§7.16).** O anexo aqui é só a **afordância de entrada**: ao
+> enviar um PDF, o fluxo continua na **revisão efêmera** já speccada (§7.16) — nada do documento
+> é guardado (regra 6). As telas dedicadas de importar/revisar **permanecem** e só são geradas
+> **após** o backend da [[spec-07-importacao-pdf]]; aqui desenhamos apenas o anexo e o retorno
+> do bot com o link "Revisar importação".
+
+> **Prompt fechado (anti-invenção).** Mesmo rigor do §7.7b: cada elemento, rótulo e valor é
+> literal; há uma lista do que é **proibido** gerar; os estados extras vêm **depois**, como
+> variações à parte. Cole do zero.
+
 ```text
-Tela CHAT FINANCEIRO (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) —
-eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área
-principal, que será encaixado dentro desse shell (título da página: "Chat financeiro").
-Conversa calma, foco no conteúdo.
-- Banner discreto no topo: "Respostas geradas com IA. Os números vêm do seu banco de dados —
-  a IA nunca os inventa."
-- Bolhas: do usuário (à direita, neutras) e do assistente (à esquerda). Na resposta do
-  assistente, todo valor em MONO; abaixo da bolha, um CHIP DE FONTE: "fonte: gastos · junho ·
-  categoria Mercado · 12 registros" e um selo "número conferido".
-- Exemplo de resposta: "Você gastou R$ 1.234,56 em Mercado em junho."
-- Estado PENSANDO: indicador sutil "consultando seus dados…".
-- Estado INSTABILIDADE: aviso ocre "Instabilidade no momento — tentando de novo…".
-- Estado FALLBACK: bolha SEM números "Não consegui confirmar os números com segurança agora.
-  Pode reformular a pergunta?" (sem inventar valor).
-- Campo de entrada fixo embaixo com placeholder "Pergunte sobre seus gastos…".
+Gere um COMPONENTE ASIDE (painel lateral DOCADO À DIREITA) de "Chat financeiro" de um app de
+finanças pessoais em pt-BR. Ignore qualquer versão anterior desta tela — comece do zero. É só
+este painel de chat: NÃO gere nenhuma outra tela, fluxo ou página nova.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície do painel e bolhas: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px no painel/cards, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+
+━━━ LAYOUT GERAL (painel docado sobre o app) ━━━
+- À ESQUERDA, ocupando o resto da largura: apenas uma SUGESTÃO ESMAECIDA do app (um dashboard
+  qualquer, bem apagado) só para dar contexto de "painel sobre a tela atual". NÃO redesenhe
+  barra lateral, cabeçalho nem detalhes — é fundo esmaecido, sem foco.
+- À DIREITA: o PAINEL DE CHAT docado, ALTURA TOTAL da janela, largura fixa confortável
+  (~400px no desktop). Superfície #FBFBF8, com uma linha fina (#DDE0D7) separando do app à
+  esquerda e sombra difusa. No mobile (360px) o painel vira uma folha que cobre a tela inteira.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere outra navegação, menu, abas, breadcrumb, logo, avatar, gráfico, banner promocional
+  nem rodapé de página. Só o painel de chat à direita e o fundo esmaecido à esquerda.
+- NÃO adicione, remova nem renomeie NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, dicas, tooltips, ícones decorativos, "termos", nem conteúdo que não
+  esteja escrito aqui entre aspas. Todo texto visível está entre aspas: use-o LITERALMENTE.
+- O anexo aceita SOMENTE PDF — NÃO desenhe opção de imagem, câmera, foto, planilha nem outro tipo.
+
+━━━ ESTRUTURA DO PAINEL (de cima para baixo) ━━━
+1. CABEÇALHO do painel: título "Chat financeiro" (Bricolage Grotesque) à esquerda e um botão
+   "X" (fechar) à direita.
+2. BANNER de transparência (discreto, uma linha, sobre superfície levemente destacada): "Respostas
+   geradas com IA. Os números vêm do seu banco de dados — a IA nunca os inventa."
+3. HISTÓRICO (área ROLÁVEL, ocupa a MAIOR PARTE da altura — é o topo do chat): bolhas de conversa,
+   das mais antigas (em cima) às mais recentes (embaixo):
+   - Bolha do USUÁRIO (à direita, neutra #EDF0E8): "Quanto gastei no mercado em junho?"
+   - Bolha do ASSISTENTE (à esquerda, #FBFBF8 com borda #DDE0D7): "Você gastou R$ 1.234,56 em
+     Mercado em junho." — o valor em MONO. LOGO ABAIXO da bolha, na mesma linha: um CHIP DE FONTE
+     (pill, secundário) "fonte: gastos · junho · categoria Mercado · 12 registros" e um selo pill
+     verde-cédula suave "número conferido".
+   - Bolha do USUÁRIO com ANEXO (à direita): um chip de arquivo "fatura-nubank.pdf · PDF" (ícone
+     de documento) acima do texto "Segue minha fatura".
+   - Bolha do ASSISTENTE respondendo ao anexo (à esquerda): "Fatura lida ✓ Encontrei 18 lançamentos
+     (R$ 4.210,00)." com um botão secundário (contorno verde-cédula) "Revisar importação". Abaixo,
+     em texto secundário minúsculo: "O PDF já foi descartado."
+4. ÁREA DE ENTRADA fixa no rodapé do painel, com uma linha fina (#DDE0D7) acima:
+   - Um botão de ANEXO à esquerda (ícone de clipe de papel), rótulo acessível "Anexar PDF".
+   - Um campo de texto que cresce, placeholder "Pergunte sobre seus gastos…".
+   - Um botão primário de ENVIAR à direita (verde-cédula, ícone de seta, alvo ≥ 44px).
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro: todo valor na resposta vem pronto do backend; a tela só exibe.
+O anexo é SOMENTE PDF e é efêmero — processado e descartado, nada do documento fica armazenado
+(daí a nota "O PDF já foi descartado"). Acessível: contraste AA, foco de teclado visível (anel
+verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
 ```
+
+> **Estados adicionais (gerar depois, como variações à parte — não no prompt principal, com o
+> mesmo rigor literal):**
+> - **VAZIO (primeiro uso):** histórico só com um texto-guia calmo, sem bolhas — "Pergunte sobre
+>   seus gastos ou anexe a fatura em PDF."
+> - **PDF ANEXADO (pronto para enviar):** acima do campo de texto, um chip "fatura-nubank.pdf · PDF"
+>   com um "✕ remover", e a nota discreta "O PDF é processado e descartado — nada fica armazenado."
+> - **ANEXO INVÁLIDO:** aviso inline em argila junto à entrada — "Aceito apenas PDF."
+> - **PENSANDO:** a última bolha do assistente vira um indicador sutil "consultando seus dados…".
+> - **INSTABILIDADE:** aviso ocre — "Instabilidade no momento — tentando de novo…".
+> - **FALLBACK (sem números):** bolha do assistente SEM nenhum número — "Não consegui confirmar os
+>   números com segurança agora. Pode reformular a pergunta?"
 
 ### 7.15 Importar fatura (upload) — *gerar após backend da 07*
 **Objetivo:** enviar o PDF da fatura. **Estados:** arrastando; arquivo inválido; **PDF com senha**; enviando.
@@ -575,18 +756,66 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
   em `home.blade.php`. Material Symbols (CDN) do Stitch foi trocado por SVG inline no `x-icon`
   (regra 6/LGPD: sem CDN de terceiros). Tokens novos no design system: `secondary`, `tertiary`,
   `error`, `on-primary`, `surface-container-highest`. Os **três estados** do Stitch estão
-  implementados e prontos para ligar: `pronto` (dados), `x-dashboard.empty-state` (vazio,
-  primeiro mês) e `x-dashboard.loading` (skeleton). Hoje o estado sai da query
-  `?estado=vazio|carregando` (afordância de revisão na rota `home`); quando o backend existir,
-  o controller decide o estado a partir dos dados reais. **Pendente:** apenas ligar aos dados
-  reais do backend (spec-06) — os valores passam a chegar já formatados. O FAB "Registrar gasto"
-  aponta para §7.7 (ainda não existe) → marcado "em breve".
-- **Próximo:** grupo B (núcleo financeiro) — §7.6 a §7.13. A ligação técnica das telas A e do
-  Dashboard ao Laravel (Blade+Tailwind, rotas, auth, validação) fica para a etapa de
-  implementação.
+  implementados: `pronto` (dados), `x-dashboard.empty-state` (vazio) e `x-dashboard.loading`
+  (skeleton). O FAB "Registrar gasto" abre o modal §7.7b.
+- **Dashboard — ligação ao backend: 🟢 concluída (dados reais).** `DashboardController@index`
+  (rota `home`) compõe os números JÁ calculados pelo domínio (`ResumoDoMes` + as 4 consultas
+  determinísticas) e apenas FORMATA em pt-BR para a tela (regra 3/5; a UI nunca calcula, regra 4).
+  Preenche a régua do mês (novo domínio `App\Domain\Dashboard\DiasDeVencimentoNoMes` para os ticks
+  de vencimento), os 4 cards (disponível, gastos do mês + comparativo vs. mês anterior, a vencer em
+  7 dias, fatura do cartão em destaque), o donut por categoria (top 3 + "Outros") e a lista de
+  próximas contas. Estado `vazio` quando o usuário não tem lançamentos; `?estado=` segue como
+  afordância de revisão. Cobertura: `tests/Feature/Dashboard/DashboardTest.php` (login, vazio,
+  números reais formatados, isolamento por usuário) e `tests/Feature/Domain/DiasDeVencimentoNoMesTest.php`.
+  **Deferido:** navegação por competência (mês anterior/seguinte) — o resumo é ancorado no "hoje".
+- **Registrar gasto — modal rápido (§7.7b): 🟢 implementado em Blade (dados fake).**
+  Componente `x-modal.registrar-gasto` (`resources/views/components/modal/registrar-gasto.blade.php`),
+  fiel à tela do Stitch "Registrar gasto — Crédito": mesmos estilos de campo (`.input-field`)
+  e botões, prévia mono "calculada pelo sistema", chip de vencimento somente-leitura. Material
+  Symbols (CDN) trocado por SVG inline no `x-icon` (regra 6/LGPD). Comportamento em
+  `resources/js/pages/registrar-gasto.js` (vanilla, code-split): abrir pelo **FAB** do dashboard,
+  troca de forma (crédito × à vista, com Cartão/Parcelas/prévia vs. vencimento editável +
+  recorrência), seleção de categoria, **validação inline** (variação de erro em argila) e a
+  **animação de salvando** (spinner + campos desabilitados). Afordância de revisão
+  `?modal=aberto|erro|salvando` (mesmo padrão do `?estado` do dashboard).
+- **Registrar gasto — ligação ao backend: 🟢 concluída (persiste no banco).** Borda web fina
+  reusando o domínio já testado (`App\Domain\Gasto\RegistrarGastoManual`): `RegistrarGastoRequest`
+  (validação + tradução form→`DadosGastoManual`, valor pt-BR→centavos, escopo por usuário),
+  `GastoController@previa` (calcula sem gravar) e `@store` (grava), rotas `gastos.previa`/
+  `gastos.store`. **Fluxo em dois passos (regra 7):** o formulário manda para a prévia → o backend
+  calcula parcelas/vencimento/valor (regra 4, a tela nunca calcula) → o painel de confirmação mostra
+  o resumo + tabela mono + aviso de duplicidade → só então grava (transaction + installments +
+  auditoria, atômico). A home carrega os **cartões e categorias reais** do usuário no modal. Cobertura:
+  `tests/Feature/Gasto/RegistrarGastoWebTest.php` (auth, validação, mapeamento, prévia sem persistir,
+  gravação à vista e no crédito, isolamento por usuário, duplicidade). **Deferido (feature própria,
+  com migration + TDD):** "data de pagamento" (marcar como pago) e recorrência — aceitos na UI, ainda
+  não persistidos.
+- **Registro histórico (Stitch):**
+  Projeto Stitch `Caderno de Contas Sereno` (`projects/9921880157030532605`), design system
+  `Caderno de Contas` (`assets/ea051d20127a4459af28c95eb27d2eb6`). Screen id
+  `ac72979b888345569d88d18bfc8b974c` — "Modal Registrar Gasto - Crédito Parcelado", desktop.
+  Estado principal: forma **crédito** revelando Cartão (`Nubank •••• 1234 — fecha dia 28`) +
+  Parcelas 3 com **prévia mono** ("calculada pelo sistema"), chip somente-leitura "vence 5 de
+  julho · calculado pelo cartão", data de pagamento opcional, switch "Repete todo mês?" e
+  Categoria com selo **"sugerido"** no Mercado. Correção aplicada na 2ª iteração: seletor de
+  forma de pagamento com as **5 formas distintas** (crédito · débito · pix · dinheiro · boleto),
+  desfazendo o "Pix / Dinheiro" fundido e incluindo boleto. **Pendências para a ligação ao
+  Blade:** trocar Material Symbols (CDN) por SVG inline (regra 6/LGPD, como no Dashboard);
+  gerar as **variações de estado** ainda não desenhadas (fora-de-cartão com vencimento
+  editável; crédito sem cartão cadastrado; recorrente ligado; validações inline; salvando).
+- **Próximo:** grupo B (núcleo financeiro) — §7.6, §7.7 e §7.8 a §7.13. A ligação técnica das
+  telas A e do Dashboard ao Laravel (Blade+Tailwind, rotas, auth, validação) fica para a etapa
+  de implementação.
 - **Decisão de arquitetura de UI:** o **shell (aside + header) é único** e reutilizado por
   todas as telas logadas; os prompts §7.5–§7.17 pedem **apenas o conteúdo** da área principal
   (ver nota do §5). Telas pré-login (§7.1–§7.4) não têm shell.
+- **Decisão de design aplicada (§7.14, Chat financeiro):** o chat na web deixou de ser página
+  cheia e virou um **aside docado à direita** (companheiro persistente, espelho do aside de
+  navegação do outro lado): **histórico no topo**, entrada de texto embaixo e **anexo somente-PDF**.
+  Prompt reescrito no estilo **fechado (anti-invenção)** do §7.7b, com a tela do Stitch mostrando o
+  painel **docado sobre um app esmaecido**. O anexo é só a **afordância de entrada**: o PDF continua
+  no fluxo de **revisão efêmera** (§7.16) e é descartado (regra 6); as telas dedicadas §7.15/§7.16
+  seguem no mini-TODO, geradas **após** o backend da [[spec-07-importacao-pdf]].
 - **Decisão de design aplicada:** token `papel` ajustado `#F3F4EF` → `#EDF0E8` (§4.2 e §7.0)
   para o fundo ler claramente como verde-acinzentado e fugir do "cream" (default de IA).
 - **Adiado para etapa técnica posterior:** ligação das telas ao Laravel (Inertia/Blade, dados

@@ -47,8 +47,8 @@
             <p class="mb-8 max-w-md font-body-lg text-body-lg text-on-surface-variant">
                 Comece a mapear seu mês hoje. Registre seu primeiro gasto para a organização começar a acontecer.
             </p>
-            <button type="button" aria-disabled="true" title="Em breve — registro pela web"
-                class="cursor-default rounded-control bg-primary px-8 py-3 font-body-md text-body-md font-semibold text-on-primary shadow-lg shadow-primary/10">
+            <button type="button" data-rg-open
+                class="rounded-control bg-primary px-8 py-3 font-body-md text-body-md font-semibold text-on-primary shadow-lg shadow-primary/10 transition-all hover:bg-cedula-clara active:scale-95">
                 Registrar gasto
             </button>
             <div class="mt-12 w-full max-w-sm border-t border-linha/60 pt-8">
