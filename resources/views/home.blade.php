@@ -128,7 +128,7 @@
 
     {{-- FAB "Registrar gasto" — abre o modal de captura rápida (spec §7.7b). --}}
     <button type="button" data-rg-open
-        class="group fixed bottom-8 right-8 z-40 inline-flex items-center gap-3 rounded-full bg-primary-container px-6 py-4 font-body-md text-body-md font-semibold text-on-primary shadow-lg transition-all hover:bg-cedula-clara active:scale-95">
+        class="group fixed bottom-8 right-8 z-40 inline-flex items-center gap-3 rounded-full bg-primary-container px-6 py-4 font-body-md text-body-md font-semibold text-on-primary shadow-lg transition-all hover:bg-cedula-clara active:scale-95 lg:right-[calc(380px+2rem)]">
         <x-icon name="plus" class="h-5 w-5 transition-transform group-hover:rotate-90" />
         <span>Registrar gasto</span>
     </button>

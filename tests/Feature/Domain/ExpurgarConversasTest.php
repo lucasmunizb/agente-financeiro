@@ -117,6 +117,36 @@ it('o comando ai:expurgar-conversas apaga conversas antigas', function () {
     expect(DB::table('agent_conversations')->where('id', $velha)->exists())->toBeFalse();
 });
 
+/** Mensagem do chat web (chat_messages) com created_at fixo. */
+function mensagemChat(User $user, CarbonImmutable $criadaEm): App\Models\ChatMessage
+{
+    $m = App\Models\ChatMessage::create(['user_id' => $user->id, 'role' => 'user', 'body' => 'oi']);
+    $m->forceFill(['created_at' => $criadaEm, 'updated_at' => $criadaEm])->saveQuietly();
+
+    return $m;
+}
+
+it('apaga mensagens do chat web (chat_messages) com mais de 60 dias; mantém as recentes', function () {
+    $user = User::factory()->create();
+
+    $velha = mensagemChat($user, agora()->subDays(61));
+    $nova = mensagemChat($user, agora()->subDays(10));
+
+    app(ExpurgarConversas::class)->executar(agora());
+
+    expect(App\Models\ChatMessage::query()->whereKey($velha->id)->exists())->toBeFalse()
+        ->and(App\Models\ChatMessage::query()->whereKey($nova->id)->exists())->toBeTrue();
+});
+
+it('mantém a mensagem do chat de exatamente 60 dias (borda não é "mais de 60 dias")', function () {
+    $user = User::factory()->create();
+    $borda = mensagemChat($user, agora()->subDays(60));
+
+    app(ExpurgarConversas::class)->executar(agora());
+
+    expect(App\Models\ChatMessage::query()->whereKey($borda->id)->exists())->toBeTrue();
+});
+
 it('o expurgo está agendado diariamente às 03:30 (spec 06 / C5)', function () {
     $schedule = app(Schedule::class);
 

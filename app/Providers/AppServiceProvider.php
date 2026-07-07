@@ -18,11 +18,13 @@ use App\Domain\Telegram\ManipuladorQueEnfileira;
 use App\Domain\Telegram\Resposta\RespostaAoUsuario;
 use App\Domain\Telegram\Resposta\RespostaInerte;
 use App\Domain\Telegram\RoteadorDeComandos;
+use App\Domain\Telegram\RoteadorDeMensagem;
 use App\Domain\Telegram\Saida\ClienteTelegram;
 use App\Domain\Telegram\Saida\ClienteTelegramHttp;
-use App\Domain\Telegram\RoteadorDeMensagem;
 use App\Listeners\LogarFailoverDeIA;
+use App\Models\ChatMessage;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Events\AgentFailedOver;
 
@@ -80,5 +82,16 @@ class AppServiceProvider extends ServiceProvider
     {
         // Registra a indisponibilidade de provedor de IA (failover nativo da SDK).
         Event::listen(AgentFailedOver::class, LogarFailoverDeIA::class);
+
+        // Chat financeiro (3ª zona do shell, spec §7.14): injeta o histórico REAL do
+        // próprio usuário na coluna de chat, sempre isolado por user_id (escopo estrito).
+        View::composer('components.chat.panel', function ($view) {
+            $view->with('mensagens', auth()->check()
+                ? ChatMessage::query()
+                    ->where('user_id', auth()->id())
+                    ->orderBy('created_at')->orderBy('id')
+                    ->get()
+                : collect());
+        });
     }
 }

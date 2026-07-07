@@ -125,12 +125,16 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 4. **Exporte** o design/código e registre em §10. A **ligação ao Laravel** (Inertia/Blade,
    dados reais, validação) é a etapa técnica seguinte — fora do Stitch.
 
-> **Shell padrão (aside + header) — já criado.** Todas as telas **logadas** compartilham o
-> mesmo **shell**: uma **barra lateral (aside)** de navegação e um **cabeçalho (header)**. Ele
-> já foi **gerado no Stitch** e vira um **layout Blade** reutilizado. Por isso, os prompts das
-> telas logadas (§7.5–§7.17) pedem **apenas o conteúdo da área principal** — o Stitch **não**
-> deve redesenhar aside nem header nelas. As telas **pré-login** (§7.1–§7.4) não têm shell
-> (sem navegação do app).
+> **Shell padrão (aside + header + coluna de chat) — já criado.** Todas as telas **logadas**
+> compartilham o mesmo **shell**. No desktop ele tem **três zonas**: (1) uma **barra lateral
+> (aside)** de navegação à esquerda, (2) o **conteúdo da tela** no centro e (3) uma **coluna de
+> chat fixa, sempre aberta**, à direita (o Chat financeiro, §7.14). Há ainda o **cabeçalho
+> (header)** no topo. Aside e header já foram **gerados no Stitch** e viram um **layout Blade**
+> reutilizado; a coluna de chat entra como a **terceira zona** do mesmo shell. Por isso, os
+> prompts das telas logadas (§7.5–§7.17) pedem **apenas o conteúdo da área principal** — o Stitch
+> **não** deve redesenhar aside, header nem a coluna de chat nelas. **No mobile** (não cabem três
+> colunas) a coluna de chat **recolhe** para um lançador e abre como folha (regra do layout, ver
+> §7.14). As telas **pré-login** (§7.1–§7.4) não têm shell (sem navegação do app).
 
 ## 6. Mini-TODO — telas a gerar
 > Marque conforme gerar/aprovar. Telas de importação dependem do backend da [[spec-07-importacao-pdf]].
@@ -157,7 +161,7 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 - [ ] 13. Cartões & faturas
 
 **C. IA**
-- [ ] 14. Chat financeiro — **aside direito docado** *(histórico no topo · entrada de texto · anexo somente-PDF · fonte/trace + estados; substitui a versão de página cheia)*
+- [x] 14. Chat financeiro — **coluna fixa (3ª coluna do shell, sempre aberta)** *(histórico no topo · entrada de texto · anexo somente-PDF · fonte/trace + estados; NÃO é overlay — o body fica entre a nav e o chat; recolhe no mobile)* — **gerado no Stitch** ("Chat financeiro — coluna fixa") e **implementado em Blade** como a 3ª zona do `x-layouts.app`: componente `x-chat.panel` (cabeçalho, banner de transparência, histórico rolável, entrada com anexo somente-PDF). Sempre aberta a partir de `lg` (conteúdo com `lg:pr-[380px]`); abaixo de `lg` recolhe para folha, aberta pelo lançador do header. JS mínimo (folha, validação de PDF, campo que cresce). Estado vazio + estados de interação (pensando · instável · anexado · inválido) conduzidos pelo `chat.js`. **Ligado ao backend (real):** conversa pelo **mesmo motor do Telegram** (`ResponderConsulta` → `AssistenteDeConsulta` + guard barreira 4 + fontes barreira 5) via `POST /chat/mensagens`; histórico **real** e isolado por usuário em `chat_messages` (retenção de 60 dias no expurgo `ai:expurgar-conversas`), injetado pelo view composer. Anexo **PDF-only validado por MIME real** no servidor (`seguranca-ia`) e **efêmero** (nunca persistido — regra 6/`lgpd`); a extração de fatura ([[spec-07-importacao-pdf]]) segue pós-MVP (PDF válido recebe aviso honesto). **Deferido:** memória de conversa (contexto multi-turno) e registro de gasto por linguagem natural no chat.
 
 **D. Importação de PDF — gerar após o backend da [[spec-07-importacao-pdf]]**
 - [ ] 15. Importar fatura (upload)
@@ -568,17 +572,24 @@ principal, que será encaixado dentro desse shell (título da página: "Cartões
 - Deixe claro que o total é calculado pelo sistema. Botão "Adicionar cartão".
 ```
 
-### 7.14 Chat financeiro — *aside direito docado (histórico + entrada + anexo só-PDF)*
-**Objetivo:** conversar sobre as finanças na web — como no bot — por um **painel de chat docado
-à direita** (espelho do aside de navegação, do outro lado), com o **histórico no topo**, uma
+### 7.14 Chat financeiro — *coluna fixa (3ª coluna do shell, sempre aberta)*
+**Objetivo:** conversar sobre as finanças na web — como no bot — por uma **coluna de chat fixa,
+sempre aberta, à direita** (a terceira coluna do shell), com o **histórico no topo**, uma
 **entrada de texto** e um **anexo que aceita SOMENTE PDF**. Substitui a versão de página cheia:
 esta é **a** forma do chat na web. **Estados:** vazio; PDF anexado; anexo inválido; pensando;
 instabilidade/re-tentativa; fallback sem números.
 
-> **Por que "aside" e não página.** O chat é um **companheiro persistente** (como o bot está
-> sempre a um toque): fica docado à direita, sobre a tela em que o usuário está, sem tirá-lo do
-> contexto. Por isso o prompt **não** pede o conteúdo da área principal (como §7.6–§7.17), e sim
-> o **painel** sobre uma sugestão esmaecida do app.
+> **Coluna fixa, NÃO overlay.** O chat é um **companheiro persistente** (como o bot está sempre
+> a um toque): é a **terceira coluna** de um layout de três colunas — **nav** à esquerda ·
+> **conteúdo da tela** no centro · **chat** à direita. Os três **coexistem**: o body reflui e
+> fica **entre** a nav e o chat; nada é esmaecido, não há backdrop e a coluna **não cobre** o
+> conteúdo. Por isso o prompt pede **apenas o conteúdo da coluna de chat** — como os demais
+> prompts logados pedem só a área principal (§7.6–§7.17) e não redesenham o shell.
+>
+> **Responsividade (regra 360px).** "Sempre aberta" vale no **desktop/telas largas**; três
+> colunas **não** cabem no mobile. Em tela estreita (a partir de ~1024px pra baixo) a coluna
+> **recolhe** para um lançador e abre como folha por cima. Esse colapso é regra do **layout
+> Blade** (`x-layouts.app`), não do desenho do rail — fica **fora** do prompt.
 >
 > **Anexo PDF × importação (§7.15/§7.16).** O anexo aqui é só a **afordância de entrada**: ao
 > enviar um PDF, o fluxo continua na **revisão efêmera** já speccada (§7.16) — nada do documento
@@ -591,38 +602,46 @@ instabilidade/re-tentativa; fallback sem números.
 > variações à parte. Cole do zero.
 
 ```text
-Gere um COMPONENTE ASIDE (painel lateral DOCADO À DIREITA) de "Chat financeiro" de um app de
-finanças pessoais em pt-BR. Ignore qualquer versão anterior desta tela — comece do zero. É só
-este painel de chat: NÃO gere nenhuma outra tela, fluxo ou página nova.
+Gere UMA tela: o CONTEÚDO de uma COLUNA FIXA de "Chat financeiro" — a terceira coluna,
+à DIREITA, de um app de finanças pessoais em pt-BR. Ignore qualquer versão anterior desta
+tela — comece do zero. É SÓ o conteúdo dessa coluna de chat.
+Nome da tela: "Chat financeiro — coluna fixa".
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL de TRÊS COLUNAS: (1) barra lateral de navegação à esquerda,
+(2) o conteúdo da tela atual no centro, (3) esta COLUNA DE CHAT à direita — SEMPRE ABERTA,
+fixa, coexistindo com as outras. Ela NÃO é um overlay: não há fundo esmaecido, não há
+backdrop, não cobre o conteúdo. O conteúdo do centro NÃO fica apagado — os três convivem.
+Gere APENAS o conteúdo da coluna de chat (itens 1 a 4 abaixo). NÃO desenhe a navegação
+esquerda, o header do app, nem o conteúdo do centro.
 
 ━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
 Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
 - Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
-- Superfície do painel e bolhas: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Superfície da coluna e bolhas: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
 - Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
 - Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
 - TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
-- Cantos: 12px no painel/cards, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Cantos: 12px em cards, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples (clipe de papel, seta, documento). Sem ícones preenchidos,
+  coloridos ou decorativos.
 
-━━━ LAYOUT GERAL (painel docado sobre o app) ━━━
-- À ESQUERDA, ocupando o resto da largura: apenas uma SUGESTÃO ESMAECIDA do app (um dashboard
-  qualquer, bem apagado) só para dar contexto de "painel sobre a tela atual". NÃO redesenhe
-  barra lateral, cabeçalho nem detalhes — é fundo esmaecido, sem foco.
-- À DIREITA: o PAINEL DE CHAT docado, ALTURA TOTAL da janela, largura fixa confortável
-  (~400px no desktop). Superfície #FBFBF8, com uma linha fina (#DDE0D7) separando do app à
-  esquerda e sombra difusa. No mobile (360px) o painel vira uma folha que cobre a tela inteira.
+━━━ FORMATO DA COLUNA ━━━
+- Coluna vertical de ALTURA TOTAL da janela, largura fixa confortável (~380px no desktop),
+  superfície #FBFBF8, separada do conteúdo à esquerda por uma linha fina (#DDE0D7). Sem sombra
+  forte de "flutuante" — ela é parte do layout, encostada na borda direita.
+- SEM botão de fechar e SEM backdrop: a coluna está sempre presente.
 
 ━━━ PROIBIDO (para você NÃO inventar nada) ━━━
-- NÃO gere outra navegação, menu, abas, breadcrumb, logo, avatar, gráfico, banner promocional
-  nem rodapé de página. Só o painel de chat à direita e o fundo esmaecido à esquerda.
+- NÃO gere navegação, menu, abas, breadcrumb, logo, avatar, gráfico, banner promocional,
+  header do app, conteúdo central, nem fundo esmaecido. SÓ a coluna de chat.
 - NÃO adicione, remova nem renomeie NENHUM elemento além dos listados abaixo.
 - NÃO invente valores, dicas, tooltips, ícones decorativos, "termos", nem conteúdo que não
   esteja escrito aqui entre aspas. Todo texto visível está entre aspas: use-o LITERALMENTE.
 - O anexo aceita SOMENTE PDF — NÃO desenhe opção de imagem, câmera, foto, planilha nem outro tipo.
 
-━━━ ESTRUTURA DO PAINEL (de cima para baixo) ━━━
-1. CABEÇALHO do painel: título "Chat financeiro" (Bricolage Grotesque) à esquerda e um botão
-   "X" (fechar) à direita.
+━━━ ESTRUTURA DA COLUNA (de cima para baixo) ━━━
+1. CABEÇALHO da coluna: título "Chat financeiro" (Bricolage Grotesque) à esquerda. Sem botão X.
 2. BANNER de transparência (discreto, uma linha, sobre superfície levemente destacada): "Respostas
    geradas com IA. Os números vêm do seu banco de dados — a IA nunca os inventa."
 3. HISTÓRICO (área ROLÁVEL, ocupa a MAIOR PARTE da altura — é o topo do chat): bolhas de conversa,
@@ -633,20 +652,22 @@ Conceito "caderno de contas": a precisão de um extrato com a calma de um cadern
      (pill, secundário) "fonte: gastos · junho · categoria Mercado · 12 registros" e um selo pill
      verde-cédula suave "número conferido".
    - Bolha do USUÁRIO com ANEXO (à direita): um chip de arquivo "fatura-nubank.pdf · PDF" (ícone
-     de documento) acima do texto "Segue minha fatura".
+     de documento, de linha) acima do texto "Segue minha fatura".
    - Bolha do ASSISTENTE respondendo ao anexo (à esquerda): "Fatura lida ✓ Encontrei 18 lançamentos
      (R$ 4.210,00)." com um botão secundário (contorno verde-cédula) "Revisar importação". Abaixo,
      em texto secundário minúsculo: "O PDF já foi descartado."
-4. ÁREA DE ENTRADA fixa no rodapé do painel, com uma linha fina (#DDE0D7) acima:
-   - Um botão de ANEXO à esquerda (ícone de clipe de papel), rótulo acessível "Anexar PDF".
+4. ÁREA DE ENTRADA fixa no rodapé da coluna, com uma linha fina (#DDE0D7) acima:
+   - Um botão de ANEXO à esquerda (ícone de clipe de papel, de linha), rótulo acessível "Anexar PDF".
    - Um campo de texto que cresce, placeholder "Pergunte sobre seus gastos…".
-   - Um botão primário de ENVIAR à direita (verde-cédula, ícone de seta, alvo ≥ 44px).
+   - Um botão primário de ENVIAR à direita (verde-cédula, ícone de seta de linha, alvo ≥ 44px).
 
 ━━━ INVARIANTES ━━━
 A interface NUNCA calcula dinheiro: todo valor na resposta vem pronto do backend; a tela só exibe.
 O anexo é SOMENTE PDF e é efêmero — processado e descartado, nada do documento fica armazenado
 (daí a nota "O PDF já foi descartado"). Acessível: contraste AA, foco de teclado visível (anel
-verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+verde-cédula), alvos ≥ 44px.
+
+Entregue como UMA tela: "Chat financeiro — coluna fixa".
 ```
 
 > **Estados adicionais (gerar depois, como variações à parte — não no prompt principal, com o
@@ -810,12 +831,18 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
   todas as telas logadas; os prompts §7.5–§7.17 pedem **apenas o conteúdo** da área principal
   (ver nota do §5). Telas pré-login (§7.1–§7.4) não têm shell.
 - **Decisão de design aplicada (§7.14, Chat financeiro):** o chat na web deixou de ser página
-  cheia e virou um **aside docado à direita** (companheiro persistente, espelho do aside de
-  navegação do outro lado): **histórico no topo**, entrada de texto embaixo e **anexo somente-PDF**.
-  Prompt reescrito no estilo **fechado (anti-invenção)** do §7.7b, com a tela do Stitch mostrando o
-  painel **docado sobre um app esmaecido**. O anexo é só a **afordância de entrada**: o PDF continua
-  no fluxo de **revisão efêmera** (§7.16) e é descartado (regra 6); as telas dedicadas §7.15/§7.16
-  seguem no mini-TODO, geradas **após** o backend da [[spec-07-importacao-pdf]].
+  cheia — e também **deixou de ser overlay/drawer**. Virou uma **coluna fixa, sempre aberta**, à
+  direita: a **terceira coluna** de um layout de **três colunas** (nav · conteúdo · chat). Os três
+  **coexistem** — o body reflui e fica **entre** a nav e o chat; nada é esmaecido, sem backdrop,
+  a coluna **não cobre** o conteúdo (revoga a versão "painel docado sobre um app esmaecido"). O
+  chat passa a ser a **terceira zona do shell** (`x-layouts.app`), presente em toda rota logada.
+  **Responsividade:** "sempre aberta" vale no desktop; no mobile (≲1024px) a coluna **recolhe**
+  para um lançador e abre como folha — colapso é regra do **layout Blade**, fora do prompt do
+  Stitch. Prompt reescrito no estilo **fechado (anti-invenção)** do §7.7b, pedindo **apenas o
+  conteúdo da coluna** (sem redesenhar o shell) e **sem** botão de fechar. O anexo é só a
+  **afordância de entrada**: o PDF continua no fluxo de **revisão efêmera** (§7.16) e é descartado
+  (regra 6); as telas dedicadas §7.15/§7.16 seguem no mini-TODO, geradas **após** o backend da
+  [[spec-07-importacao-pdf]].
 - **Decisão de design aplicada:** token `papel` ajustado `#F3F4EF` → `#EDF0E8` (§4.2 e §7.0)
   para o fundo ler claramente como verde-acinzentado e fugir do "cream" (default de IA).
 - **Adiado para etapa técnica posterior:** ligação das telas ao Laravel (Inertia/Blade, dados

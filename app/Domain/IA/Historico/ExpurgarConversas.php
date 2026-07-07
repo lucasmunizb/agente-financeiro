@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\IA\Historico;
 
+use App\Models\ChatMessage;
 use Carbon\CarbonImmutable;
 use Laravel\Ai\Models\Conversation;
 use Laravel\Ai\Models\ConversationMessage;
@@ -30,6 +31,10 @@ final class ExpurgarConversas
     public function executar(CarbonImmutable $agora): int
     {
         $corte = $agora->subDays(self::DIAS_DE_RETENCAO);
+
+        // Chat financeiro na web (chat_messages): mesma janela de retenção (spec FE §7.14).
+        // Cada mensagem é independente, então o corte é por created_at (não por conversa).
+        ChatMessage::query()->where('created_at', '<', $corte)->delete();
 
         $ids = Conversation::query()
             ->where('updated_at', '<', $corte)

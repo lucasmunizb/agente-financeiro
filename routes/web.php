@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\OnboardingController;
@@ -30,6 +31,12 @@ Route::middleware('auth')->group(function () {
     // calcula sem gravar; o store persiste após a confirmação.
     Route::post('/gastos/previa', [GastoController::class, 'previa'])->name('gastos.previa');
     Route::post('/gastos', [GastoController::class, 'store'])->name('gastos.store');
+
+    // Chat financeiro (spec §7.14). Reusa o motor do Telegram (ResponderConsulta):
+    // index devolve o histórico do próprio usuário; store envia a pergunta (ou um PDF,
+    // validado por MIME real e descartado — regra 6) e devolve a resposta com fontes.
+    Route::get('/chat/mensagens', [ChatController::class, 'index'])->name('chat.index');
+    Route::post('/chat/mensagens', [ChatController::class, 'store'])->name('chat.store');
 
     // Onboarding + consentimento LGPD. O usuário chega aqui já autenticado
     // (logo após criar a conta); persistir o aceite (aceite_lgpd_em) é backend.

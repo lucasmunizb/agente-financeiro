@@ -38,11 +38,11 @@
     {{-- Tela autenticada: nunca indexar (privacidade + sem conteúdo público). --}}
     <meta name="robots" content="noindex, nofollow">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/chat.js'])
     @stack('head')
 </head>
 
-<body class="min-h-screen text-on-surface">
+<body class="min-h-screen overflow-x-clip text-on-surface">
     <div class="paper-texture" aria-hidden="true"></div>
 
     {{-- Backdrop do drawer (só mobile, quando aberto) --}}
@@ -106,8 +106,10 @@
         </div>
     </aside>
 
-    {{-- Coluna de conteúdo (desloca 16rem à direita no desktop) --}}
-    <div class="flex min-h-screen flex-col md:pl-64">
+    {{-- Coluna de conteúdo. Desloca 16rem à esquerda (aside) no desktop e reserva
+         a largura da 3ª zona (chat, 380px) à direita a partir de lg — spec §7.14:
+         nav · conteúdo · chat coexistem, o body reflui ENTRE eles (sem overlay). --}}
+    <div class="flex min-h-screen flex-col md:pl-64 lg:pr-[380px]">
         {{-- Barra superior: hambúrguer (mobile) + título da página + sino --}}
         <header class="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-linha bg-superficie/90 px-container-padding-mobile backdrop-blur md:px-container-padding-desktop">
             <div class="flex min-w-0 items-center gap-3">
@@ -119,7 +121,17 @@
                 </button>
                 <h1 class="truncate font-headline-md text-headline-md text-primary md:font-headline-md md:text-headline-md">{{ $heading ?? 'Agente Financeiro' }}</h1>
             </div>
-            <x-app.notifications :notificacoes="$notificacoes" />
+            <div class="flex items-center gap-1">
+                {{-- Lançador do chat: só abaixo de lg, onde a 3ª coluna recolhe para
+                     folha. No desktop a coluna está sempre aberta e o botão some. --}}
+                <button type="button" id="chat-open"
+                    class="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high lg:hidden"
+                    aria-controls="chat-panel" aria-expanded="false">
+                    <x-icon name="message-circle" class="h-6 w-6" />
+                    <span class="sr-only">Abrir chat financeiro</span>
+                </button>
+                <x-app.notifications :notificacoes="$notificacoes" />
+            </div>
         </header>
 
         {{-- Canvas principal. Estreito e centrado por padrão (telas de card único);
@@ -140,6 +152,14 @@
             </div>
         </main>
     </div>
+
+    {{-- Backdrop da folha do chat (só abaixo de lg, quando aberta). --}}
+    <div id="chat-backdrop" hidden
+        class="fixed inset-0 z-40 bg-inverse-surface/40 backdrop-blur-sm lg:hidden"></div>
+
+    {{-- 3ª zona do shell: chat financeiro (spec §7.14). Fixa/aberta no desktop;
+         folha deslizante no mobile. --}}
+    <x-chat.panel />
 
     {{-- Toast (feedback efêmero) --}}
     <div id="toast" role="status" aria-live="polite"
