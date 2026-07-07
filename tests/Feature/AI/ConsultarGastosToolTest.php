@@ -88,8 +88,37 @@ it('é escopada: a tool de um usuário não enxerga gastos de outro', function (
         ->and($saida)->not->toContain('9.999');
 });
 
-it('expõe um schema com periodo, categoria, cartao e status', function () {
+it('expõe um schema com periodo, categoria, cartao, status e detalhar', function () {
     $schema = (new ConsultarGastos(User::factory()->create()))->schema(new JsonSchemaTypeFactory);
 
-    expect($schema)->toHaveKeys(['periodo', 'categoria', 'cartao', 'status']);
+    expect($schema)->toHaveKeys(['periodo', 'categoria', 'cartao', 'status', 'detalhar']);
+});
+
+it('lista cada gasto quando detalhar=true (descrição, valor e data)', function () {
+    $user = User::factory()->create();
+    $futebol = Category::factory()->for($user)->create(['nome' => 'Futebol']);
+
+    $t = Transaction::factory()->for($user)->create([
+        'valor_total_cents' => 6000, 'categoria_id' => $futebol->id, 'descricao' => 'Aluguel de quadra',
+    ]);
+    Installment::factory()->for($t, 'transaction')->create([
+        'numero' => 1, 'total' => 1, 'vencimento' => '2026-07-05',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+    ]);
+
+    $saida = (string) (new ConsultarGastos($user))
+        ->handle(new Request(['periodo' => '2026-07', 'categoria' => 'Futebol', 'detalhar' => true]));
+
+    expect($saida)->toContain('Aluguel de quadra')
+        ->and($saida)->toContain('R$ 60,00')
+        ->and($saida)->toContain('05/07/2026');
+});
+
+it('não lista os itens quando detalhar não é pedido', function () {
+    $user = User::factory()->create();
+    gastoNoMes($user, 6000, '2026-07-05');
+
+    $saida = (string) (new ConsultarGastos($user))->handle(new Request(['periodo' => '2026-07']));
+
+    expect($saida)->not->toContain('05/07/2026');
 });

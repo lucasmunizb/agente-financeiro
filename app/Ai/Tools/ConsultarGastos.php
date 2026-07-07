@@ -37,7 +37,10 @@ final class ConsultarGastos implements Tool
         return 'Consulta os gastos do usuário num período (parcelas que vencem no mês). '
             .'Use `periodo` (YYYY-MM); se ausente, assume o mês corrente. Filtros opcionais: '
             .'`categoria` (nome da categoria), `cartao` (descrição ou 4 dígitos finais) e '
-            .'`status` (ex.: aberto, pago, vencido, cancelado). Devolve o total e a quebra por categoria.';
+            .'`status` (ex.: aberto, pago, vencido, cancelado). Devolve o total e a quebra por categoria. '
+            .'Passe `detalhar=true` quando o usuário pedir para LISTAR, DETALHAR, DISCRIMINAR, DESCREVER '
+            .'ou "mostrar todos" os gastos — aí a resposta traz também cada lançamento individual '
+            .'(descrição, valor, vencimento e parcela). Para o total apenas ("quanto gastei"), omita.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -52,6 +55,7 @@ final class ConsultarGastos implements Tool
             categoria: $request->filled('categoria') ? (string) $request->string('categoria') : null,
             cartao: $request->filled('cartao') ? (string) $request->string('cartao') : null,
             status: $request->filled('status') ? (string) $request->string('status') : null,
+            detalhar: $request->boolean('detalhar'),
         );
 
         $this->coletor?->registrar($resultado->payload(), $resultado->trace);
@@ -73,6 +77,10 @@ final class ConsultarGastos implements Tool
                 ->description('Filtra por cartão: a descrição (ex.: "cartão pai") ou os 4 dígitos finais. Opcional.'),
             'status' => $schema->string()
                 ->description('Filtra por status de pagamento (ex.: aberto, pago, vencido, cancelado). Opcional.'),
+            'detalhar' => $schema->boolean()
+                ->description('true para listar cada lançamento individual (descrição, valor, vencimento, parcela), '
+                    .'quando o usuário pedir para listar/detalhar/discriminar/descrever/"mostrar todos". '
+                    .'Omita (false) para devolver apenas o total.'),
         ];
     }
 }

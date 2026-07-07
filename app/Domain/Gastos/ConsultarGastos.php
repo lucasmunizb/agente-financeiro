@@ -38,6 +38,7 @@ final class ConsultarGastos
         ?string $categoria = null,
         ?string $cartao = null,
         ?string $status = null,
+        bool $detalhar = false,
     ): ResultadoConsultaGastos {
         $p = PeriodoMensal::fromString($periodo);
 
@@ -58,11 +59,14 @@ final class ConsultarGastos
                 }
             })
             ->tap(fn (Builder $q) => $this->aplicarStatus($q, $status))
+            ->orderBy('vencimento')
+            ->orderBy('id')
             ->with('transaction')
             ->get();
 
         $total = 0;
         $porCategoriaId = [];
+        $itens = [];
 
         foreach ($parcelas as $parcela) {
             $cents = $parcela->valor()->cents();
@@ -70,6 +74,15 @@ final class ConsultarGastos
 
             $porCategoriaId[$idCategoria] = ($porCategoriaId[$idCategoria] ?? 0) + $cents;
             $total += $cents;
+
+            if ($detalhar) {
+                $itens[] = [
+                    'descricao' => (string) $parcela->transaction->descricao,
+                    'cents' => $cents,
+                    'vencimento' => $parcela->vencimento,
+                    'parcela' => $parcela->total > 1 ? "{$parcela->numero}/{$parcela->total}" : null,
+                ];
+            }
         }
 
         $trace = new TraceDaConsulta(
@@ -87,6 +100,7 @@ final class ConsultarGastos
             totalCents: $total,
             porCategoria: $this->comNomes($userId, $porCategoriaId),
             trace: $trace,
+            itens: $itens,
         );
     }
 

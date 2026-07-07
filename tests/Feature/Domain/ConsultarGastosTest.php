@@ -191,3 +191,79 @@ it('expõe um payload para o guard com o total e os subtotais por categoria', fu
         ->and($payload->permiteValor(80000))->toBeTrue()  // subtotal alimentação
         ->and($payload->permiteValor(123456))->toBeFalse(); // valor inventado
 });
+
+it('não detalha os itens por padrão — só total e quebra por categoria', function () {
+    $user = User::factory()->create();
+
+    gastoFiltravel($user, 6000, '2026-07-05');
+
+    $resultado = app(ConsultarGastos::class)->para($user->id, '2026-07');
+
+    expect($resultado->itens)->toBe([])
+        ->and($resultado->totalCents)->toBe(6000);
+});
+
+it('detalha cada gasto individual quando detalhar=true (descrição, valor, vencimento, parcela)', function () {
+    $user = User::factory()->create();
+    $futebol = Category::factory()->for($user)->create(['nome' => 'Futebol']);
+
+    $t1 = Transaction::factory()->for($user)->create([
+        'valor_total_cents' => 6000, 'categoria_id' => $futebol->id, 'descricao' => 'Aluguel de quadra',
+    ]);
+    Installment::factory()->for($t1, 'transaction')->create([
+        'numero' => 1, 'total' => 1, 'vencimento' => '2026-07-20',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+    ]);
+
+    $t2 = Transaction::factory()->for($user)->create([
+        'valor_total_cents' => 5000, 'categoria_id' => $futebol->id, 'descricao' => 'Chuteira',
+    ]);
+    Installment::factory()->for($t2, 'transaction')->create([
+        'numero' => 1, 'total' => 1, 'vencimento' => '2026-07-05',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+    ]);
+
+    $resultado = app(ConsultarGastos::class)->para($user->id, '2026-07', categoria: 'Futebol', detalhar: true);
+
+    expect($resultado->totalCents)->toBe(11000)
+        ->and($resultado->itens)->toHaveCount(2)
+        // ordenado por vencimento asc: Chuteira (05/07) antes de Aluguel (20/07)
+        ->and($resultado->itens[0]['descricao'])->toBe('Chuteira')
+        ->and($resultado->itens[0]['cents'])->toBe(5000)
+        ->and($resultado->itens[0]['vencimento']->format('Y-m-d'))->toBe('2026-07-05')
+        ->and($resultado->itens[0]['parcela'])->toBeNull()
+        ->and($resultado->itens[1]['descricao'])->toBe('Aluguel de quadra')
+        ->and($resultado->itens[1]['cents'])->toBe(6000);
+});
+
+it('rotula a parcela (numero/total) quando o gasto é parcelado', function () {
+    $user = User::factory()->create();
+
+    $t = Transaction::factory()->for($user)->create(['valor_total_cents' => 30000, 'descricao' => 'Notebook']);
+    Installment::factory()->for($t, 'transaction')->create([
+        'numero' => 2, 'total' => 3, 'vencimento' => '2026-07-10',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+    ]);
+
+    $resultado = app(ConsultarGastos::class)->para($user->id, '2026-07', detalhar: true);
+
+    expect($resultado->itens[0]['parcela'])->toBe('2/3');
+});
+
+it('inclui o valor e a data de cada item detalhado no payload do guard', function () {
+    $user = User::factory()->create();
+    $futebol = Category::factory()->for($user)->create(['nome' => 'Futebol']);
+
+    $t = Transaction::factory()->for($user)->create([
+        'valor_total_cents' => 6000, 'categoria_id' => $futebol->id, 'descricao' => 'Quadra',
+    ]);
+    Installment::factory()->for($t, 'transaction')->create([
+        'numero' => 1, 'total' => 1, 'vencimento' => '2026-07-05',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+    ]);
+
+    $payload = app(ConsultarGastos::class)->para($user->id, '2026-07', detalhar: true)->payload();
+
+    expect($payload->permiteValor(6000))->toBeTrue()
+        ->and($payload->permiteData(5, 7, 2026))->toBeTrue();
+});

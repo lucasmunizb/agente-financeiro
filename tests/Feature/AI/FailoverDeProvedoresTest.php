@@ -21,9 +21,11 @@ use Illuminate\Support\Facades\Log;
  * sensível (instabilidade — doc 09).
  */
 
-it('a config de failover é um array e inclui o provedor padrão', function () {
-    expect(config('ai.failover'))->toBeArray()
-        ->and(config('ai.failover'))->toContain('anthropic');
+it('a config de failover é um array não-vazio que começa pelo provedor padrão', function () {
+    $failover = config('ai.failover');
+
+    expect($failover)->toBeArray()->not->toBeEmpty()
+        ->and($failover[0])->toBe(config('ai.default'));
 });
 
 it('todos os agentes expõem a lista de failover da config em provider()', function () {
@@ -35,6 +37,24 @@ it('todos os agentes expõem a lista de failover da config em provider()', funct
 
     $assistente = new AssistenteDeConsulta(User::factory()->make(['id' => 1]), new ColetorDeConsultas);
     expect($assistente->provider())->toBe($esperado);
+});
+
+it('todos os agentes expõem um timeout curto (da config) para failover rápido', function () {
+    config()->set('ai.request_timeout', 7);
+
+    $esperado = 7;
+
+    expect((new ClassificadorDeIntencao)->timeout())->toBe($esperado)
+        ->and((new ExtratorDeGasto)->timeout())->toBe($esperado)
+        ->and((new RedatorDeResposta)->timeout())->toBe($esperado);
+
+    $assistente = new AssistenteDeConsulta(User::factory()->make(['id' => 1]), new ColetorDeConsultas);
+    expect($assistente->timeout())->toBe($esperado);
+});
+
+it('o timeout padrão é curto (0 < t <= 10s) para não pendurar a resposta ao usuário', function () {
+    $t = (int) config('ai.request_timeout');
+    expect($t)->toBeGreaterThan(0)->toBeLessThanOrEqual(10);
 });
 
 it('loga o failover com provedor e modelo, sem dado sensível', function () {

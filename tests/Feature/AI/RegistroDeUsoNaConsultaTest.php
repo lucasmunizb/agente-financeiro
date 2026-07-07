@@ -53,6 +53,6 @@ it('registra uma chamada de IA do chat como uso tipo mensagem, escopado ao usuá
     $linha = AiUsageLog::query()->sole();
     expect($linha->tipo)->toBe(TipoDeUsoIA::MENSAGEM)
         ->and($linha->user_id)->toBe($user->id)
-        ->and($linha->provider)->toBe('anthropic')
+        ->and($linha->provider)->toBe(config('ai.default'))
         ->and($linha->model)->not->toBeNull();
 });

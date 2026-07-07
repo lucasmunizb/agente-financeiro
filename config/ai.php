@@ -32,6 +32,21 @@ return [
         explode(',', env('AI_FAILOVER', env('AI_PROVIDER', 'anthropic')))
     ))),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Timeout por request (segundos)
+    |--------------------------------------------------------------------------
+    |
+    | Timeout HTTP aplicado a CADA chamada de provedor (por request, não pela
+    | conversa inteira). Mantido curto de propósito: se o provedor principal
+    | pendurar, a SDK falha rápido e cai no próximo do failover — a resposta ao
+    | usuário precisa ser quase instantânea. Pior caso ≈ timeout × nº provedores,
+    | que deve caber no limite de execução do PHP.
+    |
+    */
+
+    'request_timeout' => (int) env('AI_REQUEST_TIMEOUT', 8),
+
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
