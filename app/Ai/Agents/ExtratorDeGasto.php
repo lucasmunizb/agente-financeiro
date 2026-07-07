@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Ai\Agents;
 
 use App\Ai\Concerns\UsaFailoverDeProvedores;
+use App\Ai\Concerns\UsaRaciocinioBaixoNaGroq;
 use App\Domain\IA\GastoExtraido;
 use App\Domain\IA\ResultadoDaExtracao;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\JsonSchema\Types\Type;
+use Laravel\Ai\Attributes\UseCheapestModel;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Contracts\HasTools;
+use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Promptable;
 use Laravel\Ai\Responses\StructuredAgentResponse;
@@ -23,14 +28,22 @@ use Stringable;
  * cru; a normalização determinística (Money/RelativeDate, fuso SP) é feita FORA da IA na
  * etapa de confirmação. Campo obrigatório ausente vira esclarecimento (barreira 1, §3.3),
  * e crédito exige cartão (§3.4). Implementado via Laravel AI SDK (regra inviolável 8).
+ *
+ * Custo (doc 02 §3.6): extrair 7 campos para um JSON é tarefa mecânica — roda no modelo mais
+ * BARATO do provedor (#[UseCheapestModel]) e pede reasoning_effort baixo à Groq (corta o
+ * raciocínio dos modelos gpt-oss sem truncar o JSON). Sem #[MaxTokens]: o teto incluiria o
+ * reasoning e quebraria o structured output. A normalização/valor continua determinística
+ * fora da IA (regra 4).
  */
-class ExtratorDeGasto implements Agent, Conversational, HasStructuredOutput, HasTools
+#[UseCheapestModel]
+class ExtratorDeGasto implements Agent, Conversational, HasProviderOptions, HasStructuredOutput, HasTools
 {
     /** Formas de pagamento suportadas — espelha a tabela de referência `PaymentMethod` (doc 03 §4.6). */
     private const FORMAS = ['credito', 'debito', 'pix', 'dinheiro', 'boleto'];
 
     use Promptable;
     use UsaFailoverDeProvedores;
+    use UsaRaciocinioBaixoNaGroq;
 
     /**
      * Extrai um gasto do texto do usuário. Devolve o gasto cru ou os campos a esclarecer.
@@ -120,7 +133,7 @@ class ExtratorDeGasto implements Agent, Conversational, HasStructuredOutput, Has
     }
 
     /**
-     * @return \Laravel\Ai\Contracts\Tool[]
+     * @return Tool[]
      */
     public function tools(): iterable
     {
@@ -128,26 +141,30 @@ class ExtratorDeGasto implements Agent, Conversational, HasStructuredOutput, Has
     }
 
     /**
-     * @return array<string, \Illuminate\JsonSchema\Types\Type>
+     * @return array<string, Type>
      */
     public function schema(JsonSchema $schema): array
     {
+        // Structured output ESTRITO da Groq (strict=true) exige TODOS os campos em `required`;
+        // por isso cada um é required()->nullable(): o modelo devolve null quando não sabe, e
+        // limpar() trata null como ausente (barreira 1) — mesma semântica de "campo faltante".
         return [
-            'descricao' => $schema->string()
-                ->description('O que foi comprado ou pago, curto. Ex.: "mercado", "uber".'),
-            'valor' => $schema->string()
-                ->description('O valor EXATAMENTE como dito, em texto. Ex.: "35", "35 conto", "R$ 35,90". NUNCA calcule nem converta.'),
-            'forma_pagamento' => $schema->string()
-                ->enum(self::FORMAS)
-                ->description('Forma de pagamento, quando dita.'),
-            'cartao' => $schema->string()
-                ->description('Identificação textual do cartão (ex.: "cartão pai"). Obrigatório quando forma_pagamento = credito.'),
-            'categoria' => $schema->string()
-                ->description('Categoria sugerida, se evidente. A classificação final é determinística.'),
-            'data' => $schema->string()
-                ->description('A data EXATAMENTE como dita ("hoje", "ontem", "amanhã", "mês que vem", "05/06"). NUNCA resolva a data.'),
-            'parcelas' => $schema->integer()
-                ->description('Número de parcelas quando parcelado (ex.: "3x" → 3). Ausente significa à vista.'),
+            'descricao' => $schema->string()->required()->nullable()
+                ->description('O que foi comprado ou pago, curto. Ex.: "mercado", "uber". null se não disser.'),
+            'valor' => $schema->string()->required()->nullable()
+                ->description('O valor EXATAMENTE como dito, em texto. Ex.: "35", "35 conto", "R$ 35,90". NUNCA calcule nem converta. null se não disser.'),
+            // null entra no enum além do type: em strict a constraint `enum` é validada mesmo
+            // com type nullable, então sem o null aqui a saída "campo ausente" viola o schema.
+            'forma_pagamento' => $schema->string()->enum([...self::FORMAS, null])->required()->nullable()
+                ->description('Forma de pagamento, quando dita. null se não disser.'),
+            'cartao' => $schema->string()->required()->nullable()
+                ->description('Identificação textual do cartão (ex.: "cartão pai"). Obrigatório quando forma_pagamento = credito. null se não houver.'),
+            'categoria' => $schema->string()->required()->nullable()
+                ->description('Categoria sugerida, se evidente. A classificação final é determinística. null se não evidente.'),
+            'data' => $schema->string()->required()->nullable()
+                ->description('A data EXATAMENTE como dita ("hoje", "ontem", "amanhã", "mês que vem", "05/06"). NUNCA resolva a data. null se não disser.'),
+            'parcelas' => $schema->integer()->required()->nullable()
+                ->description('Número de parcelas quando parcelado (ex.: "3x" → 3). null significa à vista.'),
         ];
     }
 }

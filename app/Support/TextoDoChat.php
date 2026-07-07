@@ -7,22 +7,45 @@ namespace App\Support;
 use Illuminate\Support\HtmlString;
 
 /**
- * Formatação de apresentação do texto do chat (spec FE §7.14). Escapa o texto (é conteúdo
- * do usuário/IA — nunca confiar) e envolve os valores em R$ com a fonte MONO (assinatura do
- * design system: dinheiro é dado tabular monoespaçado). Não calcula nada — só realça o que
- * já veio pronto do backend (regra 4/5). O mesmo realce existe no chat.js para as mensagens
- * anexadas em tempo real.
+ * Formatação de apresentação do texto do chat (spec FE §7.14). Remove a linha técnica de
+ * "fonte:" que o modelo às vezes ecoa do payload, escapa o texto (é conteúdo do usuário/IA
+ * — nunca confiar), aplica o negrito de markdown e envolve os valores em R$ com a fonte MONO
+ * (assinatura do design system: dinheiro é dado tabular monoespaçado). Não calcula nada — só
+ * apresenta o que já veio pronto do backend (regra 4/5). O mesmo tratamento existe no
+ * chat.js para as mensagens anexadas em tempo real — mantenha os dois em sintonia.
  */
 final class TextoDoChat
 {
     public static function comValoresMono(string $texto): HtmlString
     {
+        $texto = self::semLinhaDeFonte($texto);
+
+        $html = e($texto);
+
+        // Negrito de markdown: **texto** → <strong>. Depois do escape — os marcadores ** não
+        // são HTML, então o conteúdo interno já está seguro.
+        $html = preg_replace('/\*\*(.+?)\*\*/su', '<strong>$1</strong>', $html);
+
+        // Realça os valores em R$ com a fonte mono (assinatura do design system).
         $html = preg_replace(
             '/R\$\s?\d[\d.]*,\d{2}/u',
             '<span class="font-value-label text-value-label">$0</span>',
-            e($texto),
+            $html,
         );
 
         return new HtmlString(nl2br($html));
+    }
+
+    /**
+     * Remove a linha técnica "fonte: <tool> (<filtros>); N registro(s)" que o modelo às vezes
+     * ecoa do payload para dentro da resposta. A transparência da fonte é responsabilidade do
+     * chip de metadados da bolha — o corpo é só a resposta em linguagem natural, sem o nome
+     * cru da ferramenta nem a sintaxe de filtros.
+     */
+    private static function semLinhaDeFonte(string $texto): string
+    {
+        $texto = preg_replace('/^\h*fonte:.*registro\(s\)\.?\h*$/imu', '', $texto);
+
+        return trim($texto);
     }
 }

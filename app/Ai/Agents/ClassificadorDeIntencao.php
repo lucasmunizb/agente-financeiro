@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Ai\Agents;
 
 use App\Ai\Concerns\UsaFailoverDeProvedores;
+use App\Ai\Concerns\UsaRaciocinioBaixoNaGroq;
 use App\Domain\IA\Intencao;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\JsonSchema\Types\Type;
+use Laravel\Ai\Attributes\UseCheapestModel;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Contracts\HasTools;
+use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Promptable;
 use Laravel\Ai\Responses\StructuredAgentResponse;
@@ -21,11 +26,19 @@ use Stringable;
  * intenção do enum `Intencao`. NÃO extrai valores nem calcula dinheiro; quando a saída
  * não corresponde a uma intenção conhecida, cai em DESCONHECIDO (barreira 1, §3.3).
  * Implementado via Laravel AI SDK (regra inviolável 8).
+ *
+ * Custo (doc 02 §3.6): classificar em um enum é tarefa trivial — roda no modelo mais BARATO
+ * do provedor (#[UseCheapestModel]) e pede reasoning_effort baixo à Groq (corta os tokens de
+ * raciocínio dos modelos gpt-oss sem truncar o JSON). Sem #[MaxTokens]: nesses modelos o teto
+ * inclui o reasoning e quebraria o structured output. Sem impacto de segurança: o escopo por
+ * usuário e o guard vivem em outra camada.
  */
-class ClassificadorDeIntencao implements Agent, Conversational, HasStructuredOutput, HasTools
+#[UseCheapestModel]
+class ClassificadorDeIntencao implements Agent, Conversational, HasProviderOptions, HasStructuredOutput, HasTools
 {
     use Promptable;
     use UsaFailoverDeProvedores;
+    use UsaRaciocinioBaixoNaGroq;
 
     /**
      * Classifica o texto do usuário em uma intenção. Saída desconhecida nunca vira chute.
@@ -71,7 +84,7 @@ class ClassificadorDeIntencao implements Agent, Conversational, HasStructuredOut
     }
 
     /**
-     * @return \Laravel\Ai\Contracts\Tool[]
+     * @return Tool[]
      */
     public function tools(): iterable
     {
@@ -79,7 +92,7 @@ class ClassificadorDeIntencao implements Agent, Conversational, HasStructuredOut
     }
 
     /**
-     * @return array<string, \Illuminate\JsonSchema\Types\Type>
+     * @return array<string, Type>
      */
     public function schema(JsonSchema $schema): array
     {

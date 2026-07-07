@@ -4,6 +4,7 @@ use App\Ai\Agents\ExtratorDeGasto;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\JsonSchema\Types\IntegerType;
 use Illuminate\JsonSchema\Types\StringType;
+use Laravel\Ai\ObjectSchema;
 
 /*
  * Agent de extração de campos (doc 02 §3.1, papel 2). Texto → JSON estruturado. A IA
@@ -33,9 +34,26 @@ it('conta parcelas como inteiro (quantidade declarada, não dinheiro)', function
     expect(schemaExtrator()['parcelas'])->toBeInstanceOf(IntegerType::class);
 });
 
-it('restringe a forma de pagamento às formas suportadas', function () {
+it('restringe a forma de pagamento às formas suportadas (mais null para "não disse")', function () {
+    // null é aceito (campo ausente vira esclarecimento); as demais são só as formas válidas.
     expect(schemaExtrator()['forma_pagamento']->toArray()['enum'])
-        ->toEqualCanonicalizing(['credito', 'debito', 'pix', 'dinheiro', 'boleto']);
+        ->toEqualCanonicalizing(['credito', 'debito', 'pix', 'dinheiro', 'boleto', null]);
+});
+
+it('gera schema compatível com structured output ESTRITO (Groq strict) sem mudar a semântica', function () {
+    // Groq força response_format strict=true: o schema PRECISA listar TODOS os campos em
+    // `required` (senão 400 "required is required"). Para preservar "campo ausente vira
+    // esclarecimento", cada campo é required PORÉM nullable (type: [..., "null"]) — o modelo
+    // devolve null quando não sabe, e limpar() já trata null como ausente (barreira 1).
+    $shape = (new ObjectSchema(schemaExtrator(), 'schema_definition', true))->toSchema();
+
+    $campos = array_keys($shape['properties']);
+
+    expect($shape['required'] ?? [])->toEqualCanonicalizing($campos);
+
+    foreach ($shape['properties'] as $prop) {
+        expect((array) ($prop['type'] ?? []))->toContain('null');
+    }
 });
 
 it('instrui a não calcular dinheiro, assumir BRL e o fuso de São Paulo', function () {

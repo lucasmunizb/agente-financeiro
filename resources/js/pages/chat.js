@@ -37,8 +37,16 @@ if (panel) {
         d.textContent = s ?? '';
         return d.innerHTML;
     }
+    // Remove a linha técnica "fonte: <tool> (<filtros>); N registro(s)" que o modelo às vezes
+    // ecoa do payload — a fonte aparece nos chips de metadados, nunca no corpo da resposta.
+    function semLinhaDeFonte(texto) {
+        return (texto ?? '')
+            .replace(/^[^\S\n]*fonte:.*registro\(s\)\.?[^\S\n]*$/gim, '')
+            .trim();
+    }
     function comValoresMono(texto) {
-        return escapeHtml(texto)
+        return escapeHtml(semLinhaDeFonte(texto))
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
             .replace(/R\$\s?\d[\d.]*,\d{2}/g, '<span class="font-value-label text-value-label">$&</span>')
             .replace(/\n/g, '<br>');
     }
