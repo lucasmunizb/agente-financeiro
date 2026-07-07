@@ -4,20 +4,24 @@ declare(strict_types=1);
 
 namespace App\Domain\Chat;
 
-use App\Domain\IA\Consulta\ResponderConsulta;
-use App\Domain\IA\Consulta\TraceDaConsulta;
+use App\Domain\Interacao\ProcessarInteracao;
+use App\Domain\Telegram\Comando;
+use App\Domain\Telegram\ComandoRecebido;
 use App\Models\ChatMessage;
 use App\Models\User;
 
 /**
- * Chat financeiro na web (spec FE §7.14). Reutiliza o MESMO motor do Telegram
- * ({@see ResponderConsulta}: agente + tools escopadas por usuário + guard barreira 4 +
- * fontes barreira 5) e persiste o histórico real ({@see ChatMessage}), sempre isolado por
- * usuário. A IA nunca calcula dinheiro (regra 4): os valores da resposta vêm do domínio, já
- * validados pelo guard antes de gravar.
+ * Chat financeiro na web (spec FE §7.14). Reutiliza o MESMO motor do Telegram: delega a
+ * {@see ProcessarInteracao} (confirmação pendente → classificação → registro/consulta) e
+ * redige a resposta com {@see RedatorDoChat}. Assim o chat web tem as mesmas funcionalidades
+ * do bot — registrar um gasto (com confirmação "sim/não" antes de gravar, regra 7) e
+ * consultar (guard barreira 4 + fontes barreira 5) — sem duplicar regra. Persiste o
+ * histórico real ({@see ChatMessage}), isolado por usuário. A IA nunca calcula dinheiro
+ * (regra 4).
  *
- * Cada pergunta é atendida de forma independente (sem memória de conversa), igual ao bot
- * hoje — dar contexto de turnos anteriores ao agente é melhoria futura.
+ * Cada mensagem é atendida de forma independente (sem memória de conversa livre), igual ao
+ * bot; a confirmação de gasto, porém, é stateful entre mensagens (pendente em banco), então
+ * "gastei 50 no mercado" → "sim" grava em duas mensagens, como no Telegram.
  */
 final class ResponderNoChat
 {
@@ -28,37 +32,36 @@ final class ResponderNoChat
     public const RESPOSTA_ANEXO = 'Recebi sua fatura em PDF. A leitura automática de faturas ainda não está disponível — por enquanto, registre os gastos manualmente. O arquivo foi processado e descartado; nada dele ficou armazenado.';
 
     public function __construct(
-        private readonly ResponderConsulta $responder,
+        private readonly ProcessarInteracao $orquestrar,
+        private readonly RedatorDoChat $redator,
     ) {}
 
     /**
-     * Grava a pergunta do usuário, consulta o motor e grava a resposta (com fontes e o
-     * veredito do guard). Devolve a mensagem do assistente.
+     * Grava a mensagem do usuário, roda a orquestração (mesmo motor do bot) e grava a
+     * resposta redigida (com fontes/veredito quando for consulta). Devolve a mensagem do
+     * assistente. Texto livre: sem slash, o roteamento é o de uma mensagem DESCONHECIDA.
      */
-    public function perguntar(User $user, string $pergunta): ChatMessage
+    public function perguntar(User $user, string $texto): ChatMessage
     {
         ChatMessage::create([
             'user_id' => $user->id,
             'role' => 'user',
-            'body' => $pergunta,
+            'body' => $texto,
         ]);
 
-        $resposta = $this->responder->responder($user, $pergunta);
+        $resultado = $this->orquestrar->processar(
+            $user,
+            new ComandoRecebido(Comando::DESCONHECIDO, '', $texto),
+        );
+
+        $resposta = $this->redator->redigir($resultado);
 
         return ChatMessage::create([
             'user_id' => $user->id,
             'role' => 'assistant',
             'body' => $resposta->texto,
             'aprovado' => $resposta->aprovado,
-            'fontes' => array_map(
-                static fn (TraceDaConsulta $t): array => [
-                    'ferramenta' => $t->ferramenta,
-                    'filtros' => $t->filtros,
-                    'registros' => $t->registros,
-                    'resumo' => $t->resumo(),
-                ],
-                $resposta->fontes,
-            ),
+            'fontes' => $resposta->fontes,
         ]);
     }
 

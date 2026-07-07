@@ -48,8 +48,8 @@
             <span class="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container text-outline">
                 <x-icon name="message-circle" class="h-6 w-6" />
             </span>
-            <p class="max-w-[240px] font-body-md text-body-md text-on-surface-variant">
-                Pergunte sobre seus gastos ou anexe a fatura em PDF.
+            <p class="max-w-[260px] font-body-md text-body-md text-on-surface-variant">
+                Registre um gasto (ex.: “gastei 50 no mercado”), pergunte sobre suas finanças ou anexe a fatura em PDF.
             </p>
         </div>
 
@@ -91,8 +91,8 @@
             </div>
 
             <div class="flex items-end gap-2 rounded-control border border-linha bg-superficie transition-colors focus-within:border-primary-container">
-                <label for="chat-input" class="sr-only">Pergunte sobre seus gastos</label>
-                <textarea id="chat-input" rows="1" placeholder="Pergunte sobre seus gastos…"
+                <label for="chat-input" class="sr-only">Registre um gasto ou pergunte sobre suas finanças</label>
+                <textarea id="chat-input" rows="1" placeholder="Registre um gasto ou pergunte…"
                     class="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-4 py-3 font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"></textarea>
                 <button type="button" id="chat-send" disabled
                     class="m-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-primary-container text-on-primary transition-colors hover:bg-cedula-clara disabled:cursor-not-allowed disabled:opacity-40">

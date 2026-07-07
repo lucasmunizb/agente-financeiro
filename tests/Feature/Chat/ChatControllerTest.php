@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Ai\Agents\AssistenteDeConsulta;
+use App\Ai\Agents\ClassificadorDeIntencao;
+use App\Ai\Agents\ExtratorDeGasto;
 use App\Models\ChatMessage;
+use App\Models\Transaction;
 use App\Models\User;
 use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\StatusPagamentoSeeder;
@@ -41,6 +44,7 @@ function pdfReal(): string
 
 it('store: usuário autenticado envia mensagem e recebe a resposta do assistente', function () {
     $user = User::factory()->create();
+    Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'consultar']]);
     Ai::fakeAgent(AssistenteDeConsulta::class, ['Olá! Posso ajudar com suas finanças.']);
 
     $resp = $this->actingAs($user)->postJson(route('chat.store'), ['mensagem' => 'oi']);
@@ -52,6 +56,40 @@ it('store: usuário autenticado envia mensagem e recebe a resposta do assistente
 
     expect($resp->json('mensagem.body'))->toContain('Olá');
     expect(ChatMessage::query()->where('user_id', $user->id)->count())->toBe(2);
+});
+
+it('store: registrar um gasto pelo chat devolve a prévia e deixa pendente (regra 7)', function () {
+    $user = User::factory()->create();
+    Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'registrar']]);
+    Ai::fakeAgent(ExtratorDeGasto::class, [[
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+    ]]);
+
+    $resp = $this->actingAs($user)->postJson(route('chat.store'), ['mensagem' => 'gastei 90 no mercado no pix hoje']);
+
+    $resp->assertOk()->assertJsonPath('mensagem.role', 'assistant');
+    expect($resp->json('mensagem.body'))->toContain('R$ 90,00')->toContain('sim');
+    // Nada gravado até o "sim" (regra 7).
+    expect(Transaction::count())->toBe(0);
+});
+
+it('store: registro → "sim" grava o gasto (confirmação persiste entre requisições, como no bot)', function () {
+    $user = User::factory()->create();
+    Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'registrar']]);
+    Ai::fakeAgent(ExtratorDeGasto::class, [[
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+    ]]);
+
+    // 1ª requisição: propõe e deixa pendente (nada gravado).
+    $this->actingAs($user)->postJson(route('chat.store'), ['mensagem' => 'gastei 90 no mercado no pix hoje'])->assertOk();
+    expect(Transaction::count())->toBe(0);
+
+    // 2ª requisição: "sim" resolve o pendente e grava — determinístico, sem IA.
+    $resp = $this->actingAs($user)->postJson(route('chat.store'), ['mensagem' => 'sim']);
+
+    $resp->assertOk();
+    expect($resp->json('mensagem.body'))->toContain('registrei');
+    expect(Transaction::where('user_id', $user->id)->count())->toBe(1);
 });
 
 it('store: exige autenticação', function () {
