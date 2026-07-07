@@ -38,11 +38,12 @@ final class TextoDoChat
 
     /**
      * Remove a linha técnica "fonte: <tool> (<filtros>); N registro(s)" que o modelo às vezes
-     * ecoa do payload para dentro da resposta. A transparência da fonte é responsabilidade do
-     * chip de metadados da bolha — o corpo é só a resposta em linguagem natural, sem o nome
-     * cru da ferramenta nem a sintaxe de filtros.
+     * ecoa do payload para dentro da resposta. O corpo entregue é só a resposta em linguagem
+     * natural, sem o nome cru da ferramenta nem a sintaxe de filtros — a fonte (barreira 5) é
+     * registro interno, não faz parte do texto enviado a nenhum canal. Público para ser o
+     * strip canônico reusado na redação de origem (RedatorDoChat), cobrindo web e Telegram.
      */
-    private static function semLinhaDeFonte(string $texto): string
+    public static function semLinhaDeFonte(string $texto): string
     {
         $texto = preg_replace('/^\h*fonte:.*registro\(s\)\.?\h*$/imu', '', $texto);
 

@@ -54,8 +54,7 @@
         </div>
 
         @foreach ($mensagens as $m)
-            <x-chat.message :role="$m->role" :body="$m->body" :aprovado="$m->aprovado"
-                :tem-anexo="$m->tem_anexo" :fontes="$m->fontes ?? []" />
+            <x-chat.message :role="$m->role" :body="$m->body" :tem-anexo="$m->tem_anexo" />
         @endforeach
     </div>
 

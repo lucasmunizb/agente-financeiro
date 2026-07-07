@@ -11,6 +11,7 @@ use App\Domain\Shared\Money;
 use App\Domain\Telegram\Resposta\ResultadoDaInteracao;
 use App\Domain\Telegram\Resposta\TipoDeInteracao;
 use App\Models\Transaction;
+use App\Support\TextoDoChat;
 
 /**
  * Redação (apresentação, regra 3) das respostas do chat financeiro na web a partir do
@@ -37,8 +38,11 @@ final class RedatorDoChat
     public function redigir(ResultadoDaInteracao $resultado): RespostaDoChat
     {
         return match ($resultado->tipo) {
+            // A resposta entregue é SÓ o corpo: um eventual eco da linha técnica "fonte:" que o
+            // modelo cospe é removido aqui, na origem, para sair pronto em qualquer canal (web e
+            // bot). A fonte segue registrada (barreira 5), mas nunca faz parte do texto enviado.
             TipoDeInteracao::CONSULTA => new RespostaDoChat(
-                $resultado->consulta->texto,
+                TextoDoChat::semLinhaDeFonte($resultado->consulta->texto),
                 $resultado->consulta->aprovado,
                 $this->fontes($resultado->consulta->fontes),
             ),

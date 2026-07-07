@@ -82,21 +82,11 @@ if (panel) {
         );
     }
 
-    function bolhaAssistente({ body, aprovado, fontes }) {
-        const chips = (fontes || [])
-            .map(
-                (f) =>
-                    `<span class="inline-flex items-center gap-1.5 rounded-full border border-linha bg-superficie px-2.5 py-1 font-label-sm text-label-sm text-on-surface-variant">${escapeHtml(f.resumo || f.ferramenta || 'fonte')}</span>`,
-            )
-            .join('');
-        const conferido = aprovado
-            ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-primary-container/10 px-2.5 py-1 font-label-sm text-label-sm text-primary-container">número conferido</span>`
-            : '';
-        const meta = chips || conferido
-            ? `<div class="flex flex-wrap gap-2 border-t border-linha/60 pt-3">${chips}${conferido}</div>`
-            : '';
+    // A resposta é SÓ o corpo — sem chips de fonte nem selo "conferido". A transparência da
+    // fonte (barreira 5) é registro interno, nunca parte da bolha enviada ao usuário.
+    function bolhaAssistente({ body }) {
         return elemento(
-            `<div class="flex justify-start"><div class="notebook-card max-w-[90%] space-y-3 rounded-card rounded-tl-sm px-4 py-4"><p class="font-body-md text-body-md text-on-surface">${comValoresMono(body)}</p>${meta}</div></div>`,
+            `<div class="flex justify-start"><div class="notebook-card max-w-[90%] rounded-card rounded-tl-sm px-4 py-4"><p class="font-body-md text-body-md text-on-surface">${comValoresMono(body)}</p></div></div>`,
         );
     }
 
