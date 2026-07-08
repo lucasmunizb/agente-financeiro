@@ -106,20 +106,58 @@
                 @endif
             </div>
 
-            {{-- Próximas contas --}}
+            {{-- Contas: dividido em "em atraso" (o que já venceu) + "a vencer" (spec 06b).
+                 Em atraso vem primeiro, com acento argila (error), por ser o estado de
+                 alerta. Valores/contagens chegam PRONTOS do backend (regras 4/5). --}}
             <div class="notebook-card rounded-card p-8 lg:col-span-2">
-                <div class="mb-4 flex items-center justify-between">
-                    <h3 class="font-headline-md text-headline-md text-on-surface">Próximas contas</h3>
+                <div class="mb-2 flex items-center justify-between">
+                    <h3 class="font-headline-md text-headline-md text-on-surface">Contas</h3>
                 </div>
 
-                @if (count($vm['proximasContas']) === 0)
-                    <p class="py-8 text-center font-body-sm text-body-sm text-outline">Nenhuma conta a vencer nos próximos dias.</p>
+                @php $temAtraso = count($vm['contasVencidas']) > 0; $temAVencer = count($vm['proximasContas']) > 0; @endphp
+
+                @if (! $temAtraso && ! $temAVencer)
+                    <p class="py-8 text-center font-body-sm text-body-sm text-outline">Nenhuma conta em atraso ou a vencer nos próximos dias.</p>
                 @else
-                    <div>
-                        @foreach ($vm['proximasContas'] as $conta)
-                            <x-dashboard.bill-row icon="receipt" :icon-tone="$conta['iconTone']"
-                                :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="a_vencer" />
-                        @endforeach
+                    {{-- Seção "Em atraso" — só aparece quando há algo vencido. --}}
+                    @if ($temAtraso)
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between border-b border-linha pb-2">
+                                <span class="inline-flex items-center gap-1.5 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-error">
+                                    <x-icon name="alert" class="h-4 w-4" />
+                                    Em atraso
+                                </span>
+                                <span class="font-value-label text-value-label text-error">
+                                    {{ $vm['emAtraso']['contas'] }} {{ $vm['emAtraso']['contas'] === 1 ? 'conta' : 'contas' }} · {{ $vm['emAtraso']['valor'] }}
+                                </span>
+                            </div>
+                            @foreach ($vm['contasVencidas'] as $conta)
+                                <x-dashboard.bill-row icon="alert" :icon-tone="$conta['iconTone']"
+                                    :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="atraso" />
+                            @endforeach
+                        </div>
+                    @endif
+
+                    {{-- Seção "A vencer". --}}
+                    <div class="{{ $temAtraso ? 'mt-8' : 'mt-4' }}">
+                        <div class="flex items-center justify-between border-b border-linha pb-2">
+                            <span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-on-surface-variant">
+                                A vencer
+                            </span>
+                            @if ($temAVencer)
+                                <span class="font-value-label text-value-label text-on-surface-variant">
+                                    {{ $vm['aVencer']['contas'] }} {{ $vm['aVencer']['contas'] === 1 ? 'conta' : 'contas' }} · {{ $vm['aVencer']['valor'] }}
+                                </span>
+                            @endif
+                        </div>
+                        @if ($temAVencer)
+                            @foreach ($vm['proximasContas'] as $conta)
+                                <x-dashboard.bill-row icon="receipt" :icon-tone="$conta['iconTone']"
+                                    :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="a_vencer" />
+                            @endforeach
+                        @else
+                            <p class="py-6 text-center font-body-sm text-body-sm text-outline">Nenhuma conta a vencer nos próximos dias.</p>
+                        @endif
                     </div>
                 @endif
             </div>

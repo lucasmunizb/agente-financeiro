@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Dashboard;
 
+use App\Domain\ContasVencidas\ConsultarContasVencidas;
 use App\Domain\Disponivel\ConsultarDisponivelDoMes;
 use App\Domain\FaturaCartao\ConsultarFaturaCartao;
 use App\Domain\Gastos\ConsultarGastos;
@@ -32,6 +33,7 @@ final class ResumoDoMes
     public function __construct(
         private readonly ConsultarGastos $gastos,
         private readonly ConsultarProximasContas $proximasContas,
+        private readonly ConsultarContasVencidas $contasVencidas,
         private readonly ConsultarFaturaCartao $faturaCartao,
         private readonly ConsultarDisponivelDoMes $disponivel,
     ) {}
@@ -42,6 +44,8 @@ final class ResumoDoMes
 
         $gastos = $this->gastos->para($userId, $mes);
         $proximasContas = $this->proximasContas->para($userId, $hoje, $janelaProximasContas);
+        // Sem janela: todas as vencidas em aberto (decisão spec 06b §10).
+        $contasVencidas = $this->contasVencidas->para($userId, $hoje);
         $disponivel = $this->disponivel->para($userId, $mes);
 
         // Uma fatura por cartão ativo do usuário (escopo por user_id). Resolve pelo final_4
@@ -58,6 +62,7 @@ final class ResumoDoMes
             mes: $mes,
             gastos: $gastos,
             proximasContas: $proximasContas,
+            contasVencidas: $contasVencidas,
             disponivel: $disponivel,
             faturas: $faturas,
         );

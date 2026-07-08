@@ -99,7 +99,17 @@ class DashboardController extends Controller
 
             'donut' => $this->donut($resumo->gastos->porCategoria, $totalGastosCents),
 
+            // Quadro de contas dividido (spec 06b): "em atraso" (já venceu) + "a vencer".
+            'contasVencidas' => $this->contasVencidas($resumo),
+            'emAtraso' => [
+                'valor' => Money::fromCents($resumo->totalContasVencidasCents())->formatBRL(),
+                'contas' => count($resumo->contasVencidas->contas),
+            ],
             'proximasContas' => $this->proximasContas($resumo, $hoje),
+            'aVencer' => [
+                'valor' => Money::fromCents($resumo->totalProximasContasCents())->formatBRL(),
+                'contas' => count($resumo->proximasContas->contas),
+            ],
         ];
     }
 
@@ -251,5 +261,25 @@ class DashboardController extends Controller
                 'iconTone' => $conta['vencimento'] <= $limite7 ? 'ocre' : 'primary',
             ];
         }, array_slice($resumo->proximasContas->contas, 0, 5));
+    }
+
+    /**
+     * Linhas de "Contas em atraso" (até 5), já formatadas — o que venceu e segue em
+     * aberto (spec 06b). Tom `error` (argila) em todas: atraso é o estado de alerta.
+     *
+     * @return list<array{title: string, due: string, value: string, iconTone: string}>
+     */
+    private function contasVencidas(ResumoDoMesResultado $resumo): array
+    {
+        return array_map(function (array $conta): array {
+            $venc = CarbonImmutable::parse($conta['vencimento'], 'America/Sao_Paulo');
+
+            return [
+                'title' => $conta['descricao'],
+                'due' => 'venceu '.$this->dataExtenso($venc),
+                'value' => Money::fromCents($conta['cents'])->formatBRL(),
+                'iconTone' => 'error',
+            ];
+        }, array_slice($resumo->contasVencidas->contas, 0, 5));
     }
 }

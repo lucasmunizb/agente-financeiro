@@ -94,6 +94,34 @@ it('exibe os números reais do mês, já formatados', function () {
         ->assertSee('vence 18 de junho');
 });
 
+it('divide o quadro de contas em "em atraso" e "a vencer" (spec 06b)', function () {
+    $user = User::factory()->create();
+
+    $tx = dashboardGasto($user, 20000, '2026-06-10');  // venceu antes de hoje (06-15) → em atraso
+    $tx->update(['descricao' => 'Aluguel']);
+    $tx2 = dashboardGasto($user, 12000, '2026-06-20');  // futura → a vencer
+    $tx2->update(['descricao' => 'Internet']);
+
+    $this->actingAs($user)->get('/')
+        ->assertOk()
+        ->assertSee('Em atraso')
+        ->assertSee('Aluguel')
+        ->assertSee('venceu 10 de junho')     // formatação pt-BR na borda
+        ->assertSee('R$ 200,00')              // total em atraso (domínio → borda)
+        ->assertSee('A vencer')
+        ->assertSee('Internet')
+        ->assertSee('vence 20 de junho');
+});
+
+it('não mostra a seção "em atraso" quando não há contas vencidas', function () {
+    $user = User::factory()->create();
+    dashboardGasto($user, 12000, '2026-06-20'); // só futura
+
+    $this->actingAs($user)->get('/')
+        ->assertOk()
+        ->assertDontSee('Em atraso');
+});
+
 it('é isolado por usuário (não vaza dados de terceiros)', function () {
     $user = User::factory()->create();
     $outro = User::factory()->create();

@@ -230,5 +230,34 @@ it('expõe os traces (fontes) de cada consulta para auditoria', function () {
     expect($ferramentas)->toContain('consultar_gastos')
         ->toContain('consultar_proximas_contas')
         ->toContain('consultar_disponivel_mes')
-        ->toContain('consultar_fatura_cartao');
+        ->toContain('consultar_fatura_cartao')
+        ->toContain('consultar_contas_vencidas');
+});
+
+it('agrega também as contas em atraso, batendo com a consulta isolada (C8 — spec 06b)', function () {
+    $user = User::factory()->create();
+
+    resumoParcela($user, 30000, '2026-06-05');  // já venceu (antes de hojeSP 2026-06-15)
+    resumoParcela($user, 18000, '2026-06-10');  // já venceu
+    resumoParcela($user, 90000, '2026-06-20');  // a vencer
+
+    $hoje = hojeSP();
+    $resumo = app(ResumoDoMes::class)->para($user->id, $hoje);
+    $vencidas = app(App\Domain\ContasVencidas\ConsultarContasVencidas::class)->para($user->id, $hoje);
+
+    expect($resumo->totalContasVencidasCents())->toBe(48000)                 // 300 + 180
+        ->and($resumo->totalContasVencidasCents())->toBe($vencidas->totalCents) // reuso, não recálculo
+        ->and($resumo->totalContasVencidasCents())->toBeInt()                // regra 5
+        ->and($resumo->contasVencidas->contas)->toHaveCount(2);
+});
+
+it('usuário sem nada em atraso tem contasVencidas zeradas e lista vazia (C8 — borda)', function () {
+    $user = User::factory()->create();
+
+    resumoParcela($user, 90000, '2026-06-20'); // só futura
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    expect($resumo->totalContasVencidasCents())->toBe(0)
+        ->and($resumo->contasVencidas->contas)->toBe([]);
 });

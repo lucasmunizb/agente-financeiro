@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Dashboard;
 
+use App\Domain\ContasVencidas\ResultadoConsultaContasVencidas;
 use App\Domain\Disponivel\ResultadoConsultaDisponivel;
 use App\Domain\FaturaCartao\ResultadoConsultaFaturaCartao;
 use App\Domain\Gastos\ResultadoConsultaGastos;
@@ -26,6 +27,7 @@ final class ResumoDoMesResultado
         public readonly string $mes,
         public readonly ResultadoConsultaGastos $gastos,
         public readonly ResultadoConsultaProximasContas $proximasContas,
+        public readonly ResultadoConsultaContasVencidas $contasVencidas,
         public readonly ResultadoConsultaDisponivel $disponivel,
         public readonly array $faturas,
     ) {}
@@ -40,6 +42,12 @@ final class ResumoDoMesResultado
     public function totalProximasContasCents(): int
     {
         return $this->proximasContas->totalCents;
+    }
+
+    /** Total das contas em atraso — vencidas e ainda em aberto (centavos). */
+    public function totalContasVencidasCents(): int
+    {
+        return $this->contasVencidas->totalCents;
     }
 
     /** Disponível do mês corrente (centavos). */
@@ -67,6 +75,7 @@ final class ResumoDoMesResultado
         return [
             $this->gastos->trace,
             $this->proximasContas->trace,
+            $this->contasVencidas->trace,
             $this->disponivel->trace,
             ...array_map(
                 static fn (ResultadoConsultaFaturaCartao $fatura): TraceDaConsulta => $fatura->trace,
