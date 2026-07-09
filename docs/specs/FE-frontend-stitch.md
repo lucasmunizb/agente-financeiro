@@ -150,7 +150,7 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 
 **B. Núcleo financeiro**
 - [x] 5. Dashboard / Visão geral *(tela-assinatura: a régua do mês; shell aside + header — **implementado em Blade e ligado ao backend (spec-06)**: valores reais do domínio, estado vazio/pronto pelos dados, coberto por testes de feature)*
-- [ ] 6. Lançamentos — lista
+- [x] 6. Lançamentos — lista *(**gerada no Stitch** — só a tela; falta integração ao Blade/backend)*
 - [ ] 7. Lançamento — criar/editar (com prévia de parcelas)
 - [x] 7b. Registrar gasto — **modal rápido** (FAB do dashboard) *(valor, forma, cartão, vencimento, pagamento opcional, recorrente, categoria)* — **gerado no Stitch**, **implementado em Blade** e **ligado ao backend** (persiste de verdade): fluxo em dois passos (formulário → prévia calculada pelo backend → confirmar → grava, regra 7), cartões/categorias reais do usuário, validação server-side (Form Request), reuso de `RegistrarGastoManual`. Coberto por testes de borda web. **Deferido:** marcar como pago (data de pagamento) e recorrência (backend pós-MVP).
 - [ ] 8. Lançamento — detalhe (parcelas + status)
@@ -364,21 +364,92 @@ Estilo EXTRATO: denso, legível, valores em mono à direita.
 ### 7.7 Lançamento — criar/editar (com prévia de parcelas)
 **Objetivo:** capturar um gasto e **confirmar** antes de gravar (regra 7). **Estados:** validação; crédito exige cartão; prévia de parcelas.
 ```text
-Tela CRIAR/EDITAR LANÇAMENTO (use o tema). NÃO gere barra lateral (aside) nem cabeçalho
-(header) — eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da
-área principal, que será encaixado dentro desse shell (título da página: "Novo lançamento").
-Formulário calmo, um campo por linha no mobile.
-Campos: "Descrição"; "Valor" (campo mono, prefixo R$); "Data" (date picker, default hoje);
-"Forma de pagamento" (crédito, débito, pix, dinheiro, boleto); "Cartão" (aparece e fica
-OBRIGATÓRIO só quando a forma é crédito); "Parcelas" (1 a 24, só faz sentido no crédito);
-"Categoria" (seletor com chips coloridos + ícone; sugestão automática destacada, editável).
+Gere a tela CRIAR/EDITAR LANÇAMENTO de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
+principal, dentro do shell. Ignore qualquer versão anterior desta tela — comece do zero. Gere
+DUAS variações (detalhadas no fim): "Novo lançamento — Crédito" e "Novo lançamento — Pix/à vista".
 
-PRÉVIA DE PARCELAS (aparece quando parcelas > 1): tabela monoespaçada com nº, valor da parcela
-e data de vencimento de cada uma — rotulada "Prévia (ainda não gravado)". Deixe explícito que
-os valores foram calculados pelo sistema, não pela tela.
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
 
-Rodapé: botão primário "Revisar e confirmar" (NÃO grava direto — abre confirmação com o resumo).
-Validação inline e direta ("Crédito exige um cartão."). Sem auto-save.
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM campo além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, ícones decorativos nem qualquer
+  conteúdo que não esteja escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (igual nas duas variações) ━━━
+- Título da página "Novo lançamento" (Bricolage Grotesque) e, abaixo, a nota discreta "* obrigatório".
+- Formulário em cartão (#FBFBF8, cantos 12px), campos empilhados UM POR LINHA (no desktop pode
+  usar 2 colunas), cada um com rótulo acima. Obrigatórios com "*".
+
+━━━ CAMPOS FIXOS (nas DUAS variações, nesta ordem) ━━━
+1. "Descrição" * — input de texto, valor: "Mercado do mês".
+2. "Valor" * — input MONO com prefixo "R$" e o número alinhado à direita, valor: "R$ 450,00".
+3. "Data da compra" * — campo de data, valor: "05/07/2026".
+4. "Forma de pagamento" * — controle segmentado com EXATAMENTE 5 opções, nesta ordem:
+   "Crédito", "Débito", "Pix", "Dinheiro", "Boleto". Quebre em duas linhas de largura igual se
+   não couber — NÃO junte nem remova opções. O segmento selecionado em verde-cédula #1F6E5A com
+   texto claro; os demais neutros.
+… (aqui entram os campos condicionais, que MUDAM por variação — ver abaixo) …
+ÚLTIMO campo fixo (sempre por último, nas duas variações):
+"Categoria" * — seletor de chips (pill) com ícone + rótulo, nesta ordem: "Mercado",
+   "Restaurante", "Transporte", "Moradia", "Lazer", "Outros". O chip "Mercado" está SELECIONADO
+   (fundo verde-cédula) e traz um selo pequeno "sugerido". Os demais neutros.
+
+━━━ VARIAÇÃO A — forma selecionada: "Crédito" ━━━
+Entre o campo 4 e a Categoria, mostre NESTA ordem:
+- "Cartão" * — dropdown MONO, valor: "Nubank •••• 1234 — fecha dia 28".
+- "Parcelas" — seletor numérico de 1 a 24, valor: "3". Logo abaixo, uma TABELA MONO rotulada
+  "Prévia — calculada pelo sistema (ainda não gravado)", 3 linhas (colunas: nº · valor ·
+  vencimento), alinhadas à direita:
+      "1/3"  "R$ 150,00"  "vence 05/08"
+      "2/3"  "R$ 150,00"  "vence 05/09"
+      "3/3"  "R$ 150,00"  "vence 05/10"
+- "Data de vencimento" * — NÃO é editável: mostre um CHIP somente-leitura, texto:
+  "vence 5 de agosto · calculado pelo cartão".
+- "Data de pagamento" — rótulo "Data de pagamento (opcional)", campo de data VAZIO, com apoio
+  discreto "vazio = em aberto".
+NESTA variação NÃO existe o switch de recorrência (crédito usa parcelas). Não o desenhe aqui.
+
+━━━ VARIAÇÃO B — forma selecionada: "Pix / à vista" ━━━
+Segmento "Pix" selecionado (o comportamento de débito/dinheiro/boleto é idêntico). Entre o campo
+4 e a Categoria, mostre NESTA ordem — e NÃO mostre "Cartão", "Parcelas" nem a tabela de prévia:
+- "Data de vencimento" * — campo de DATA EDITÁVEL, valor: "05/07/2026".
+- "Data de pagamento" — rótulo "Data de pagamento (opcional)", campo de data VAZIO, com apoio
+  discreto "vazio = em aberto".
+- "Gasto recorrente" — um SWITCH rotulado "Repete todo mês?", mostrado LIGADO, com apoio discreto
+  "assinaturas e contas fixas". Por estar ligado, revela abaixo: "Periodicidade" (dropdown, valor
+  "mensal") e "Dia" (seletor de dia do mês, valor "5").
+
+━━━ RODAPÉ (nas duas variações) ━━━
+Linha fina (#DDE0D7) acima e dois botões: primário "Revisar e confirmar" (verde-cédula, à
+direita) e secundário "Cancelar" (contorno verde-cédula, à esquerda). "Revisar e confirmar" NÃO
+grava direto — abre um PAINEL DE CONFIRMAÇÃO com o resumo do lançamento (descrição, valor, forma,
+cartão/parcelas, vencimento, categoria) e os botões "Confirmar" e "Voltar"; acima do resumo, a
+frase "Confira antes de gravar — nada foi salvo ainda.".
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro nem vencimento: o valor por parcela, a prévia e o vencimento do
+cartão chegam prontos do backend — a tela só EXIBE; e nada é gravado sem a confirmação explícita.
+Acessível: contraste AA, foco de teclado visível (anel verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue as DUAS variações como telas separadas: "Novo lançamento — Crédito" e
+"Novo lançamento — Pix/à vista".
 ```
 
 ### 7.7b Registrar gasto — *modal rápido (FAB do dashboard)*
@@ -491,85 +562,369 @@ Entregue as DUAS variações como telas separadas: "Registrar gasto — Crédito
 ### 7.8 Lançamento — detalhe (parcelas + status)
 **Objetivo:** ver um lançamento e suas parcelas. **Estados:** com parcela paga (edição bloqueada).
 ```text
-Tela DETALHE DO LANÇAMENTO (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header)
-do app — eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da
-área principal, que será encaixado dentro desse shell.
-- Cabeçalho do conteúdo (não confundir com o header do app): descrição, chip de categoria,
-  valor total (mono) e selo de status.
-- Metadados: forma/cartão, data, origem ("manual" ou "Telegram" ou "fatura PDF").
-- TABELA DE PARCELAS (mono): nº, valor, vencimento, status de cada uma (aberto/pago/atraso).
-- Ações: "Editar" e "Cancelar". Se houver parcela paga, "Editar" fica desabilitado com a
-  explicação "Há parcelas pagas — não é possível editar; você pode cancelar as futuras."
-- Tudo é leitura de dados prontos; a tela não recalcula nada.
+Gere a tela DETALHE DO LANÇAMENTO de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
+principal, dentro do shell. Ignore qualquer versão anterior — comece do zero. É SÓ esta tela.
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, ícones decorativos nem qualquer
+  conteúdo que não esteja escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA ━━━
+1. CABEÇALHO DO CONTEÚDO (não é o header do app): à esquerda a descrição "Mercado do mês"
+   (Bricolage Grotesque) com um chip de categoria pill "Mercado" logo abaixo; à direita o valor
+   total MONO "R$ 450,00" e um selo de status pill "em aberto" (ocre).
+2. BLOCO DE METADADOS (linhas "rótulo → valor"; datas e números em MONO):
+   - "Forma de pagamento": "Crédito"
+   - "Cartão": "Nubank •••• 1234"
+   - "Data da compra": "05/07/2026"
+   - "Vencimento": "5 de agosto · calculado pelo cartão"
+   - "Origem": "manual"  (os únicos valores possíveis deste campo são "manual", "Telegram" ou "fatura PDF")
+3. TABELA DE PARCELAS (MONO, alinhada à direita), com cabeçalho de colunas "nº · valor ·
+   vencimento · status" e 3 linhas:
+      "1/3"  "R$ 150,00"  "05/08"  selo "pago"
+      "2/3"  "R$ 150,00"  "05/09"  selo "em aberto"
+      "3/3"  "R$ 150,00"  "05/10"  selo "agendado"
+   Selos (pill): "pago" verde-cédula suave · "em aberto" ocre · "agendado" neutro · "vencido"
+   argila. Use APENAS estes rótulos de status.
+4. AÇÕES no rodapé: botão secundário "Editar" e botão secundário "Cancelar". Como HÁ uma parcela
+   paga nesta tela, "Editar" fica DESABILITADO, com a explicação em texto secundário:
+   "Há parcelas pagas — não é possível editar; você pode cancelar as futuras."
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula nem recalcula dinheiro: valor total, valor por parcela, parcela vigente
+e status chegam prontos do backend — a tela só EXIBE. Acessível: contraste AA, foco de teclado
+visível (anel verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue como UMA tela: "Detalhe do lançamento".
 ```
 
 ### 7.9 Confirmações pendentes — *espelho web do "Confirma?"*
 **Objetivo:** materializar a regra 7 na web (gastos interpretados aguardando "sim"). **Estados:** vazio.
 ```text
-Tela CONFIRMAÇÕES PENDENTES (use o tema). NÃO gere barra lateral (aside) nem cabeçalho
-(header) — eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da
-área principal, que será encaixado dentro desse shell (título da página: "Confirmações
-pendentes"). Lista de itens interpretados (ex.: vindos do Telegram) aguardando confirmação
-antes de gravar.
-- Cada item é um card com a PRÉVIA: descrição, valor (mono), categoria sugerida, forma/cartão,
-  prévia de parcelas se houver, e a frase "Pronto para gravar — confirme".
-- Dois botões por card: "Confirmar" (primário) e "Ajustar" (abre o formulário 7.7).
-- Se a IA pediu esclarecimento, mostrar a pergunta ("Qual cartão? Nubank ou Itaú?") com opções.
-- Estado vazio tranquilo: "Nada para confirmar agora."
-Deixe claro que NADA foi gravado até o "Confirmar".
+Gere a tela CONFIRMAÇÕES PENDENTES de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
+principal, dentro do shell. Ignore qualquer versão anterior — comece do zero. Gere a tela
+principal + a variação VAZIO (no fim).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, ícones decorativos nem qualquer
+  conteúdo que não esteja escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) ━━━
+- Título da página "Confirmações pendentes" (Bricolage Grotesque) e uma linha secundária:
+  "Interpretei estes gastos. Nada foi gravado — confirme para salvar."
+- LISTA de cards de prévia (superfície #FBFBF8, cantos 12px), um por item:
+  CARD 1 (gasto pronto): descrição "Uber", valor MONO "R$ 32,90", chip de categoria "Transporte"
+    com selo pequeno "sugerido", linha de metadados "Pix · vence 05/07", e a frase "Pronto para
+    gravar — confirme". Dois botões: primário "Confirmar" e secundário "Ajustar".
+  CARD 2 (parcelado): descrição "Geladeira", valor MONO "R$ 2.400,00", chip "Moradia", linha
+    "Crédito · Nubank •••• 1234", e uma TABELA MONO curta (colunas nº · valor · vencimento):
+        "1/3"  "R$ 800,00"  "vence 05/08"
+        "2/3"  "R$ 800,00"  "vence 05/09"
+        "3/3"  "R$ 800,00"  "vence 05/10"
+    Mesma dupla de botões: primário "Confirmar" e secundário "Ajustar".
+  CARD 3 (esclarecimento pedido pela IA): descrição "Almoço", valor MONO "R$ 68,00", e uma
+    pergunta destacada "Qual cartão?" com dois botões de opção "Nubank" e "Itaú"; NESTE card
+    ainda NÃO aparecem os botões "Confirmar"/"Ajustar" (a escolha vem primeiro).
+- Deixe explícito, em texto secundário: "Nada é gravado até você confirmar."
+
+━━━ VARIAÇÃO — VAZIO ━━━
+Sem cards; um estado vazio calmo: "Nada para confirmar agora." com a linha de apoio "Gastos que
+você registrar pelo Telegram aparecem aqui para confirmação."
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro: valores e prévia de parcelas chegam prontos do backend. "Ajustar"
+abre o formulário completo; "Confirmar" grava — e nada é gravado antes disso. Acessível: contraste
+AA, foco de teclado visível (anel verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Confirmações pendentes" e "Confirmações pendentes — vazio".
 ```
 
 ### 7.10 Receitas
 **Objetivo:** cadastrar/listar receitas (base do disponível). **Estados:** vazio.
 ```text
-Tela RECEITAS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) — eles são
-o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área principal, que
-será encaixado dentro desse shell (título da página: "Receitas").
-- Resumo do mês: "Receitas de junho" R$ 6.500,00 (mono).
-- Filtro por tipo: fixa / variável.
-- Lista: descrição · tipo · valor (mono) · data/competência.
-- Botão "Adicionar receita" abre formulário simples (descrição, valor, tipo, data) com
-  "Revisar e confirmar". Sem cálculo no cliente.
+Gere a tela RECEITAS de um app de finanças pessoais em pt-BR — o CONTEÚDO da área principal,
+dentro do shell. Ignore qualquer versão anterior — comece do zero. Gere a tela principal + a
+variação FORMULÁRIO "Adicionar receita" (no fim).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, ícones decorativos nem qualquer
+  conteúdo que não esteja escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) ━━━
+- Título da página "Receitas".
+- CARD de resumo no topo: rótulo "Receitas de julho" e o valor MONO em destaque "R$ 6.500,00".
+- FILTRO por tipo: controle segmentado com 3 opções, nesta ordem: "Todas", "Fixa", "Variável".
+  "Todas" selecionado (verde-cédula).
+- LISTA (estilo extrato, valores MONO à direita), colunas "descrição · tipo · data · valor":
+      "Salário"        chip "Fixa"      "05/07"   "R$ 5.000,00"
+      "Freela"         chip "Variável"  "12/07"   "R$ 1.200,00"
+      "Pix recebido"   chip "Variável"  "20/07"   "R$ 300,00"
+- Botão primário "Adicionar receita" (no topo à direita).
+
+━━━ VARIAÇÃO — FORMULÁRIO "Adicionar receita" ━━━
+Um cartão/painel com os campos, UM POR LINHA (obrigatórios com "*"):
+- "Descrição" * — valor: "Salário".
+- "Valor" * — input MONO com prefixo "R$", valor: "R$ 5.000,00".
+- "Tipo" * — controle segmentado "Fixa" / "Variável", "Fixa" selecionado.
+- "Data" * — campo de data, valor: "05/07/2026".
+Rodapé com linha fina (#DDE0D7) acima: primário "Revisar e confirmar" e secundário "Cancelar".
+Não grava direto — abre uma confirmação com o resumo antes de salvar.
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro: o total do resumo vem pronto do backend — a tela não soma
+receitas. Nada é gravado sem a confirmação. Acessível: contraste AA, foco de teclado visível
+(anel verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Receitas" e "Receitas — adicionar".
 ```
 
 ### 7.11 Orçamento do mês
 **Objetivo:** ver limite e consumo (total + por categoria). **Estados:** sem orçamento definido; estouro.
 ```text
-Tela ORÇAMENTO DO MÊS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) —
-eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área
-principal, que será encaixado dentro desse shell (título da página: "Orçamento do mês").
-- Card topo: "Limite do mês" R$ 4.000,00 e "Consumido" R$ 3.120,00 (mono), com uma barra de
-  progresso calma; ao passar de 100%, a barra usa argila e mostra "acima do limite".
-- Lista por categoria: chip da categoria, barra consumo/limite, valores em mono. Categorias
-  sem limite aparecem como "sem limite", mostrando só o consumo.
-- Texto-guia se não houver orçamento: "Defina um limite para acompanhar o consumo."
-- Apenas leitura dos números (vêm prontos); a tela só visualiza.
+Gere a tela ORÇAMENTO DO MÊS de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
+principal, dentro do shell. Ignore qualquer versão anterior — comece do zero. Gere a tela
+principal + duas variações (SEM ORÇAMENTO; ESTOURO).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, ícones decorativos nem qualquer
+  conteúdo que não esteja escrito aqui entre aspas.
+- NÃO crie campo de "limite por categoria" (no MVP só existe limite mensal GERAL; por categoria
+  mostra-se apenas o consumo).
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) ━━━
+- Título da página "Orçamento do mês" e o seletor de mês "Julho de 2026" com as setas "‹" e "›".
+- CARD GERAL no topo: rótulo "Limite do mês" com o valor MONO "R$ 4.000,00" e rótulo "Consumido"
+  com "R$ 3.120,00"; uma barra de progresso calma (verde-cédula) parcialmente preenchida e, à
+  direita dela, MONO "78%". Abaixo, a linha de saldo "Resta R$ 880,00".
+- SEÇÃO "Por categoria" — lista onde CADA linha tem: chip de categoria, o consumo MONO à direita
+  e uma barra fina. Como no MVP só existe limite GERAL, cada categoria mostra APENAS o consumo e
+  a etiqueta "sem limite":
+      chip "Moradia"      "R$ 1.500,00"   "sem limite"
+      chip "Mercado"      "R$ 820,00"     "sem limite"
+      chip "Transporte"   "R$ 500,00"     "sem limite"
+      chip "Lazer"        "R$ 300,00"     "sem limite"
+
+━━━ VARIAÇÃO — SEM ORÇAMENTO ━━━
+Sem o card geral preenchido; um estado calmo com "Defina um limite para acompanhar o consumo." e
+um botão primário "Definir limite do mês".
+
+━━━ VARIAÇÃO — ESTOURO ━━━
+No card geral, "Consumido" "R$ 4.300,00" acima do "Limite do mês" "R$ 4.000,00"; a barra usa
+argila #B4452F e mostra "108%"; a linha de saldo vira "Acima do limite em R$ 300,00" (em argila).
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro: limite, consumo, percentuais e saldo chegam prontos do
+backend — a tela só EXIBE. Acessível: contraste AA, foco de teclado visível (anel verde-cédula),
+alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Orçamento do mês", "Orçamento do mês — sem orçamento" e "Orçamento do mês — estouro".
 ```
 
 ### 7.12 Categorias
 **Objetivo:** gerenciar categorias (cor, ícone, palavras-chave, arquivar). **Estados:** —
 ```text
-Tela CATEGORIAS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) — eles são
-o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área principal, que
-será encaixado dentro desse shell (título da página: "Categorias").
-- Grade/lista de categorias, cada uma com seu chip (cor + ícone) e contagem de uso.
-- Editar: nome, cor (paleta restrita harmônica com o tema), ícone, "palavras-chave" (tags)
-  e "apelidos de estabelecimento" (merchant aliases) para a classificação automática.
-- Ação "Arquivar" (não apaga histórico). Botão "Nova categoria".
-- Tom: organização tranquila; sem excesso de cores berrantes.
+Gere a tela CATEGORIAS de um app de finanças pessoais em pt-BR — o CONTEÚDO da área principal,
+dentro do shell. Ignore qualquer versão anterior — comece do zero. Gere a tela principal + a
+variação EDITAR CATEGORIA (no fim).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, cores berrantes nem qualquer conteúdo
+  que não esteja escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) ━━━
+- Título da página "Categorias" e, à direita, botão primário "Nova categoria".
+- GRADE de categorias (cards pequenos), cada card com um chip (cor + ícone de LINHA), o nome e a
+  contagem de uso em MONO, e um botão discreto "Editar". Use EXATAMENTE estas, nesta ordem:
+      "Alimentação"   "128 usos"
+      "Transporte"    "64 usos"
+      "Moradia"       "12 usos"
+      "Lazer"         "40 usos"
+      "Saúde"         "9 usos"
+      "Assinaturas"   "6 usos"
+      "Educação"      "4 usos"
+      "Outros"        "21 usos"
+
+━━━ VARIAÇÃO — EDITAR CATEGORIA ━━━
+Painel/cartão de edição da categoria "Alimentação", campos UM POR LINHA (obrigatórios com "*"):
+- "Nome" * — valor: "Alimentação".
+- "Cor" — uma paleta restrita de amostras harmônicas com o tema (sem cores berrantes); uma
+  amostra selecionada.
+- "Ícone" — uma grade pequena de ícones de LINHA para escolher; um selecionado.
+- "Palavras-chave" — campo de tags (chips removíveis), valores: "mercado", "restaurante", "ifood".
+- "Apelidos de estabelecimento" — campo de tags (chips removíveis), valores: "Pão de Açúcar", "iFood".
+Rodapé com linha fina (#DDE0D7) acima: primário "Salvar" e secundário "Arquivar" (arquivar não
+apaga o histórico).
+
+━━━ INVARIANTES ━━━
+A contagem de uso vem pronta do backend; a tela só EXIBE. A edição só é gravada ao "Salvar".
+Acessível: contraste AA, foco de teclado visível (anel verde-cédula), alvos ≥ 44px, funciona a
+partir de 360px. Tom de organização tranquila, sem excesso de cor.
+
+Entregue: "Categorias" e "Categorias — editar".
 ```
 
 ### 7.13 Cartões & faturas
 **Objetivo:** ver cartões e a fatura por competência. **Estados:** sem cartão; fatura fechada vs. aberta.
 ```text
-Tela CARTÕES & FATURAS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) —
-eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área
-principal, que será encaixado dentro desse shell (título da página: "Cartões & faturas").
-- Topo: cartões cadastrados (apelido, bandeira, "fecha dia 28 / vence dia 5").
-- Selecionado um cartão: FATURA por competência (seletor de mês). Cabeçalho com total da
-  fatura (mono), data de fechamento e vencimento, e selo "aberta"/"fechada".
-- Lista de lançamentos da fatura, estilo extrato (descrição · categoria · valor mono · parcela "2/3").
-- Deixe claro que o total é calculado pelo sistema. Botão "Adicionar cartão".
+Gere a tela CARTÕES & FATURAS de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
+principal, dentro do shell. Ignore qualquer versão anterior — comece do zero. Gere a tela
+principal + duas variações (SEM CARTÃO; FATURA FECHADA).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente logotipos de bandeira, número de cartão completo, valores, dicas, tooltips nem
+  qualquer conteúdo que não esteja escrito aqui entre aspas. (Cartão é identificado só por
+  descrição + os 4 últimos dígitos.)
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) ━━━
+- Título da página "Cartões & faturas" e, à direita, botão primário "Adicionar cartão".
+- FAIXA de cartões cadastrados (cards selecionáveis), cada um com a descrição, os 4 dígitos MONO
+  e os dias de ciclo:
+      "Nubank"   "•••• 1234"   "fecha dia 28 · vence dia 5"
+      "Itaú"     "•••• 9876"   "fecha dia 20 · vence dia 1"
+  O cartão "Nubank" está SELECIONADO (borda verde-cédula).
+- Abaixo, a FATURA do cartão selecionado por competência:
+  - Seletor de mês "Julho de 2026" com as setas "‹" e "›".
+  - Cabeçalho da fatura: total MONO em destaque "R$ 1.870,00", as datas "fecha 28 de julho ·
+    vence 5 de agosto" e um selo pill "aberta" (ocre).
+  - LISTA de lançamentos da fatura, estilo extrato (colunas "descrição · categoria · valor"),
+    valores MONO à direita; em parcelado, a fração MONO na descrição:
+        "Mercado do mês"   chip "Mercado"      "R$ 450,00"
+        "Geladeira 2/3"    chip "Moradia"      "R$ 800,00"
+        "Uber"             chip "Transporte"   "R$ 32,90"
+
+━━━ VARIAÇÃO — SEM CARTÃO ━━━
+Sem a faixa de cartões nem a fatura; um estado calmo "Cadastre um cartão para acompanhar as
+faturas." e um botão primário "Adicionar cartão".
+
+━━━ VARIAÇÃO — FATURA FECHADA ━━━
+Igual à tela principal, mas o selo da fatura é "fechada" (neutro) em vez de "aberta" (ocre).
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro: o total da fatura e as frações de parcela são calculados pelo
+sistema — a tela só EXIBE. Acessível: contraste AA, foco de teclado visível (anel verde-cédula),
+alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Cartões & faturas", "Cartões & faturas — sem cartão" e "Cartões & faturas — fatura fechada".
 ```
 
 ### 7.14 Chat financeiro — *coluna fixa (3ª coluna do shell, sempre aberta)*
@@ -685,49 +1040,176 @@ Entregue como UMA tela: "Chat financeiro — coluna fixa".
 ### 7.15 Importar fatura (upload) — *gerar após backend da 07*
 **Objetivo:** enviar o PDF da fatura. **Estados:** arrastando; arquivo inválido; **PDF com senha**; enviando.
 ```text
-Tela IMPORTAR FATURA (use o tema). [Gerar somente após o backend da importação de PDF.]
-NÃO gere barra lateral (aside) nem cabeçalho (header) — eles são o SHELL PADRÃO já definido no
-Dashboard (§7.5). Gere APENAS o conteúdo da área principal, que será encaixado dentro desse
-shell (título da página: "Importar fatura").
-- Área de upload (drag-drop + "Selecionar arquivo"), aceita SOMENTE PDF.
-- Aviso de privacidade em destaque: "Seu PDF é processado e descartado — nada do documento
-  fica armazenado." (regra 6).
-- Erros diretos: "Aceito apenas PDF."; "Este PDF está protegido por senha — envie uma versão
-  sem senha."; "Não consegui ler este arquivo."
-- Botão "Enviar para revisão". Estado enviando com progresso sóbrio.
+Gere a tela IMPORTAR FATURA de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
+principal, dentro do shell. [Gerar somente APÓS o backend da importação de PDF.] Ignore qualquer
+versão anterior — comece do zero. Gere a tela principal + as variações de estado (no fim).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- O upload aceita SOMENTE PDF — NÃO desenhe opção de imagem, câmera, foto, planilha nem outro tipo.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas nem qualquer conteúdo que não esteja escrito aqui
+  entre aspas. Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) ━━━
+- Título da página "Importar fatura".
+- ÁREA DE UPLOAD grande (borda tracejada #DDE0D7, cantos 12px): um ícone de documento de LINHA,
+  o texto "Arraste o PDF aqui ou" e um botão secundário "Selecionar arquivo". Abaixo, a linha
+  discreta "Aceito apenas PDF.".
+- BANNER de privacidade em destaque (superfície levemente destacada): "Seu PDF é processado e
+  descartado — nada do documento fica armazenado."
+- Rodapé: botão primário "Enviar para revisão" (desabilitado enquanto não há arquivo).
+
+━━━ VARIAÇÃO — ARRASTANDO ━━━
+A área de upload realçada (borda verde-cédula) com o texto "Solte para enviar".
+━━━ VARIAÇÃO — ARQUIVO INVÁLIDO ━━━
+Aviso inline em argila junto à área: "Aceito apenas PDF."
+━━━ VARIAÇÃO — PDF COM SENHA ━━━
+Aviso inline em argila: "Este PDF está protegido por senha — envie uma versão sem senha."
+━━━ VARIAÇÃO — ENVIANDO ━━━
+Um chip do arquivo "fatura-nubank.pdf · PDF" com uma barra de progresso sóbria; o botão vira
+"Enviando…" e fica desabilitado.
+
+━━━ INVARIANTES ━━━
+O PDF é EFÊMERO — processado e descartado, nada do documento é armazenado (daí o banner de
+privacidade). Acessível: contraste AA, foco de teclado visível (anel verde-cédula), alvos
+≥ 44px, funciona a partir de 360px.
+
+Entregue as telas: "Importar fatura", "Importar fatura — arrastando", "Importar fatura —
+inválido", "Importar fatura — com senha" e "Importar fatura — enviando".
 ```
 
 ### 7.16 Revisão da importação (lote) — *gerar após backend da 07*
 **Objetivo:** revisar itens extraídos e **confirmar** (regra 7), marcando duplicados. **Estados:** com duplicados; nada para importar.
 ```text
-Tela REVISÃO DA IMPORTAÇÃO (use o tema). [Gerar somente após o backend da importação de PDF.]
-NÃO gere barra lateral (aside) nem cabeçalho (header) do app — eles são o SHELL PADRÃO já
-definido no Dashboard (§7.5). Gere APENAS o conteúdo da área principal, que será encaixado
-dentro desse shell (título da página: "Revisão da importação").
-- Cabeçalho do conteúdo: "Encontrados 18 lançamentos · R$ 4.210,00" (mono) e "selecionados 16".
-- Tabela/lista em lote: checkbox por item, descrição, valor (mono), data, parcela. Itens
-  prováveis DUPLICADOS vêm desmarcados e sinalizados ("já existe nos seus lançamentos").
-- Filtro "ocultar duplicados". Seleção em massa (marcar/desmarcar todos).
-- Rodapé fixo: total selecionado (mono) + botões "Confirmar importação" (primário) e "Cancelar".
-- Lembrete: "Nada é gravado até confirmar; o PDF já foi descartado."
-- Estado "nada para importar" com texto-guia.
+Gere a tela REVISÃO DA IMPORTAÇÃO de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
+principal, dentro do shell. [Gerar somente APÓS o backend da importação de PDF.] Ignore qualquer
+versão anterior — comece do zero. Gere a tela principal + a variação NADA PARA IMPORTAR (no fim).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas nem qualquer conteúdo que não esteja escrito aqui
+  entre aspas. Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) ━━━
+- Título da página "Revisão da importação".
+- CABEÇALHO do conteúdo: "Encontrados 18 lançamentos · R$ 4.210,00" (números MONO) e, ao lado,
+  "selecionados 16".
+- FILTRO: uma caixa de seleção "Ocultar duplicados" e uma ação "Marcar/desmarcar todos".
+- TABELA/LISTA em lote, uma linha por item, colunas "‹caixa de seleção› · descrição · categoria ·
+  data · parcela · valor" (datas/valores MONO, valor à direita):
+      [x] "Mercado Extra"   chip "Mercado"       "05/07"   "—"     "R$ 320,00"
+      [x] "Posto Shell"     chip "Transporte"    "07/07"   "—"     "R$ 180,00"
+      [x] "Geladeira"       chip "Moradia"       "02/07"   "1/3"   "R$ 800,00"
+      [ ] "Netflix"         chip "Assinaturas"   "03/07"   "—"     "R$ 55,90"
+          — este item vem DESMARCADO e sinalizado, em texto secundário: "já existe nos seus lançamentos".
+- RODAPÉ fixo: total selecionado MONO "R$ 4.154,10" e dois botões: primário "Confirmar
+  importação" e secundário "Cancelar". Acima do rodapé, a linha "Nada é gravado até confirmar;
+  o PDF já foi descartado."
+
+━━━ VARIAÇÃO — NADA PARA IMPORTAR ━━━
+Sem tabela; um estado calmo "Nada para importar — todos os lançamentos desta fatura já existem."
+e um botão secundário "Voltar".
+
+━━━ INVARIANTES ━━━
+Nada é gravado até "Confirmar importação"; o PDF é efêmero (nada do documento é armazenado); os
+totais e valores chegam prontos do backend — a tela só EXIBE. Acessível: contraste AA, foco de
+teclado visível (anel verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Revisão da importação" e "Revisão da importação — nada para importar".
 ```
 
 ### 7.17 Configurações & privacidade
 **Objetivo:** perfil, fuso, vínculo, transparência de IA, direitos LGPD. **Estados:** confirmação de exclusão.
 ```text
-Tela CONFIGURAÇÕES & PRIVACIDADE (use o tema). NÃO gere barra lateral (aside) nem cabeçalho
-(header) — eles são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da
-área principal, que será encaixado dentro desse shell (título da página: "Configurações").
-Seções claras:
-- "Perfil": nome, e-mail, senha.
-- "Preferências": fuso (default America/São Paulo), mês de referência.
-- "Telegram": status do vínculo + atalho para a tela de vínculo.
-- "IA e transparência": explica os 3 papéis da IA (classificar, extrair, redigir) e reforça
-  "a IA nunca calcula dinheiro"; link para a política.
-- "Privacidade (LGPD)": retenção de conversas (60 dias), "Baixar meus dados", e "Excluir minha
-  conta" (ação destrutiva, com confirmação dupla e texto direto sobre o que será apagado).
-Tom sóbrio e honesto; a ação destrutiva é claramente separada e em argila.
+Gere a tela CONFIGURAÇÕES & PRIVACIDADE de um app de finanças pessoais em pt-BR — o CONTEÚDO da
+área principal, dentro do shell. Ignore qualquer versão anterior — comece do zero. Gere a tela
+principal + a variação CONFIRMAR EXCLUSÃO (no fim).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUMA seção ou campo além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas nem qualquer conteúdo que não esteja escrito aqui
+  entre aspas. Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) — seções empilhadas, cada uma um cartão com título ━━━
+1. "Perfil": campos "Nome" (valor "Lucas") e "E-mail" (valor "lucas@exemplo.com") e um botão
+   secundário "Alterar senha".
+2. "Preferências": "Fuso horário" (valor "America/São Paulo") e "Mês de referência" (valor
+   "Mês corrente").
+3. "Telegram": uma linha de status com selo pill "Conectado ✓" e o "@usuario" em MONO, e um
+   botão secundário "Gerenciar vínculo".
+4. "IA e transparência": o texto "A IA faz três coisas: classifica seus gastos, extrai dados de
+   faturas e redige as respostas. A IA nunca calcula dinheiro — os números vêm do seu banco de
+   dados." e um link "Política de privacidade".
+5. "Privacidade (LGPD)": a linha "Conversas são guardadas por até 60 dias."; um botão secundário
+   "Baixar meus dados"; e, CLARAMENTE SEPARADO ao final, um botão de ação destrutiva "Excluir
+   minha conta" em argila #B4452F.
+
+━━━ VARIAÇÃO — CONFIRMAR EXCLUSÃO ━━━
+Um painel de confirmação (dupla confirmação) sobre a seção de privacidade: título "Excluir minha
+conta", o texto direto "Isto apaga sua conta e seus lançamentos. Esta ação não pode ser desfeita.",
+um campo "Digite EXCLUIR para confirmar" e dois botões: destrutivo "Excluir definitivamente"
+(argila, desabilitado até digitar) e secundário "Cancelar".
+
+━━━ INVARIANTES ━━━
+Nada é excluído sem a confirmação dupla; a ação destrutiva é claramente separada e em argila.
+Acessível: contraste AA, foco de teclado visível (anel verde-cédula), alvos ≥ 44px, funciona a
+partir de 360px. Tom sóbrio e honesto.
+
+Entregue: "Configurações" e "Configurações — confirmar exclusão".
 ```
 
 ## 8. Mensagens do bot (texto — implementadas em código, não no Stitch)
@@ -824,9 +1306,13 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
   Blade:** trocar Material Symbols (CDN) por SVG inline (regra 6/LGPD, como no Dashboard);
   gerar as **variações de estado** ainda não desenhadas (fora-de-cartão com vencimento
   editável; crédito sem cartão cadastrado; recorrente ligado; validações inline; salvando).
-- **Próximo:** grupo B (núcleo financeiro) — §7.6, §7.7 e §7.8 a §7.13. A ligação técnica das
-  telas A e do Dashboard ao Laravel (Blade+Tailwind, rotas, auth, validação) fica para a etapa
-  de implementação.
+- **Lançamentos — lista (§7.6): 🟡 gerada no Stitch (só a tela).** Desenho aprovado no Stitch;
+  **falta a integração** ao Laravel (layout `x-layouts.app`, rota/controller, filtros server-side,
+  dados reais). Pendências previsíveis na ligação: trocar Material Symbols (CDN) por SVG inline
+  no `x-icon` (regra 6/LGPD, como no Dashboard/modal) e reusar o shell (sem redesenhar aside/header).
+- **Próximo:** grupo B (núcleo financeiro) — §7.7 e §7.8 a §7.13. A ligação técnica das
+  telas A, do Dashboard e da lista de lançamentos (§7.6) ao Laravel (Blade+Tailwind, rotas, auth,
+  validação) fica para a etapa de implementação.
 - **Decisão de arquitetura de UI:** o **shell (aside + header) é único** e reutilizado por
   todas as telas logadas; os prompts §7.5–§7.17 pedem **apenas o conteúdo** da área principal
   (ver nota do §5). Telas pré-login (§7.1–§7.4) não têm shell.
@@ -843,6 +1329,16 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
   **afordância de entrada**: o PDF continua no fluxo de **revisão efêmera** (§7.16) e é descartado
   (regra 6); as telas dedicadas §7.15/§7.16 seguem no mini-TODO, geradas **após** o backend da
   [[spec-07-importacao-pdf]].
+- **Decisão de autoria de prompt aplicada:** os prompts §7.7 e §7.8–§7.17 (todas as telas
+  logadas restantes, incl. importação §7.15/§7.16 e configurações §7.17) foram **reescritos no
+  padrão fechado (anti-invenção)** do §7.7b/§7.14 — blocos literais TEMA · CONTEXTO DE LAYOUT (não
+  redesenhar o shell) · PROIBIDO · ESTRUTURA com todo texto entre aspas · variações condicionais
+  separadas · INVARIANTES. Domínio conferido nos docs 03/04/08: 5 formas de pagamento, crédito =
+  única em cartão, vencimento determinístico "calculado pelo cartão", datas compra/vencimento/
+  pagamento separadas, status reais (aberto/pago/agendado/vencido…), **orçamento por categoria é
+  pós-MVP** (§7.11 mostra só consumo, sem limite por categoria), cartão por descrição + 4 dígitos
+  (sem "bandeira"), PDF efêmero (§7.15/§7.16). O §7.6 (lista) foi gerado no formato antigo antes
+  desta conversão.
 - **Decisão de design aplicada:** token `papel` ajustado `#F3F4EF` → `#EDF0E8` (§4.2 e §7.0)
   para o fundo ler claramente como verde-acinzentado e fugir do "cream" (default de IA).
 - **Adiado para etapa técnica posterior:** ligação das telas ao Laravel (Inertia/Blade, dados
