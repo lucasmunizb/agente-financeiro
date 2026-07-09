@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ConfirmacaoPendenteController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\LancamentoController;
@@ -52,6 +53,11 @@ Route::middleware('auth')->group(function () {
     // sem tocar nas irmãs. {parcela} opaco; escopo por usuário no domínio.
     Route::post('/lancamentos/parcela/{parcela}/pagar', [LancamentoController::class, 'pagarParcela'])->name('lancamentos.parcela.pagar');
 
+    // Cancelar "esta e as próximas" (FE §7.8): marca o lançamento e as parcelas ainda não
+    // finalizadas como 'cancelado', preservando as já pagas (CancelarGastoManual). Mantém a
+    // linha (histórico). {transaction} opaco; escopo por usuário no domínio.
+    Route::post('/lancamentos/{transaction}/cancelar', [LancamentoController::class, 'cancelar'])->name('lancamentos.cancelar');
+
     // Detalhe de um lançamento (FE §7.8): metadados + parcelas com status derivado por data
     // (ConsultarLancamentoDetalhe). Leitura apenas; a UI nunca calcula (regra 4). A edição
     // acontece por modal na própria tela (?editar=1 abre já aberto). {transaction} opaco.
@@ -61,6 +67,13 @@ Route::middleware('auth')->group(function () {
     // calcula sem gravar; o store persiste após a confirmação.
     Route::post('/gastos/previa', [GastoController::class, 'previa'])->name('gastos.previa');
     Route::post('/gastos', [GastoController::class, 'store'])->name('gastos.store');
+
+    // Fila de confirmações pendentes (FE §7.9): base comum que recorrência e importação de PDF
+    // alimentam. Confirmar grava (RegistrarGastoManual); rejeitar descarta — nada sem o "sim"
+    // (regra 7). {pendente} opaco; escopo por usuário no domínio.
+    Route::get('/confirmacoes', [ConfirmacaoPendenteController::class, 'index'])->name('confirmacoes');
+    Route::post('/confirmacoes/{pendente}/confirmar', [ConfirmacaoPendenteController::class, 'confirmar'])->name('confirmacoes.confirmar');
+    Route::post('/confirmacoes/{pendente}/rejeitar', [ConfirmacaoPendenteController::class, 'rejeitar'])->name('confirmacoes.rejeitar');
 
     // Chat financeiro (spec §7.14). Reusa o motor do Telegram (ResponderConsulta):
     // index devolve o histórico do próprio usuário; store envia a pergunta (ou um PDF,

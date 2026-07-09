@@ -22,9 +22,11 @@ use Illuminate\View\View;
  * FORMATA em pt-BR para a tela (regra 3/5). A UI nunca calcula dinheiro (regra 4);
  * percentuais/ticks são geometria de exibição derivada de valores prontos.
  *
- * Mês corrente apenas: a navegação por competência fica para depois (o resumo é
- * ancorado no "hoje"). O estado (pronto | vazio | carregando) vem dos dados reais;
- * `?estado=` continua como afordância de revisão das telas.
+ * Navegação por competência (?mes=YYYY-MM, default = mês atual): a âncora é o "hoje" real
+ * no mês corrente e o 1º dia do mês nos históricos. Regra "mesmomês": os blocos relativos ao
+ * hoje (a vencer 7d, tick da régua, quadros 06b) só aparecem no mês atual — a view decide pelo
+ * `ehMesAtual`. O estado (pronto | vazio | carregando) vem dos dados reais; `?estado=` continua
+ * como afordância de revisão das telas.
  */
 class DashboardController extends Controller
 {
@@ -49,6 +51,12 @@ class DashboardController extends Controller
         $estado = $override ?? ($temTransacoes ? 'pronto' : 'vazio');
 
         $hoje = CarbonImmutable::now('America/Sao_Paulo');
+        $mesAlvo = $this->mesAlvo($request, $hoje);
+        $ehMesAtual = $mesAlvo->format('Y-m') === $hoje->format('Y-m');
+        // No mês atual a âncora é o HOJE real (status/próximas contas são relativos ao dia);
+        // em meses históricos, o 1º dia do mês visto — aí só as figuras MENSAIS são exibidas
+        // (regra "mesmomês": os blocos relativos ao hoje somem). Ver DashboardCompetenciaTest.
+        $ancora = $ehMesAtual ? $hoje : $mesAlvo;
 
         $dados = [
             'estado' => $estado,
@@ -59,12 +67,28 @@ class DashboardController extends Controller
         ];
 
         if ($estado === 'pronto') {
-            $dados['vm'] = $this->viewModel($userId, $hoje, $resumoDoMes);
+            $dados['vm'] = $this->viewModel($userId, $ancora, $ehMesAtual, $resumoDoMes);
         } else {
-            $dados['mesLabel'] = $this->rotuloMes($hoje);
+            $dados['mesLabel'] = $this->rotuloMes($ancora);
         }
 
         return view('home', $dados);
+    }
+
+    /**
+     * Competência escolhida (1º dia do mês, fuso SP). Aceita ?mes=YYYY-MM válido; qualquer
+     * outra coisa (ausente, forjada, mês fora de 01–12) cai no mês corrente. Não é id — mês
+     * pode ir em claro na URL (mesma convenção do filtro da lista de lançamentos).
+     */
+    private function mesAlvo(Request $request, CarbonImmutable $hoje): CarbonImmutable
+    {
+        $mes = (string) $request->query('mes', '');
+
+        if (preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $mes) === 1) {
+            return CarbonImmutable::createFromFormat('!Y-m-d', $mes.'-01', 'America/Sao_Paulo');
+        }
+
+        return $hoje->startOfMonth();
     }
 
     /**
@@ -72,7 +96,7 @@ class DashboardController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function viewModel(int $userId, CarbonImmutable $hoje, ResumoDoMes $resumoDoMes): array
+    private function viewModel(int $userId, CarbonImmutable $hoje, bool $ehMesAtual, ResumoDoMes $resumoDoMes): array
     {
         $resumo = $resumoDoMes->para($userId, $hoje);
         $mes = $resumo->mes;
@@ -82,7 +106,12 @@ class DashboardController extends Controller
 
         return [
             'mesLabel' => $this->rotuloMes($hoje),
-            'today' => $hoje->day,
+            // Navegação por competência (FE §7.5). Fora do mês atual, a régua não marca "hoje"
+            // e a view esconde os blocos relativos ao dia (a vencer/contas) — regra "mesmomês".
+            'ehMesAtual' => $ehMesAtual,
+            'mesAnterior' => $hoje->subMonthNoOverflow()->format('Y-m'),
+            'mesSeguinte' => $hoje->addMonthNoOverflow()->format('Y-m'),
+            'today' => $ehMesAtual ? $hoje->day : null,
             'daysInMonth' => $hoje->daysInMonth,
             'dueDays' => app(DiasDeVencimentoNoMes::class)->para($userId, $mes),
             'availablePct' => $this->percentualDisponivel($disponivelCents, $resumo->disponivel->receitasCents),

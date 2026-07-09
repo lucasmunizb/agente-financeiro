@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Calendar\RelativeDate;
+use App\Domain\Gasto\CancelarGastoManual;
 use App\Domain\Gasto\PagamentoNaoPermitidoException;
 use App\Domain\Gasto\RegistrarPagamentoParcela;
 use App\Domain\Lancamentos\ConsultarLancamentoDetalhe;
@@ -226,6 +227,22 @@ class LancamentoController extends Controller
         return redirect()
             ->route('lancamentos.show', OpaqueId::encode($paga->transaction_id))
             ->with('sucesso', 'Pagamento registrado.');
+    }
+
+    /**
+     * Cancela o lançamento e as parcelas ainda NÃO finalizadas ("esta e as próximas"),
+     * preservando as já pagas/parciais/estornadas (FE §7.8). Borda fina: delega ao domínio
+     * determinístico ({@see CancelarGastoManual}), que isola por usuário (404 para lançamento
+     * alheio, via findOrFail) e mantém o histórico (não apaga a linha). Volta ao detalhe. A
+     * confirmação (regra 7) veio da tela antes do POST.
+     */
+    public function cancelar(Request $request, int $transaction, CancelarGastoManual $cancelar): RedirectResponse
+    {
+        $cancelada = $cancelar->confirmar($transaction, $request->user()->id);
+
+        return redirect()
+            ->route('lancamentos.show', OpaqueId::encode($cancelada->id))
+            ->with('sucesso', 'Lançamento cancelado.');
     }
 
     /**

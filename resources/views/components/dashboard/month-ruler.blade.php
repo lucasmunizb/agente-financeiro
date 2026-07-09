@@ -4,6 +4,8 @@
     'dueDays' => [5, 10, 20, 25, 30], // dias com vencimento (ticks ocre)
     'daysInMonth' => 30, // total de dias do mês exibido
     'availablePct' => 65, // % da faixa de "disponível" (calculada no backend)
+    'prevUrl' => null, // navegação por competência (mês anterior); null desabilita
+    'nextUrl' => null, // navegação por competência (mês seguinte); null desabilita
 ])
 
 {{-- ELEMENTO-ASSINATURA — "A régua do mês" (spec FE §4.5). Régua horizontal do dia 1
@@ -12,19 +14,29 @@
 <section class="animate-enter overflow-hidden rounded-card border border-linha bg-surface-container-lowest p-6 shadow-sm">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-y-2">
         <div class="flex items-center gap-2">
-            <button type="button" aria-label="Mês anterior"
-                class="rounded-full p-1 text-on-surface-variant transition-colors hover:bg-surface-container-high">
+            <a @if ($prevUrl) href="{{ $prevUrl }}" @else aria-disabled="true" tabindex="-1" @endif aria-label="Mês anterior"
+                @class([
+                    'rounded-full p-1 transition-colors',
+                    'text-on-surface-variant hover:bg-surface-container-high focus:outline-none focus:ring-2 focus:ring-primary' => $prevUrl,
+                    'pointer-events-none text-outline-variant opacity-50' => ! $prevUrl,
+                ])>
                 <x-icon name="chevron-left" class="h-5 w-5" />
-            </button>
+            </a>
             <h2 class="font-headline-md text-headline-md text-on-surface">{{ $monthLabel }}</h2>
-            <button type="button" aria-label="Próximo mês"
-                class="rounded-full p-1 text-on-surface-variant transition-colors hover:bg-surface-container-high">
+            <a @if ($nextUrl) href="{{ $nextUrl }}" @else aria-disabled="true" tabindex="-1" @endif aria-label="Próximo mês"
+                @class([
+                    'rounded-full p-1 transition-colors',
+                    'text-on-surface-variant hover:bg-surface-container-high focus:outline-none focus:ring-2 focus:ring-primary' => $nextUrl,
+                    'pointer-events-none text-outline-variant opacity-50' => ! $nextUrl,
+                ])>
                 <x-icon name="chevron-right" class="h-5 w-5" />
-            </button>
+            </a>
         </div>
         <div class="flex gap-4 font-label-sm text-label-sm text-on-surface-variant">
             <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-ocre"></span> Vencimentos</span>
-            <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-primary-container"></span> Hoje</span>
+            @unless ($today === null)
+                <span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-primary-container"></span> Hoje</span>
+            @endunless
         </div>
     </div>
 

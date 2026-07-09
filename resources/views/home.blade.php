@@ -36,7 +36,9 @@
             :today="$vm['today']"
             :due-days="$vm['dueDays']"
             :days-in-month="$vm['daysInMonth']"
-            :available-pct="$vm['availablePct']" />
+            :available-pct="$vm['availablePct']"
+            :prev-url="route('home', ['mes' => $vm['mesAnterior']])"
+            :next-url="route('home', ['mes' => $vm['mesSeguinte']])" />
 
         {{-- Cards de resumo (bento). Valores em mono, alinhados à direita. --}}
         <div class="grid animate-enter grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4" style="animation-delay: 0.1s">
@@ -57,11 +59,14 @@
                 @endif
             </x-dashboard.summary-card>
 
-            <x-dashboard.summary-card label="A vencer (7 dias)" :value="$vm['aVencer7']['valor']" tone="ocre">
-                <x-slot:badge>
-                    <span class="font-body-sm text-label-sm font-medium text-ocre">{{ $vm['aVencer7']['contas'] }} {{ $vm['aVencer7']['contas'] === 1 ? 'conta' : 'contas' }}</span>
-                </x-slot:badge>
-            </x-dashboard.summary-card>
+            {{-- "A vencer (7 dias)" é relativo ao HOJE real: só no mês atual (regra "mesmomês"). --}}
+            @if ($vm['ehMesAtual'])
+                <x-dashboard.summary-card label="A vencer (7 dias)" :value="$vm['aVencer7']['valor']" tone="ocre">
+                    <x-slot:badge>
+                        <span class="font-body-sm text-label-sm font-medium text-ocre">{{ $vm['aVencer7']['contas'] }} {{ $vm['aVencer7']['contas'] === 1 ? 'conta' : 'contas' }}</span>
+                    </x-slot:badge>
+                </x-dashboard.summary-card>
+            @endif
 
             @if ($vm['fatura'])
                 <x-dashboard.summary-card label="Fatura do cartão" :value="$vm['fatura']['valor']" :sub="$vm['fatura']['sub']" />
@@ -72,8 +77,9 @@
 
         {{-- Meio: gastos por categoria (donut) + próximas contas. --}}
         <div class="grid animate-enter grid-cols-1 gap-gutter lg:grid-cols-3" style="animation-delay: 0.2s">
-            {{-- Donut "gastos por categoria" --}}
-            <div class="notebook-card flex flex-col items-center rounded-card p-8 lg:col-span-1">
+            {{-- Donut "gastos por categoria" (mensal — aparece em qualquer competência). Ocupa
+                 a largura toda quando o quadro de contas some (mês histórico). --}}
+            <div class="notebook-card flex flex-col items-center rounded-card p-8 {{ $vm['ehMesAtual'] ? 'lg:col-span-1' : 'lg:col-span-3' }}">
                 <h3 class="mb-8 w-full font-headline-md text-headline-md text-on-surface">Gastos por categoria</h3>
 
                 @if (count($vm['donut']['segmentos']) === 0)
@@ -108,7 +114,9 @@
 
             {{-- Contas: dividido em "em atraso" (o que já venceu) + "a vencer" (spec 06b).
                  Em atraso vem primeiro, com acento argila (error), por ser o estado de
-                 alerta. Valores/contagens chegam PRONTOS do backend (regras 4/5). --}}
+                 alerta. Valores/contagens chegam PRONTOS do backend (regras 4/5).
+                 Relativo ao HOJE real → só no mês atual (regra "mesmomês"). --}}
+            @if ($vm['ehMesAtual'])
             <div class="notebook-card rounded-card p-8 lg:col-span-2">
                 <div class="mb-2 flex items-center justify-between">
                     <h3 class="font-headline-md text-headline-md text-on-surface">Contas</h3>
@@ -161,6 +169,7 @@
                     </div>
                 @endif
             </div>
+            @endif
         </div>
     </div>
 

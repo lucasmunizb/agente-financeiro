@@ -209,3 +209,45 @@ it('a lista linka cada linha por token OPACO (nunca o id real) e o editar com ?e
     // E o token realmente resolve a tela de detalhe.
     $this->actingAs($user)->get('/lancamentos/'.$m[1])->assertOk()->assertSee('Mercado do mês');
 });
+
+it('oferece cancelar (esta e as próximas) com prévia quando há parcela em aberto', function () {
+    $user = User::factory()->create();
+    $tx = txDetalheWeb($user, 30000, [
+        ['numero' => 1, 'total' => 3, 'vencimento' => '2026-05-20', 'status' => StatusPagamento::ABERTO],
+        ['numero' => 2, 'total' => 3, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::ABERTO],
+        ['numero' => 3, 'total' => 3, 'vencimento' => '2026-07-20', 'status' => StatusPagamento::ABERTO],
+    ]);
+
+    $this->actingAs($user)->get(route('lancamentos.show', $tx))
+        ->assertOk()
+        ->assertSee('Cancelar restantes')
+        ->assertSee('Confirmar cancelamento') // o form (prévia + POST) só aparece quando há o que cancelar
+        ->assertSee('/cancelar');
+});
+
+it('ainda oferece cancelar as restantes mesmo com o lançamento bloqueado por parcela paga', function () {
+    $user = User::factory()->create();
+    $tx = txDetalheWeb($user, 30000, [
+        ['numero' => 1, 'total' => 3, 'vencimento' => '2026-05-20', 'status' => StatusPagamento::PAGO],
+        ['numero' => 2, 'total' => 3, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::ABERTO],
+        ['numero' => 3, 'total' => 3, 'vencimento' => '2026-07-20', 'status' => StatusPagamento::ABERTO],
+    ]);
+
+    $this->actingAs($user)->get(route('lancamentos.show', $tx))
+        ->assertOk()
+        ->assertSee('não é possível editar; você ainda pode cancelar as restantes')
+        ->assertSee('Confirmar cancelamento');
+});
+
+it('não oferece a confirmação de cancelar quando nada resta cancelável', function () {
+    $user = User::factory()->create();
+    $tx = txDetalheWeb($user, 30000, [
+        ['numero' => 1, 'total' => 2, 'vencimento' => '2026-05-20', 'status' => StatusPagamento::PAGO],
+        ['numero' => 2, 'total' => 2, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::CANCELADO],
+    ]);
+
+    $this->actingAs($user)->get(route('lancamentos.show', $tx))
+        ->assertOk()
+        ->assertSee('Cancelar restantes')      // rótulo permanece (botão inerte)
+        ->assertDontSee('Confirmar cancelamento'); // mas sem form/POST
+});

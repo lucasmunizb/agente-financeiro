@@ -92,6 +92,10 @@ class AppServiceProvider extends ServiceProvider
         // escopo por usuário continua no controller/domínio (findOrFail por user_id).
         Route::bind('transaction', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
 
+        // Idem para {pendente} (pending_confirmation) — confirmar/rejeitar na fila (FE §7.9).
+        // O escopo por usuário é aplicado no domínio (findOrFail por user_id).
+        Route::bind('pendente', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
+
         // Idem para {parcela} (installment) — marcar como paga (FE §7.8). O escopo por
         // usuário fica no domínio (findOrFail via whereHas user_id).
         Route::bind('parcela', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));

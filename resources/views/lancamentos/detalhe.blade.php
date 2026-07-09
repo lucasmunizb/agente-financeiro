@@ -138,20 +138,62 @@
         </section>
 
         {{-- Ações. "Editar" abre o modal (regra 7); trava com parcela paga. "Cancelar
-             futuras" é backend pós-MVP nesta borda — fica como afordância "em breve". --}}
+             restantes" cancela esta e as próximas parcelas em aberto (as pagas são mantidas),
+             com prévia + confirmação embutida no <details> (regra 7, sem JS); grava por POST. --}}
+        @php
+            // Filtro de APRESENTAÇÃO (não é cálculo de dinheiro): as parcelas que o domínio vai
+            // cancelar = as que não estão pagas nem canceladas. O status de exibição já mapeia
+            // pago_parcial→pago e estornado→cancelado, então isto casa exatamente com o conjunto
+            // preservado por CancelarGastoManual. Sem parcela cancelável, o botão fica inerte.
+            $parcelasCancelaveis = array_values(array_filter(
+                $parcelas,
+                fn ($p) => ! in_array($p['status'], ['pago', 'cancelado'], true),
+            ));
+            $podeCancelar = count($parcelasCancelaveis) > 0;
+        @endphp
         <footer class="flex flex-col gap-4">
             @if ($bloqueado)
                 <div class="flex items-start gap-2 text-on-surface-variant">
                     <x-icon name="info" class="mt-0.5 h-4 w-4 shrink-0" />
-                    <p class="font-body-sm text-body-sm">Há parcelas pagas — não é possível editar; você pode cancelar as futuras.</p>
+                    <p class="font-body-sm text-body-sm">Há parcelas pagas — não é possível editar; você ainda pode cancelar as restantes.</p>
                 </div>
             @endif
 
-            <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button type="button" disabled title="Em breve"
-                    class="inline-flex h-11 items-center justify-center rounded-control border border-linha px-6 font-body-md text-body-md font-medium text-on-surface-variant opacity-60">
-                    Cancelar futuras
-                </button>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-end">
+                {{-- Cancelar (destrutivo): mesmo padrão do "Marcar pago" — <details> puro, com a
+                     prévia do que será cancelado e confirmação antes de gravar (regra 7). --}}
+                @if ($podeCancelar)
+                    <details class="inline-block text-left sm:mr-auto">
+                        <summary class="inline-flex h-11 cursor-pointer list-none items-center justify-center gap-1.5 rounded-control border border-error/40 px-6 font-body-md text-body-md font-medium text-error transition-colors hover:bg-error/5 focus:outline-none focus:ring-2 focus:ring-error">
+                            <x-icon name="x" class="h-4 w-4" /> Cancelar restantes
+                        </summary>
+                        <form method="POST" action="{{ route('lancamentos.cancelar', $transaction) }}"
+                            class="mt-2 flex max-w-sm flex-col gap-3 rounded-control border border-error/30 bg-error/5 p-4">
+                            @csrf
+                            <p class="font-body-sm text-body-sm text-on-surface">
+                                Isto cancela {{ count($parcelasCancelaveis) === 1 ? 'a parcela em aberto' : 'as ' . count($parcelasCancelaveis) . ' parcelas em aberto' }} deste lançamento. As parcelas já pagas são mantidas e o histórico é preservado. Não dá para desfazer.
+                            </p>
+                            <ul class="flex flex-col gap-1 border-y border-error/20 py-2 font-value-label text-value-label">
+                                @foreach ($parcelasCancelaveis as $p)
+                                    <li class="flex items-center justify-between gap-3 text-on-surface-variant">
+                                        <span>{{ $p['label'] }} · vence {{ $p['vencimento'] }}</span>
+                                        <span class="text-on-surface">{{ $p['valor'] }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            <button type="submit"
+                                class="inline-flex h-11 items-center justify-center rounded-control bg-error px-4 font-body-sm text-body-sm font-semibold text-white transition-colors hover:bg-error/90 focus:outline-none focus:ring-2 focus:ring-error focus:ring-offset-2 focus:ring-offset-surface-container-low active:scale-95">
+                                Confirmar cancelamento
+                            </button>
+                        </form>
+                    </details>
+                @else
+                    <button type="button" disabled title="Nada a cancelar"
+                        class="inline-flex h-11 items-center justify-center rounded-control border border-linha px-6 font-body-md text-body-md font-medium text-on-surface-variant opacity-60 sm:mr-auto">
+                        Cancelar restantes
+                    </button>
+                @endif
+
                 @if ($bloqueado)
                     <button type="button" disabled
                         class="inline-flex h-11 items-center justify-center rounded-control bg-primary px-6 font-body-md text-body-md font-semibold text-on-primary opacity-50">
