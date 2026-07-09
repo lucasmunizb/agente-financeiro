@@ -133,6 +133,49 @@ it('grava um gasto no crédito parcelado usando o vencimento do cartão', functi
         ->toBe(['2026-07-05', '2026-08-05', '2026-09-05']);
 });
 
+it('grava um gasto FORA DE CARTÃO parcelado (pix em 3x), com vencimentos mensais', function () {
+    $user = User::factory()->create();
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-01', 'America/Sao_Paulo'));
+
+    // Combinado de pagar alguém em 3x via pix (não recorrente): 1 transação, 3 parcelas.
+    $resp = $this->actingAs($user)->postJson('/gastos', [
+        'descricao' => 'Combinado com o João',
+        'valor' => '300,00',
+        'forma' => 'pix',
+        'vencimento' => '2026-07-05',
+        'parcelas' => 3,
+    ]);
+
+    $resp->assertOk()->assertJsonPath('ok', true);
+
+    $tx = Transaction::with('installments')->first();
+    expect($tx->card_id)->toBeNull()
+        ->and($tx->valor_total_cents)->toBe(30000)
+        ->and($tx->installments)->toHaveCount(3);
+
+    // Soma das parcelas derivadas = total (sem perder centavo).
+    expect($tx->installments->sum(fn ($p) => $p->valor()->cents()))->toBe(30000);
+
+    // Fora de cartão: 1ª vence na data informada; +1 mês por parcela.
+    expect($tx->installments->sortBy('numero')->pluck('vencimento')->map->toDateString()->all())
+        ->toBe(['2026-07-05', '2026-08-05', '2026-09-05']);
+});
+
+it('a prévia calcula as parcelas fora de cartão (pix em 3x) sem persistir', function () {
+    $user = User::factory()->create();
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-01', 'America/Sao_Paulo'));
+
+    $this->actingAs($user)->postJson('/gastos/previa', [
+        'descricao' => 'Combinado', 'valor' => '300,00', 'forma' => 'pix',
+        'vencimento' => '2026-07-05', 'parcelas' => 3,
+    ])->assertOk()
+        ->assertJsonCount(3, 'parcelas')
+        ->assertJsonPath('parcelas.0.valor', 'R$ 100,00')
+        ->assertJsonPath('parcelas.0.label', '1/3');
+
+    expect(Transaction::count())->toBe(0);
+});
+
 /* ------------------------------------------------------------- validação ---- */
 
 it('rejeita descrição e valor ausentes', function () {

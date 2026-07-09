@@ -26,6 +26,7 @@ class Installment extends Model
         'numero',
         'total',
         'vencimento',
+        'data_pagamento',
         'status_id',
     ];
 
@@ -38,6 +39,7 @@ class Installment extends Model
             'numero' => 'integer',
             'total' => 'integer',
             'vencimento' => 'immutable_date',
+            'data_pagamento' => 'immutable_date',
         ];
     }
 

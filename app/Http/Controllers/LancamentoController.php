@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Calendar\RelativeDate;
+use App\Domain\Gasto\PagamentoNaoPermitidoException;
+use App\Domain\Gasto\RegistrarPagamentoParcela;
 use App\Domain\Lancamentos\ConsultarLancamentoDetalhe;
 use App\Domain\Lancamentos\ConsultarLancamentos;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\OpaqueId;
 use App\Http\Controllers\Concerns\PreparaEdicaoDeGasto;
+use App\Http\Requests\PagarParcelaRequest;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\PaymentMethod;
 use App\Models\Transaction;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
@@ -161,6 +166,12 @@ class LancamentoController extends Controller
         $tx = Transaction::with(['installments', 'paymentMethod'])
             ->where('user_id', $userId)->findOrFail($transaction);
 
+        // Só é possível marcar pago FORA DE CARTÃO (cartão quita pela fatura, §4.3).
+        // Mapa numero→id (opaco) para o formulário de pagamento por parcela.
+        $foraDeCartao = $tx->card_id === null;
+        $idPorNumero = $tx->installments->keyBy('numero');
+        $naoPagavel = [ConsultarLancamentoDetalhe::STATUS_PAGO, ConsultarLancamentoDetalhe::STATUS_CANCELADO];
+
         return view('lancamentos.detalhe', [
             'transaction' => $tx,
             'descricao' => $detalhe->descricao,
@@ -176,16 +187,45 @@ class LancamentoController extends Controller
                 ? $this->dataExtenso($detalhe->vencimento).' · calculado pelo cartão'
                 : $detalhe->vencimento->format('d/m/Y'),
             'origemLabel' => self::ORIGEM_LABEL[$detalhe->origem] ?? $detalhe->origem,
-            'parcelas' => array_map(fn (array $p): array => [
-                'label' => $p['total'] > 1 ? "{$p['numero']}/{$p['total']}" : 'Única',
-                'valor' => Money::fromCents($p['cents'])->formatBRL(),
-                'vencimento' => $p['vencimento']->format('d/m'),
-                'status' => $p['status'],
-            ], $detalhe->parcelas),
+            'parcelas' => array_map(function (array $p) use ($foraDeCartao, $idPorNumero, $naoPagavel): array {
+                $pagavel = $foraDeCartao && ! in_array($p['status'], $naoPagavel, true);
+
+                return [
+                    'label' => $p['total'] > 1 ? "{$p['numero']}/{$p['total']}" : 'Única',
+                    'valor' => Money::fromCents($p['cents'])->formatBRL(),
+                    'vencimento' => $p['vencimento']->format('d/m'),
+                    'status' => $p['status'],
+                    'pagavel' => $pagavel,
+                    // Id opaco só quando pagável (a URL de pagamento nunca expõe id real).
+                    'opaqueId' => $pagavel ? OpaqueId::encode((int) $idPorNumero[$p['numero']]->id) : null,
+                ];
+            }, $detalhe->parcelas),
+            'hojeIso' => CarbonImmutable::now('America/Sao_Paulo')->toDateString(),
             'bloqueado' => $detalhe->temParcelaPaga,
             'dados' => $this->prefill($tx),
             'abrirEdicao' => $request->query('editar') === '1' && ! $detalhe->temParcelaPaga,
         ] + $this->opcoesDoUsuario($userId));
+    }
+
+    /**
+     * Marca UMA parcela como paga (FE §7.8, fora de cartão). Borda fina: valida a data e
+     * delega ao domínio determinístico ({@see RegistrarPagamentoParcela}), que isola por
+     * usuário (404 para parcela alheia), recusa cartão e não toca nas irmãs. Volta ao
+     * detalhe do lançamento. A UI nunca calcula (regra 4); confirmação já veio da tela.
+     */
+    public function pagarParcela(PagarParcelaRequest $request, int $parcela, RegistrarPagamentoParcela $pagar): RedirectResponse
+    {
+        $dataPagamento = CarbonImmutable::parse((string) $request->input('data_pagamento'), RelativeDate::TIMEZONE);
+
+        try {
+            $paga = $pagar->confirmar($parcela, $request->user()->id, $dataPagamento);
+        } catch (PagamentoNaoPermitidoException $e) {
+            return back()->withErrors(['data_pagamento' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('lancamentos.show', OpaqueId::encode($paga->transaction_id))
+            ->with('sucesso', 'Pagamento registrado.');
     }
 
     /**

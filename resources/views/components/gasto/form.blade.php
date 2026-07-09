@@ -150,13 +150,17 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-col gap-2">
-                        <label for="rg-parcelas" class="font-body-sm text-body-sm text-on-surface-variant">Parcelas</label>
-                        <input id="rg-parcelas" name="parcelas" type="number" value="{{ $valParcelas }}" min="1" max="24"
-                            class="input-field h-12 w-24 rounded-lg px-4 font-value-label text-value-label text-on-surface" />
-                        <p class="font-label-sm text-label-sm text-outline">O vencimento e o valor de cada parcela são calculados na revisão.</p>
-                    </div>
                 @endif
+            </div>
+
+            {{-- Parcelas — vale em cartão E fora de cartão (ex.: combinar pagar alguém em
+                 3x via pix; §4.1/decisão 2026-07-08). O vencimento e o valor de cada parcela
+                 são calculados pelo backend na revisão (regra 4). 1 = à vista. --}}
+            <div class="flex flex-col gap-2">
+                <label for="rg-parcelas" class="font-body-sm text-body-sm text-on-surface-variant">Parcelas</label>
+                <input id="rg-parcelas" name="parcelas" type="number" inputmode="numeric" value="{{ $valParcelas }}" min="1" max="24"
+                    class="input-field h-12 w-24 rounded-lg px-4 font-value-label text-value-label text-on-surface" />
+                <p class="font-label-sm text-label-sm text-outline">1 = à vista. Em várias vezes, cada parcela vence +1 mês; o valor é calculado na revisão.</p>
             </div>
 
             {{-- ===== Campos só À VISTA (débito, pix, dinheiro, boleto) ===== --}}
@@ -178,14 +182,6 @@
                     </div>
                     <p class="-mt-2 font-label-sm text-label-sm text-outline">assinaturas e contas fixas (em breve)</p>
                 </div>
-            </div>
-
-            {{-- Data de pagamento (opcional) — aceita, ainda não marca como pago --}}
-            <div class="flex flex-col gap-2">
-                <label for="rg-pagamento" class="font-body-sm text-body-sm text-on-surface-variant">Data de pagamento (opcional)</label>
-                <input id="rg-pagamento" name="pagamento" type="date"
-                    class="input-field h-12 w-full rounded-lg px-4 font-body-md text-body-md text-on-surface-variant" />
-                <p class="font-label-sm text-label-sm text-outline">vazio = em aberto</p>
             </div>
 
             {{-- Categoria (opcional; chips reais do usuário) --}}

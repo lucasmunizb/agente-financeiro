@@ -134,6 +134,46 @@ it('permite editar quando não há parcela paga (link para a edição)', functio
         ->assertSee('Editar');
 });
 
+it('mostra a ação de marcar pago numa parcela fora de cartão em aberto', function () {
+    $user = User::factory()->create();
+    $tx = txDetalheWeb($user, 30000, [
+        ['numero' => 1, 'total' => 3, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::ABERTO],
+    ], forma: PaymentMethod::PIX);
+
+    $html = $this->actingAs($user)->get(route('lancamentos.show', $tx))
+        ->assertOk()
+        ->assertSee('Marcar pago')
+        ->getContent();
+
+    // O form de pagamento aponta para a parcela por TOKEN OPACO (nunca o id real).
+    expect(preg_match('#/lancamentos/parcela/([A-Za-z0-9_-]+)/pagar#', $html, $m))->toBe(1)
+        ->and(OpaqueId::decode($m[1]))->toBe($tx->installments()->first()->id)
+        ->and($html)->not->toContain('/lancamentos/parcela/'.$tx->installments()->first()->id.'/');
+});
+
+it('não oferece marcar pago em lançamento de cartão (quita pela fatura)', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create();
+    $tx = txDetalheWeb($user, 30000, [
+        ['numero' => 1, 'total' => 1, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::ABERTO],
+    ], cartao: $cartao, forma: PaymentMethod::CREDITO);
+
+    $this->actingAs($user)->get(route('lancamentos.show', $tx))
+        ->assertOk()
+        ->assertDontSee('Marcar pago');
+});
+
+it('não oferece marcar pago numa parcela já paga', function () {
+    $user = User::factory()->create();
+    $tx = txDetalheWeb($user, 30000, [
+        ['numero' => 1, 'total' => 1, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::PAGO],
+    ], forma: PaymentMethod::PIX);
+
+    $this->actingAs($user)->get(route('lancamentos.show', $tx))
+        ->assertOk()
+        ->assertDontSee('Marcar pago');
+});
+
 it('devolve 404 para transação de outro usuário', function () {
     $user = User::factory()->create();
     $outro = User::factory()->create();

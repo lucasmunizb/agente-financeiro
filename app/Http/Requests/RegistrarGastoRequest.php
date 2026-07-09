@@ -68,10 +68,6 @@ class RegistrarGastoRequest extends FormRequest
                         ->whereNull('deleted_at');
                 }),
             ],
-
-            // Aceito para compatibilidade com o formulário; marcar como pago ainda
-            // não é suportado pelo domínio (ver nota no controller). Não persistido.
-            'pagamento' => ['nullable', 'date'],
         ];
     }
 
@@ -136,7 +132,10 @@ class RegistrarGastoRequest extends FormRequest
             valorTotalCents: Money::fromHuman((string) $this->input('valor'))->cents(),
             dataCompra: $dataCompra,
             paymentMethodId: PaymentMethod::idFor($forma),
-            parcelas: $ehCredito ? max(1, (int) $this->input('parcelas', 1)) : 1,
+            // Parcelamento vale em cartão E fora de cartão (ex.: combinar pagar alguém
+            // em Nx via pix — não recorrente, decisão do usuário 2026-07-08). O motor
+            // (GeradorDeParcelas) gera N parcelas +1 mês independente da forma.
+            parcelas: max(1, (int) $this->input('parcelas', 1)),
             cardId: $ehCredito ? (int) $this->input('card_id') : null,
             accountId: null,
             categoriaId: $this->filled('categoria_id') ? (int) $this->input('categoria_id') : null,

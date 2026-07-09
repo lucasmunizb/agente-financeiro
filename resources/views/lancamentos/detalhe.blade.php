@@ -18,6 +18,20 @@
             Lançamentos
         </a>
 
+        {{-- Feedback do pagamento por parcela (POST server-rendered → flash). --}}
+        @if (session('sucesso'))
+            <div role="status" class="flex items-start gap-2 rounded-card border border-primary/30 bg-primary-container/10 p-4">
+                <x-icon name="check" class="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <p class="font-body-sm text-body-sm text-on-surface">{{ session('sucesso') }}</p>
+            </div>
+        @endif
+        @error('data_pagamento')
+            <div role="alert" class="flex items-start gap-2 rounded-card border border-error/30 bg-error/5 p-4">
+                <x-icon name="alert" class="mt-0.5 h-5 w-5 shrink-0 text-error" />
+                <p class="font-body-sm text-body-sm text-on-surface">{{ $message }}</p>
+            </div>
+        @enderror
+
         {{-- Cabeçalho: descrição + categoria à esquerda; valor total + status à direita. --}}
         <header class="flex flex-col gap-4 border-b border-linha pb-6 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex flex-col gap-2">
@@ -70,23 +84,50 @@
             <div class="pl-4">
                 <h3 class="mb-4 font-headline-md text-headline-md text-on-surface">Parcelas</h3>
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[28rem] border-collapse">
+                    <table class="w-full min-w-[34rem] border-collapse">
                         <thead>
                             <tr class="border-b border-linha font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
                                 <th class="pb-2 text-left font-medium">Nº</th>
                                 <th class="pb-2 text-right font-medium">Valor</th>
                                 <th class="pb-2 text-right font-medium">Vencimento</th>
                                 <th class="pb-2 text-right font-medium">Status</th>
+                                <th class="pb-2 text-right font-medium"><span class="sr-only">Ação</span></th>
                             </tr>
                         </thead>
                         <tbody class="font-value-label text-value-label text-on-surface">
                             @foreach ($parcelas as $parcela)
-                                <tr class="border-b border-linha last:border-0">
+                                <tr class="border-b border-linha last:border-0 align-top">
                                     <td class="py-3 text-left">{{ $parcela['label'] }}</td>
                                     <td class="py-3 text-right">{{ $parcela['valor'] }}</td>
                                     <td class="py-3 text-right text-on-surface-variant">{{ $parcela['vencimento'] }}</td>
                                     <td class="py-3 text-right">
                                         <x-ui.status-badge :status="$parcela['status']" />
+                                    </td>
+                                    <td class="py-3 text-right">
+                                        {{-- Marcar pago (só fora de cartão e ainda não paga/cancelada). `<details>`
+                                             puro (sem JS): funciona mesmo com a tela bloqueada por outra parcela
+                                             paga. Confirmação com prévia embutida (regra 7); grava por POST. --}}
+                                        @if ($parcela['pagavel'])
+                                            <details class="inline-block text-left">
+                                                <summary class="inline-flex cursor-pointer list-none items-center gap-1 rounded-control border border-linha px-3 py-1.5 font-label-sm text-label-sm font-medium text-primary transition-colors hover:bg-primary-container/10 focus:outline-none focus:ring-2 focus:ring-primary">
+                                                    <x-icon name="check" class="h-4 w-4" /> Marcar pago
+                                                </summary>
+                                                <form method="POST" action="{{ route('lancamentos.parcela.pagar', $parcela['opaqueId']) }}"
+                                                    class="mt-2 flex min-w-[13rem] flex-col gap-2 rounded-control border border-linha bg-surface-container-lowest p-3">
+                                                    @csrf
+                                                    <p class="font-label-sm text-label-sm text-on-surface-variant">
+                                                        Confirmar pagamento de <span class="font-value-label text-on-surface">{{ $parcela['valor'] }}</span> (parcela {{ $parcela['label'] }}).
+                                                    </p>
+                                                    <label for="pg-{{ $loop->index }}" class="font-label-sm text-label-sm text-on-surface-variant">Data de pagamento</label>
+                                                    <input id="pg-{{ $loop->index }}" name="data_pagamento" type="date" required value="{{ $hojeIso }}"
+                                                        class="input-field h-11 rounded-control px-3 font-value-label text-value-label text-on-surface" />
+                                                    <button type="submit"
+                                                        class="inline-flex h-11 items-center justify-center rounded-control bg-primary px-4 font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface-container-low active:scale-95">
+                                                        Confirmar pagamento
+                                                    </button>
+                                                </form>
+                                            </details>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach

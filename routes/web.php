@@ -47,6 +47,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/lancamentos/{transaction}/previa', [LancamentoFormController::class, 'previa'])->name('lancamentos.previa');
     Route::put('/lancamentos/{transaction}', [LancamentoFormController::class, 'update'])->name('lancamentos.update');
 
+    // Marcar UMA parcela como paga (FE §7.8, fora de cartão). POST server-rendered da tela
+    // de detalhe: grava status 'pago' + data na parcela alvo (RegistrarPagamentoParcela),
+    // sem tocar nas irmãs. {parcela} opaco; escopo por usuário no domínio.
+    Route::post('/lancamentos/parcela/{parcela}/pagar', [LancamentoController::class, 'pagarParcela'])->name('lancamentos.parcela.pagar');
+
     // Detalhe de um lançamento (FE §7.8): metadados + parcelas com status derivado por data
     // (ConsultarLancamentoDetalhe). Leitura apenas; a UI nunca calcula (regra 4). A edição
     // acontece por modal na própria tela (?editar=1 abre já aberto). {transaction} opaco.

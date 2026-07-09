@@ -19,6 +19,7 @@ class AuditLog extends Model
     public const ACAO_CRIAR = 'criar';
     public const ACAO_EDITAR = 'editar';
     public const ACAO_CANCELAR = 'cancelar';
+    public const ACAO_PAGAR = 'pagar';
     public const ACAO_EXCLUIR = 'excluir';
     public const ACAO_IMPORTAR = 'importar';
 
