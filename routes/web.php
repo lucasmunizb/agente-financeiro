@@ -83,6 +83,9 @@ Route::middleware('auth')->group(function () {
     // (CriarCartao). Cartão selecionado por token opaco (?cartao=); mês em claro (?mes=).
     Route::get('/cartoes', [CartaoController::class, 'index'])->name('cartoes');
     Route::post('/cartoes', [CartaoController::class, 'store'])->name('cartoes.store');
+    // Editar e remover (cancelamento lógico — soft delete). {cartao} opaco; escopo no domínio.
+    Route::put('/cartoes/{cartao}', [CartaoController::class, 'update'])->name('cartoes.update');
+    Route::delete('/cartoes/{cartao}', [CartaoController::class, 'destroy'])->name('cartoes.destroy');
 
     // Orçamento do mês (FE §7.11): ver limite/consumo (por competência) e definir o limite
     // geral (DefinirOrcamento, updateOrCreate). Leitura já avaliada pelo domínio; a UI não

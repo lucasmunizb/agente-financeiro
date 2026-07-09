@@ -68,7 +68,9 @@ it('lista os cartões e a fatura do selecionado, com ciclo e selo aberta', funct
         ->assertSee('1/3')                  // fração da parcela
         ->assertSee('28 de julho')          // fecha
         ->assertSee('5 de agosto')          // vence
-        ->assertSee('aberta');              // selo (hoje 09/07 ≤ fecha 28/07)
+        ->assertSee('aberta')               // selo (hoje 09/07 ≤ fecha 28/07)
+        ->assertSee('Editar cartão')        // ações do cartão selecionado
+        ->assertSee('Remover cartão');
 });
 
 it('adiciona um cartão, salva e volta à tela com aviso', function () {
@@ -105,4 +107,73 @@ it('não mostra nem seleciona cartão de outro usuário', function () {
     $this->actingAs($user)->get(route('cartoes', ['cartao' => $alheio->getRouteKey()]))
         ->assertOk()
         ->assertDontSee('CartaoAlheio');
+});
+
+it('edita o cartão (inclusive o limite), salva e volta com aviso', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+
+    $this->actingAs($user)
+        ->put(route('cartoes.update', $card->getRouteKey()), [
+            'descricao' => 'Nubank Ultravioleta', 'final_4' => '4321',
+            'dia_fechamento' => 20, 'dia_vencimento' => 1, 'limite' => '8.000,00',
+        ])
+        ->assertRedirectContains('/cartoes')
+        ->assertSessionHas('sucesso');
+
+    $card->refresh();
+    expect($card->descricao)->toBe('Nubank Ultravioleta')
+        ->and($card->final_4)->toBe('4321')
+        ->and($card->limite_cents)->toBe(800000);
+});
+
+it('a edição rejeita dados inválidos (bag editarCartao)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create();
+
+    $this->actingAs($user)
+        ->put(route('cartoes.update', $card->getRouteKey()), ['descricao' => 'X', 'final_4' => '1', 'dia_fechamento' => 99])
+        ->assertSessionHasErrors(['final_4', 'dia_fechamento'], null, 'editarCartao');
+});
+
+it('não edita cartão de outro usuário (404)', function () {
+    $user = User::factory()->create();
+    $alheio = Card::factory()->for(User::factory()->create())->create();
+
+    $this->actingAs($user)
+        ->put(route('cartoes.update', $alheio->getRouteKey()), [
+            'descricao' => 'x', 'final_4' => '0000', 'dia_fechamento' => 1, 'dia_vencimento' => 1,
+        ])
+        ->assertNotFound();
+});
+
+it('remove o cartão (cancelamento lógico) e volta com aviso', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create();
+
+    $this->actingAs($user)
+        ->delete(route('cartoes.destroy', $card->getRouteKey()))
+        ->assertRedirect(route('cartoes'))
+        ->assertSessionHas('sucesso');
+
+    expect(Card::whereKey($card->id)->exists())->toBeFalse()          // some da listagem
+        ->and(Card::withTrashed()->find($card->id)->deleted_at)->not->toBeNull(); // linha preservada
+});
+
+it('não remove cartão de outro usuário (404)', function () {
+    $user = User::factory()->create();
+    $alheio = Card::factory()->for(User::factory()->create())->create();
+
+    $this->actingAs($user)->delete(route('cartoes.destroy', $alheio->getRouteKey()))->assertNotFound();
+
+    expect(Card::whereKey($alheio->id)->exists())->toBeTrue();
+});
+
+it('recusa o id REAL no path ao remover (só token opaco)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create();
+
+    $this->actingAs($user)->delete("/cartoes/{$card->id}")->assertNotFound();
+
+    expect(Card::whereKey($card->id)->exists())->toBeTrue();
 });

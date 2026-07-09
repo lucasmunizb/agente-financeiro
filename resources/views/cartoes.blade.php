@@ -136,6 +136,79 @@
                     <p class="py-4 text-center font-body-sm text-body-sm text-on-surface-variant">Nenhuma cobrança nesta competência.</p>
                 @endif
             </article>
+
+            {{-- Ações do cartão selecionado: editar (form prefilled, com limite) e remover
+                 (cancelamento lógico — soft delete). Cada uma numa <details> (sem JS); a de
+                 edição reabre no erro pelo seu error bag próprio (editarCartao). --}}
+            @php $bagEditar = $errors->getBag('editarCartao'); @endphp
+            <div class="flex flex-wrap items-start gap-3">
+                <details class="flex-1" @if ($bagEditar->isNotEmpty()) open @endif>
+                    <summary class="inline-flex h-11 cursor-pointer list-none items-center justify-center gap-1.5 rounded-control border border-cedula px-6 font-body-md text-body-md font-medium text-cedula transition-colors hover:bg-cedula/5 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <x-icon name="pencil" class="h-4 w-4" /> Editar cartão
+                    </summary>
+                    <form method="POST" action="{{ route('cartoes.update', $cartaoSelecionado) }}"
+                        class="mt-3 flex max-w-md flex-col gap-4 rounded-card border border-linha bg-superficie p-5">
+                        @csrf
+                        @method('PUT')
+                        <div class="flex flex-col gap-2">
+                            <label for="e-descricao" class="font-body-sm text-body-sm text-on-surface-variant">Descrição</label>
+                            <input id="e-descricao" name="descricao" type="text" maxlength="255" value="{{ old('descricao', $selecionadoDados['descricao']) }}"
+                                @class(['input-field h-12 rounded-lg px-4 font-body-md text-body-md text-on-surface', 'border-argila' => $bagEditar->has('descricao')]) />
+                            @if ($bagEditar->has('descricao'))<p class="font-label-sm text-label-sm text-argila">{{ $bagEditar->first('descricao') }}</p>@endif
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label for="e-final4" class="font-body-sm text-body-sm text-on-surface-variant">4 dígitos finais</label>
+                            <input id="e-final4" name="final_4" type="text" inputmode="numeric" maxlength="4" value="{{ old('final_4', $selecionadoDados['final4']) }}"
+                                @class(['input-field h-12 w-28 rounded-lg px-4 font-value-label text-value-label text-on-surface', 'border-argila' => $bagEditar->has('final_4')]) />
+                            @if ($bagEditar->has('final_4'))<p class="font-label-sm text-label-sm text-argila">{{ $bagEditar->first('final_4') }}</p>@endif
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="flex flex-col gap-2">
+                                <label for="e-fech" class="font-body-sm text-body-sm text-on-surface-variant">Fecha dia</label>
+                                <input id="e-fech" name="dia_fechamento" type="number" inputmode="numeric" min="1" max="31" value="{{ old('dia_fechamento', $selecionadoDados['diaFechamento']) }}"
+                                    @class(['input-field h-12 w-24 rounded-lg px-4 font-value-label text-value-label text-on-surface', 'border-argila' => $bagEditar->has('dia_fechamento')]) />
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <label for="e-venc" class="font-body-sm text-body-sm text-on-surface-variant">Vence dia</label>
+                                <input id="e-venc" name="dia_vencimento" type="number" inputmode="numeric" min="1" max="31" value="{{ old('dia_vencimento', $selecionadoDados['diaVencimento']) }}"
+                                    @class(['input-field h-12 w-24 rounded-lg px-4 font-value-label text-value-label text-on-surface', 'border-argila' => $bagEditar->has('dia_vencimento')]) />
+                            </div>
+                        </div>
+                        @if ($bagEditar->has('dia_fechamento'))<p class="font-label-sm text-label-sm text-argila">{{ $bagEditar->first('dia_fechamento') }}</p>@endif
+                        @if ($bagEditar->has('dia_vencimento'))<p class="font-label-sm text-label-sm text-argila">{{ $bagEditar->first('dia_vencimento') }}</p>@endif
+                        <div class="flex flex-col gap-2">
+                            <label for="e-limite" class="font-body-sm text-body-sm text-on-surface-variant">Limite (opcional)</label>
+                            <div class="relative w-40">
+                                <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-value-label text-value-label text-on-surface-variant">R$</span>
+                                <input id="e-limite" name="limite" type="text" inputmode="decimal" value="{{ old('limite', $selecionadoDados['limite']) }}" placeholder="0,00"
+                                    class="input-field h-12 w-full rounded-lg px-4 text-right font-value-label text-value-label text-on-surface" />
+                            </div>
+                        </div>
+                        <button type="submit"
+                            class="inline-flex h-11 w-fit items-center justify-center rounded-control bg-cedula px-6 font-body-md text-body-md font-semibold text-white transition-colors hover:bg-cedula-clara focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface-container-low active:scale-95">
+                            Salvar alterações
+                        </button>
+                    </form>
+                </details>
+
+                <details class="text-left">
+                    <summary class="inline-flex h-11 cursor-pointer list-none items-center justify-center gap-1.5 rounded-control border border-error/40 px-6 font-body-md text-body-md font-medium text-error transition-colors hover:bg-error/5 focus:outline-none focus:ring-2 focus:ring-error">
+                        <x-icon name="x" class="h-4 w-4" /> Remover cartão
+                    </summary>
+                    <form method="POST" action="{{ route('cartoes.destroy', $cartaoSelecionado) }}"
+                        class="mt-2 flex max-w-sm flex-col gap-3 rounded-control border border-error/30 bg-error/5 p-4">
+                        @csrf
+                        @method('DELETE')
+                        <p class="font-body-sm text-body-sm text-on-surface">
+                            O cartão sai da lista, mas os lançamentos já feitos nele permanecem (o histórico é preservado).
+                        </p>
+                        <button type="submit"
+                            class="inline-flex h-11 items-center justify-center rounded-control bg-error px-4 font-body-sm text-body-sm font-semibold text-white transition-colors hover:bg-error/90 focus:outline-none focus:ring-2 focus:ring-error focus:ring-offset-2 focus:ring-offset-surface-container-low active:scale-95">
+                            Confirmar remoção
+                        </button>
+                    </form>
+                </details>
+            </div>
         @endif
     </div>
 </x-layouts.app>

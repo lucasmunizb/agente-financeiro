@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Cartao\CriarCartao;
+use App\Domain\Cartao\EditarCartao;
+use App\Domain\Cartao\ExcluirCartao;
 use App\Domain\Cartao\ListarCartoes;
 use App\Domain\FaturaCartao\CicloDaFatura;
 use App\Domain\FaturaCartao\ConsultarFaturaCartao;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\OpaqueId;
 use App\Http\Requests\CriarCartaoRequest;
+use App\Http\Requests\EditarCartaoRequest;
 use App\Models\Card;
 use App\Models\Category;
 use Carbon\CarbonImmutable;
@@ -59,6 +62,16 @@ class CartaoController extends Controller
                 'selecionado' => $c->id === $selecionado->id,
             ])->all(),
             'cartaoSelecionado' => $selecionado->getRouteKey(),
+            // Prefill do formulário de edição (inclui o limite formatado, sem R$; regra 5).
+            'selecionadoDados' => [
+                'descricao' => $selecionado->descricao,
+                'final4' => $selecionado->final_4,
+                'diaFechamento' => $selecionado->dia_fechamento,
+                'diaVencimento' => $selecionado->dia_vencimento,
+                'limite' => $selecionado->limite_cents !== null
+                    ? trim(str_replace('R$', '', Money::fromCents($selecionado->limite_cents)->formatBRL()))
+                    : '',
+            ],
             'mes' => $mes,
             'mesLabel' => $this->rotuloMes($mesAlvo),
             'mesAnterior' => $mesAlvo->subMonthNoOverflow()->format('Y-m'),
@@ -78,6 +91,22 @@ class CartaoController extends Controller
         return redirect()
             ->route('cartoes', ['cartao' => $card->getRouteKey()])
             ->with('sucesso', 'Cartão adicionado.');
+    }
+
+    public function update(EditarCartaoRequest $request, int $cartao, EditarCartao $editar): RedirectResponse
+    {
+        $card = $editar->editar($cartao, $request->paraDominio(), CarbonImmutable::now(self::TZ));
+
+        return redirect()
+            ->route('cartoes', ['cartao' => $card->getRouteKey()])
+            ->with('sucesso', 'Cartão atualizado.');
+    }
+
+    public function destroy(Request $request, int $cartao, ExcluirCartao $excluir): RedirectResponse
+    {
+        $excluir->excluir($cartao, $request->user()->id, CarbonImmutable::now(self::TZ));
+
+        return redirect()->route('cartoes')->with('sucesso', 'Cartão removido.');
     }
 
     /**
