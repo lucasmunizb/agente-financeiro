@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Lancamentos\ConsultarLancamentoDetalhe;
 use App\Domain\Lancamentos\ConsultarLancamentos;
 use App\Domain\Shared\Money;
+use App\Domain\Shared\OpaqueId;
+use App\Http\Controllers\Concerns\PreparaEdicaoDeGasto;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\PaymentMethod;
@@ -27,6 +30,8 @@ use Illuminate\View\View;
  */
 class LancamentoController extends Controller
 {
+    use PreparaEdicaoDeGasto;
+
     /** @var array<int, string> */
     private const MESES = [
         1 => 'janeiro', 2 => 'fevereiro', 3 => 'março', 4 => 'abril', 5 => 'maio', 6 => 'junho',
@@ -49,6 +54,13 @@ class LancamentoController extends Controller
         PaymentMethod::PIX => 'zap',
         PaymentMethod::DINHEIRO => 'wallet',
         PaymentMethod::BOLETO => 'file-text',
+    ];
+
+    /** Rótulo pt-BR da origem do lançamento (doc 04; §7.8). */
+    private const ORIGEM_LABEL = [
+        'manual' => 'manual',
+        'telegram' => 'Telegram',
+        'pdf' => 'fatura PDF',
     ];
 
     /** Status de exibição aceitos no filtro (casam com o seletor e o selo). */
@@ -135,18 +147,62 @@ class LancamentoController extends Controller
     }
 
     /**
-     * Resolve um id vindo da query só se ele pertencer à coleção do usuário (evita vazar
-     * escopo e filtros forjados). Devolve null quando ausente/estranho.
+     * Detalhe de UM lançamento (FE §7.8). Borda fina: delega ao domínio determinístico
+     * ({@see ConsultarLancamentoDetalhe}) — que já isola por usuário (404 para transação
+     * alheia) e deriva o status por parcela — e apenas FORMATA em pt-BR (regra 3/5). A UI
+     * nunca calcula dinheiro (regra 4). O modal de edição reusa o form compartilhado.
+     */
+    public function show(Request $request, int $transaction, ConsultarLancamentoDetalhe $consulta): View
+    {
+        $userId = $request->user()->id;
+        $detalhe = $consulta->para($userId, $transaction, CarbonImmutable::now('America/Sao_Paulo'));
+
+        // Recarrega a transação (escopo por usuário) para alimentar o modal de edição.
+        $tx = Transaction::with(['installments', 'paymentMethod'])
+            ->where('user_id', $userId)->findOrFail($transaction);
+
+        return view('lancamentos.detalhe', [
+            'transaction' => $tx,
+            'descricao' => $detalhe->descricao,
+            'valorTotal' => Money::fromCents($detalhe->valorTotalCents)->formatBRL(),
+            'status' => $detalhe->status,
+            'categoria' => $detalhe->categoria,
+            'formaLabel' => self::FORMA_LABEL[$detalhe->forma] ?? 'Outros',
+            'cartaoLinha' => $detalhe->cartaoDescricao !== null
+                ? $detalhe->cartaoDescricao.' •••• '.$detalhe->cartaoFinal4
+                : null,
+            'dataCompra' => $detalhe->dataCompra->format('d/m/Y'),
+            'vencimentoLabel' => $detalhe->ehCredito
+                ? $this->dataExtenso($detalhe->vencimento).' · calculado pelo cartão'
+                : $detalhe->vencimento->format('d/m/Y'),
+            'origemLabel' => self::ORIGEM_LABEL[$detalhe->origem] ?? $detalhe->origem,
+            'parcelas' => array_map(fn (array $p): array => [
+                'label' => $p['total'] > 1 ? "{$p['numero']}/{$p['total']}" : 'Única',
+                'valor' => Money::fromCents($p['cents'])->formatBRL(),
+                'vencimento' => $p['vencimento']->format('d/m'),
+                'status' => $p['status'],
+            ], $detalhe->parcelas),
+            'bloqueado' => $detalhe->temParcelaPaga,
+            'dados' => $this->prefill($tx),
+            'abrirEdicao' => $request->query('editar') === '1' && ! $detalhe->temParcelaPaga,
+        ] + $this->opcoesDoUsuario($userId));
+    }
+
+    /**
+     * Resolve um id de filtro vindo da query só se ele pertencer à coleção do usuário
+     * (evita vazar escopo e filtros forjados). O valor chega SEMPRE criptografado (token
+     * opaco — README §"Identificadores nas URLs"): decodifica antes de conferir. Devolve
+     * null quando ausente, forjado, ou — de propósito — quando vem um id em claro.
      *
      * @param  Collection<int, Model>  $colecao
      */
     private function idPertencente(mixed $valor, $colecao): ?int
     {
-        if ($valor === null || ! ctype_digit((string) $valor)) {
+        $id = OpaqueId::decode(is_string($valor) ? $valor : null);
+
+        if ($id === null) {
             return null;
         }
-
-        $id = (int) $valor;
 
         return $colecao->contains('id', $id) ? $id : null;
     }
@@ -172,7 +228,10 @@ class LancamentoController extends Controller
                     'formaIcone' => self::FORMA_ICONE[$item['forma']] ?? 'wallet',
                     'parcela' => $item['parcela'],
                     'status' => $item['status'],
-                    'editUrl' => route('lancamentos.edit', $item['transactionId']),
+                    // Id criptografado no path (nunca o valor real — README §"Identificadores
+                    // nas URLs"). O domínio devolve o id inteiro; opacificamos na borda.
+                    'showUrl' => route('lancamentos.show', OpaqueId::encode($item['transactionId'])),
+                    'editarUrl' => route('lancamentos.show', OpaqueId::encode($item['transactionId'])).'?editar=1',
                 ], $grupo['itens']),
             ];
         }, $grupos);

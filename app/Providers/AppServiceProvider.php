@@ -10,6 +10,7 @@ use App\Domain\Importacao\OcrFallback;
 use App\Domain\Importacao\OcrTesseract;
 use App\Domain\Importacao\ParserDeFatura;
 use App\Domain\Importacao\ParserItau;
+use App\Domain\Shared\OpaqueId;
 use App\Domain\Telegram\ClassificadorDeComando;
 use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\FluxoDeVinculo;
@@ -24,6 +25,7 @@ use App\Domain\Telegram\Saida\ClienteTelegramHttp;
 use App\Listeners\LogarFailoverDeIA;
 use App\Models\ChatMessage;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Events\AgentFailedOver;
@@ -83,6 +85,12 @@ class AppServiceProvider extends ServiceProvider
     {
         // Registra a indisponibilidade de provedor de IA (failover nativo da SDK).
         Event::listen(AgentFailedOver::class, LogarFailoverDeIA::class);
+
+        // Parâmetro {transaction} das rotas chega SEMPRE criptografado (requisito
+        // inegociável — README §"Identificadores nas URLs"). Decodifica o token opaco de
+        // volta no id inteiro; token forjado ou id em claro (`/lancamentos/123`) → 404. O
+        // escopo por usuário continua no controller/domínio (findOrFail por user_id).
+        Route::bind('transaction', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
 
         // Chat financeiro (3ª zona do shell, spec §7.14): injeta o histórico REAL do
         // próprio usuário na coluna de chat, sempre isolado por user_id (escopo estrito).

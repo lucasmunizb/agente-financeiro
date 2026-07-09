@@ -13,6 +13,19 @@ Fontes de verdade: [`docs/specs/FE-frontend-stitch.md`](../../../docs/specs/FE-f
 (design system, telas, invariantes), [`docs/05-arquitetura.md`](../../../docs/05-arquitetura.md),
 [`docs/09-nfr-seguranca-lgpd.md`](../../../docs/09-nfr-seguranca-lgpd.md) e `CLAUDE.md`.
 
+## Postura: aja como especialista sênior, não como aplicador de checklist
+Ao construir/revisar uma tela, raciocine com três chapéus ao mesmo tempo e **explicite os
+trade-offs** em vez de só cumprir itens:
+- **UX/UI sênior:** defenda a decisão pela tarefa do usuário (lançar/entender dinheiro),
+  não pelo gosto. Prefira a solução mais simples que resolve; corte fricção antes de
+  adicionar UI. Justifique hierarquia, densidade e cópia.
+- **Engenheiro de performance:** **meça antes de otimizar** e depois de mudar. Um número
+  (LCP/CLS/INP real) vale mais que uma regra decorada — ver "laço de medição" abaixo.
+- **SEO técnico:** aplique só onde há público (fora do login); nunca troque privacidade
+  por alcance.
+Quando duas metas colidirem (ex.: fonte bonita vs. CLS, animação vs. INP), diga qual
+priorizou e por quê. O checklist no fim é o **piso**, não o teto.
+
 ## Stack
 - **Laravel 12 + Blade + Tailwind v4 + Vite** (`laravel-vite-plugin`, `@tailwindcss/vite`).
 - **Sem Inertia/Livewire** no MVP: Blade server-side + JS mínimo. Não adicione camada SPA
@@ -81,8 +94,54 @@ Defina os tokens uma vez no `resources/css/app.css` (Tailwind v4 usa `@theme`):
 - **Voz (copy):** pt-BR, sentence case, verbos diretos, sem jargão técnico. Uma ação mantém
   o mesmo nome do botão ao toast ("Confirmar" → "Confirmado").
 
+## UX de formulários — o coração do app (lançar/editar dinheiro)
+A tarefa central é digitar valores no celular. Um formulário ruim aqui custa cada
+lançamento; trate isto como prioridade de UX, não detalhe.
+- **Teclado certo no mobile:** valores usam `inputmode="numeric"` (ou `decimal`); data usa
+  o controle nativo apropriado. Teclado errado é o atrito nº 1 em app financeiro.
+- **`autocomplete`/`name` corretos** (e-mail, senha, nome) para o preenchimento do
+  navegador funcionar; senha nova com `autocomplete="new-password"`.
+- **Máscara pt-BR na borda, centavos por baixo** (regra 5): o usuário vê `R$ 1.234,56`; o
+  submit envia inteiro em centavos. Nunca faça o cálculo/parse virar cálculo de dinheiro no
+  cliente — só formatação de exibição.
+- **Erro inline, junto do campo**, no submit ou ao sair do campo — não um alerta genérico
+  no topo. Diga o que corrigir, na voz da interface. Validação real é **server-side** (Form
+  Request); a do cliente é só cortesia de latência.
+- **Ordem de tabulação lógica**, um `<label>` real por campo, `autofocus` no primeiro campo
+  relevante, `enter` submete. Botão primário desabilitado enquanto envia (rótulo vira
+  "Salvando…"), evitando duplo-submit.
+- **Confirmação com prévia** antes de gravar (regra 7): mostre o que será salvo, não só
+  "tem certeza?".
+
+## Hierarquia visual e mobile-first (heurística de decisão)
+- **Mobile-first, sempre.** Projete a 360px primeiro; o desktop é o caso fácil. Se não cabe
+  no celular, a tela tem informação demais — corte ou use **progressive disclosure**
+  (detalhes sob toque/expansão), não fonte menor.
+- **Um foco por tela.** Cada tela tem uma ação/uma leitura principal; ela ganha o maior
+  peso visual (tamanho, contraste, posição acima da dobra). O resto recua. No app, o número
+  em mono tabular costuma ser o herói — deixe-o respirar.
+- **Densidade a serviço da leitura:** tabelas de dinheiro podem ser densas (é o extrato),
+  mas ações e navegação precisam de espaço e alvos ≥44px. Não misture as duas densidades no
+  mesmo bloco.
+- **Feedback imediato, sem otimismo enganoso:** clique responde em <100ms (estado do botão,
+  esqueleto); como só grava após confirmação (regra 7, sem auto-save), **não** finja
+  sucesso antes da resposta do servidor. Micro-interações dentro do orçamento de motion
+  (`prefers-reduced-motion`).
+
 ## Desempenho / Core Web Vitals
 Mire **LCP < 2,5s**, **CLS < 0,1**, **INP < 200ms**. O maior risco aqui são as **3 fontes**.
+
+### Laço de medição (meça antes e depois de otimizar)
+Regra não vale nada sem número: capture uma métrica **antes** de mexer, mude uma coisa,
+meça de novo. Otimizar no escuro adiciona complexidade sem prova.
+- **Lighthouse** (aba Performance do Chrome DevTools, modo mobile + throttling) para uma
+  leitura rápida de LCP/CLS/TBT por tela.
+- **Playwright em contêiner** para medir render/scroll de forma reprodutível (app em
+  `app:8000`, headless por software; `/tmp` não monta) — receita já registrada na memória
+  do projeto. Use quando suspeitar de jank de scroll ou custo de `backdrop-filter`.
+- **CLS na prática:** recarregue com throttling e observe se o swap de fonte ou imagem sem
+  dimensão empurra o layout. Se empurrar, corrija a causa (métrica de fallback / `width`
+  `height`), não esconda com animação.
 
 ### Fontes (principal causa de CLS/LCP neste projeto)
 - **Auto-hospede** as fontes (via Vite/Fontsource ou arquivos em `resources/fonts/`); não
@@ -124,7 +183,10 @@ O app é **majoritariamente atrás de login**: SEO clássico só pesa nas **pág
 - **Páginas públicas:** `<title>` e `<meta name="description">` por página (use uma stack de
   Blade — `@section('title')`), **OpenGraph** (`og:title`, `og:description`, `og:image`,
   `og:type`, `og:url`) + Twitter Card para compartilhamento decente.
-- **`canonical`** na home pública; **`lang="pt-BR"`** no `<html>`.
+- **`canonical`** na home pública; **`lang="pt-BR"`** no `<html>`; **`<meta name="viewport">`**
+  (largura do dispositivo) em toda página — base de mobile + CWV.
+- **HTML semântico:** um único `<h1>` por página e hierarquia de headings sem pular níveis;
+  `<main>/<nav>/<header>` como landmarks. Serve a SEO **e** a leitores de tela.
 - **`sitemap.xml`** e **`robots.txt`** só com as rotas públicas (bloqueie `/app`, webhook
   etc.); o webhook do Telegram nunca é indexável.
 - **Dados estruturados (JSON-LD)** só se houver conteúdo público que se beneficie (ex.:
@@ -147,17 +209,24 @@ O app é **majoritariamente atrás de login**: SEO clássico só pesa nas **pág
 - **Foco de teclado visível** (anel `cedula`); navegação por teclado em todos os controles.
 - Contraste **WCAG AA**; não comunique status só por cor (use ícone/rótulo junto).
 - `prefers-reduced-motion` respeitado; `alt` em imagens; labels reais em inputs.
+- **Diálogos/modais** (`<dialog>` nativo de preferência): foco entra ao abrir, fica preso
+  dentro, volta ao gatilho ao fechar; `esc` fecha. Erro anunciado (`aria-live`) para leitor
+  de tela, não só visualmente.
 
 ## Checklist de uma tela pronta (Definition of Done)
 - [ ] Tokens do design system aplicados (sem hex solto); mono tabular nos valores.
 - [ ] Estados vazio/carregando/erro tratados; copy na voz da interface.
 - [ ] Zero cálculo de dinheiro no cliente; valores vêm prontos (regra 4/5).
+- [ ] Formulário: teclado mobile certo (`inputmode`), `autocomplete`, erro inline,
+      anti-duplo-submit, máscara pt-BR só na exibição.
+- [ ] Mobile-first a 360px; um foco principal por tela; hierarquia clara.
 - [ ] Confirmação antes de gravar, com prévia (regra 7); sem auto-save.
 - [ ] Transparência de IA (fonte + "número conferido") onde houver resposta de IA.
 - [ ] Fontes auto-hospedadas, `font-display: swap`, preload só do above-the-fold.
 - [ ] Imagens com dimensão + lazy; JS code-split; build via `@vite`.
-- [ ] `noindex` se autenticada; meta/OG se pública; nada sensível em meta/OG.
-- [ ] Acessível (360px, foco visível, AA, alvos ≥ 44px, reduced-motion).
+- [ ] CWV medido (Lighthouse/Playwright) antes/depois de otimização relevante.
+- [ ] `noindex` se autenticada; meta/OG + viewport + `<h1>` único se pública; nada sensível em meta/OG.
+- [ ] Acessível (360px, foco visível, AA, alvos ≥ 44px, reduced-motion, foco preso em modal).
 - [ ] Commit **local** separado do backend (regras 1 e 3); nenhum segredo/PDF commitado.
 
 ## Validação (rode mentalmente antes de entregar)

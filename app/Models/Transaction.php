@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOpaqueRouteId;
 use Database\Factories\TransactionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,12 +15,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * Dinheiro em centavos inteiros (`valor_total_cents`). O valor por parcela é
  * derivado (ver {@see Installment::valor()}), nunca persistido. Isolado por
- * usuário; origem auditável; exclusão lógica (LGPD).
+ * usuário; origem auditável; exclusão lógica (LGPD). O id NUNCA sai em claro na
+ * URL: os links de recurso usam o token opaco ({@see HasOpaqueRouteId}).
  */
 class Transaction extends Model
 {
     /** @use HasFactory<TransactionFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOpaqueRouteId, SoftDeletes;
 
     /** @var list<string> */
     protected $fillable = [

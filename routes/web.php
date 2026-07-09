@@ -38,13 +38,19 @@ Route::middleware('auth')->group(function () {
     // modal rápido (§7.7b) via <x-gasto.form>. Criar usa os endpoints do modal
     // (gastos.previa/store); editar tem os seus (prévia + update), que regeneram as
     // parcelas pelo domínio (EditarGastoManual) e travam se houver parcela paga (regra 7).
+    //
+    // {transaction} chega SEMPRE criptografado (token opaco — README §"Identificadores nas
+    // URLs"): o Route::bind (AppServiceProvider) decodifica → id, e 404 para token
+    // inválido/id em claro. Por isso NÃO há mais whereNumber aqui.
     Route::get('/lancamentos/novo', [LancamentoFormController::class, 'create'])->name('lancamentos.create');
-    Route::get('/lancamentos/{transaction}/editar', [LancamentoFormController::class, 'edit'])
-        ->whereNumber('transaction')->name('lancamentos.edit');
-    Route::post('/lancamentos/{transaction}/previa', [LancamentoFormController::class, 'previa'])
-        ->whereNumber('transaction')->name('lancamentos.previa');
-    Route::put('/lancamentos/{transaction}', [LancamentoFormController::class, 'update'])
-        ->whereNumber('transaction')->name('lancamentos.update');
+    Route::get('/lancamentos/{transaction}/editar', [LancamentoFormController::class, 'edit'])->name('lancamentos.edit');
+    Route::post('/lancamentos/{transaction}/previa', [LancamentoFormController::class, 'previa'])->name('lancamentos.previa');
+    Route::put('/lancamentos/{transaction}', [LancamentoFormController::class, 'update'])->name('lancamentos.update');
+
+    // Detalhe de um lançamento (FE §7.8): metadados + parcelas com status derivado por data
+    // (ConsultarLancamentoDetalhe). Leitura apenas; a UI nunca calcula (regra 4). A edição
+    // acontece por modal na própria tela (?editar=1 abre já aberto). {transaction} opaco.
+    Route::get('/lancamentos/{transaction}', [LancamentoController::class, 'show'])->name('lancamentos.show');
 
     // Cadastro de gasto manual (modal §7.7b). Dois passos (regra 7): a prévia
     // calcula sem gravar; o store persiste após a confirmação.

@@ -66,7 +66,20 @@ it('exige login na página de criar e de editar', function () {
 
     $user = User::factory()->create();
     $tx = criarLancamento($user);
-    $this->get("/lancamentos/{$tx->id}/editar")->assertRedirect(route('login'));
+    $this->get(route('lancamentos.edit', $tx))->assertRedirect(route('login'));
+});
+
+/* ------------------------------------------- id em claro é rejeitado -------- */
+
+it('recusa (404) o id REAL no path — só token criptografado é aceito', function () {
+    $user = User::factory()->create();
+    $tx = criarLancamento($user);
+
+    // O que a URL antiga fazia (id sequencial em claro) agora é 404 em toda a família.
+    $this->actingAs($user)->get("/lancamentos/{$tx->id}/editar")->assertNotFound();
+    $this->actingAs($user)->postJson("/lancamentos/{$tx->id}/previa", [])->assertNotFound();
+    $this->actingAs($user)->putJson("/lancamentos/{$tx->id}", [])->assertNotFound();
+    $this->actingAs($user)->get("/lancamentos/{$tx->id}")->assertNotFound();
 });
 
 /* --------------------------------------------------------------- criar ------ */
@@ -88,7 +101,7 @@ it('renderiza a edição já preenchida com os dados do lançamento', function (
     $cat = Category::factory()->for($user)->create(['nome' => 'Moradia']);
     $tx = criarLancamento($user, cents: 45000, descricao: 'Aluguel de julho', venc: '2026-07-10', cat: $cat);
 
-    $this->actingAs($user)->get("/lancamentos/{$tx->id}/editar")
+    $this->actingAs($user)->get(route('lancamentos.edit', $tx))
         ->assertOk()
         ->assertSee('Editar lançamento')
         ->assertSee('Aluguel de julho', false)   // value do input
@@ -101,14 +114,14 @@ it('devolve 404 ao editar lançamento de outro usuário (escopo)', function () {
     $outro = User::factory()->create();
     $tx = criarLancamento($outro);
 
-    $this->actingAs($user)->get("/lancamentos/{$tx->id}/editar")->assertNotFound();
+    $this->actingAs($user)->get(route('lancamentos.edit', $tx))->assertNotFound();
 });
 
 it('mostra aviso de bloqueio quando há parcela paga', function () {
     $user = User::factory()->create();
     $tx = criarLancamento($user, statusCodigo: StatusPagamento::PAGO);
 
-    $this->actingAs($user)->get("/lancamentos/{$tx->id}/editar")
+    $this->actingAs($user)->get(route('lancamentos.edit', $tx))
         ->assertOk()
         ->assertSee('Há parcelas pagas');
 });
@@ -119,7 +132,7 @@ it('a prévia da edição recalcula sem persistir', function () {
     $user = User::factory()->create();
     $tx = criarLancamento($user, cents: 45000, descricao: 'Aluguel', forma: PaymentMethod::PIX, venc: '2026-07-10');
 
-    $this->actingAs($user)->postJson("/lancamentos/{$tx->id}/previa", [
+    $this->actingAs($user)->postJson(route('lancamentos.previa', $tx), [
         'descricao' => 'Aluguel reajustado',
         'valor' => '500,00',
         'forma' => 'pix',
@@ -139,7 +152,7 @@ it('atualiza o lançamento, regenera as parcelas e audita', function () {
     $user = User::factory()->create();
     $tx = criarLancamento($user, cents: 45000, descricao: 'Aluguel', forma: PaymentMethod::PIX, venc: '2026-07-10');
 
-    $this->actingAs($user)->putJson("/lancamentos/{$tx->id}", [
+    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
         'descricao' => 'Aluguel reajustado',
         'valor' => '500,00',
         'forma' => 'pix',
@@ -162,7 +175,7 @@ it('devolve 404 ao atualizar lançamento de outro usuário', function () {
     $user = User::factory()->create();
     $tx = criarLancamento(User::factory()->create());
 
-    $this->actingAs($user)->putJson("/lancamentos/{$tx->id}", [
+    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
         'descricao' => 'Invadido', 'valor' => '1,00', 'forma' => 'pix', 'vencimento' => '2026-07-15',
     ])->assertNotFound();
 });
@@ -171,7 +184,7 @@ it('bloqueia a edição quando há parcela paga (422)', function () {
     $user = User::factory()->create();
     $tx = criarLancamento($user, statusCodigo: StatusPagamento::PAGO);
 
-    $this->actingAs($user)->putJson("/lancamentos/{$tx->id}", [
+    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
         'descricao' => 'Tentativa', 'valor' => '10,00', 'forma' => 'pix', 'vencimento' => '2026-07-15',
     ])->assertStatus(422)
         ->assertJsonPath('errors.geral.0', 'Não é possível editar: há parcela já paga.');

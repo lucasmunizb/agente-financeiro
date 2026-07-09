@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOpaqueRouteId;
 use Database\Factories\CardFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,12 +11,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Cartão identificado por 4 dígitos finais + descrição (doc 03 §4.6).
- * Limite opcional em centavos inteiros. Isolado por usuário; exclusão lógica (LGPD).
+ * Limite opcional em centavos inteiros. Isolado por usuário; exclusão lógica (LGPD). Na
+ * borda web o id só aparece CRIPTOGRAFADO ({@see HasOpaqueRouteId::opaqueId()} no filtro
+ * da lista de lançamentos).
  */
 class Card extends Model
 {
     /** @use HasFactory<CardFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOpaqueRouteId, SoftDeletes;
 
     /** @var list<string> */
     protected $fillable = [

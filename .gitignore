@@ -38,3 +38,5 @@ yarn-error.log
 # --- PDFs e texto extraído de faturas (zero retenção — regra inviolável) ---
 /storage/app/faturas/
 *.pdf
+
+.perf-tmp/

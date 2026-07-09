@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domain\Shared\OpaqueId;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
@@ -127,14 +128,66 @@ it('mostra copy de "sem resultado" quando o filtro não casa nada', function () 
         ->assertSee('Nenhum lançamento neste filtro');
 });
 
-it('linka cada lançamento para a edição e oferece "Novo lançamento"', function () {
+it('linka o detalhe por token OPACO (nunca o id real), o editar com ?editar=1 e oferece "Novo lançamento"', function () {
     $user = User::factory()->create();
     $tx = lancamentoWeb($user, 5000, '2026-06-12', 'Mercado');
 
-    $this->actingAs($user)->get('/lancamentos')
+    $html = $this->actingAs($user)->get('/lancamentos')
         ->assertOk()
         ->assertSee(route('lancamentos.create'), false)
-        ->assertSee(route('lancamentos.edit', $tx->id), false);
+        ->getContent();
+
+    // O id real NÃO aparece no path.
+    expect($html)->not->toContain('/lancamentos/'.$tx->id.'"')
+        ->and($html)->not->toContain('/lancamentos/'.$tx->id.'?');
+
+    // O link do editar é um token opaco que decodifica para ESTE tx.
+    expect(preg_match('#/lancamentos/([A-Za-z0-9_-]+)\?editar=1#', $html, $m))->toBe(1)
+        ->and(OpaqueId::decode($m[1]))->toBe($tx->id);
+});
+
+it('filtra por categoria via token OPACO na query (?categoria=<token>)', function () {
+    $user = User::factory()->create();
+    $mercado = Category::factory()->for($user)->create(['nome' => 'Mercado']);
+    $lazer = Category::factory()->for($user)->create(['nome' => 'Lazer']);
+
+    lancamentoWeb($user, 15000, '2026-06-14', 'Compra mercado', StatusPagamento::ABERTO, $mercado);
+    lancamentoWeb($user, 28000, '2026-06-10', 'Cinema', StatusPagamento::ABERTO, $lazer);
+
+    $this->actingAs($user)->get('/lancamentos?categoria='.OpaqueId::encode($mercado->id))
+        ->assertOk()
+        ->assertSee('Compra mercado')
+        ->assertDontSee('Cinema');
+});
+
+it('ignora um id REAL de categoria na query — só o token vale (filtro não aplicado)', function () {
+    $user = User::factory()->create();
+    $mercado = Category::factory()->for($user)->create(['nome' => 'Mercado']);
+    $lazer = Category::factory()->for($user)->create(['nome' => 'Lazer']);
+
+    lancamentoWeb($user, 15000, '2026-06-14', 'Compra mercado', StatusPagamento::ABERTO, $mercado);
+    lancamentoWeb($user, 28000, '2026-06-10', 'Cinema', StatusPagamento::ABERTO, $lazer);
+
+    // Id em claro não filtra (decode falha → filtro nulo): a lista sai inteira.
+    $this->actingAs($user)->get('/lancamentos?categoria='.$mercado->id)
+        ->assertOk()
+        ->assertSee('Compra mercado')
+        ->assertSee('Cinema');
+});
+
+it('renderiza os <option> de filtro com value criptografado (nunca o id real)', function () {
+    $user = User::factory()->create();
+    $mercado = Category::factory()->for($user)->create(['nome' => 'Mercado']);
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+    lancamentoWeb($user, 15000, '2026-06-14', 'Compra', StatusPagamento::ABERTO, $mercado);
+
+    $html = $this->actingAs($user)->get('/lancamentos')->assertOk()->getContent();
+
+    // O value do option de categoria/cartão não é o id em claro; é um token que decodifica.
+    expect($html)->not->toContain('value="'.$mercado->id.'"')
+        ->and($html)->not->toContain('value="'.$cartao->id.'"');
+    expect(preg_match('#<option value="([A-Za-z0-9_-]+)"[^>]*>Mercado</option>#', $html, $m))->toBe(1)
+        ->and(OpaqueId::decode($m[1]))->toBe($mercado->id);
 });
 
 it('respeita ?estado= como afordância de revisão das variações', function () {

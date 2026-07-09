@@ -220,6 +220,42 @@ Comece por [`docs/00-visao-geral.md`](docs/00-visao-geral.md). Destaques:
 
 ---
 
+## 🔒 Identificadores nas URLs
+
+**Regra inegociável: nenhum id real de recurso aparece em claro numa URL.** Todo
+identificador que sairia num parâmetro — seja no _path_ de uma rota
+(`/lancamentos/{id}`), seja num valor de filtro na _query string_
+(`?categoria={id}`) — é **sempre criptografado** com a `APP_KEY` e só existe em claro
+dentro do servidor. Nunca use o valor real num parâmetro de URL.
+
+**Como funciona**
+
+- [`App\Domain\Shared\OpaqueId`](app/Domain/Shared/OpaqueId.php) — value object que
+  `encode(int)` → token opaco e `decode(string)` → id (ou `null`). Usa `Crypt`
+  (AES keyed pela `APP_KEY`), com **IV aleatório** (o mesmo id gera tokens diferentes
+  a cada render — não dá para enumerar/correlacionar recursos pela URL) e saída
+  **base64 URL-safe** (`[A-Za-z0-9_-]`, sem `+ / =`). Sem TTL: o link continua válido.
+- [`App\Models\Concerns\HasOpaqueRouteId`](app/Models/Concerns/HasOpaqueRouteId.php) —
+  aplicado a `Transaction`, `Category`, `Card`. Sobrescreve `getRouteKey()` (então
+  `route('...', $model)` já emite o token) e expõe `opaqueId()` para usos fora de rota
+  (ex.: `value` de `<option>` no filtro).
+- **Decodificação na borda:** o parâmetro de rota `{transaction}` é resolvido por
+  `Route::bind` (em [`AppServiceProvider`](app/Providers/AppServiceProvider.php)) — token
+  inválido **ou id em claro** ⇒ **404**. Os filtros da query são decodificados no
+  controller ([`LancamentoController`](app/Http/Controllers/LancamentoController.php));
+  id em claro é simplesmente ignorado. O **escopo por usuário** continua no
+  controller/domínio (`findOrFail` por `user_id`).
+
+> Consequência de segurança: rotas antigas enumeráveis (`/lancamentos/123`) deixam de
+> existir — só o token abre a tela. Sempre gere links passando o **model**
+> (`route('lancamentos.show', $tx)`) ou `OpaqueId::encode($id)`; **nunca** o id cru.
+> Não vaza em log/URL, e não há IDOR por adivinhação de id sequencial.
+
+**O que NÃO é criptografado** (não são ids de recurso): período (`?mes=YYYY-MM`), busca
+livre (`?busca=`), forma/status (enums) e a afordância de revisão `?estado=`.
+
+---
+
 ## 📐 Regras invioláveis
 
 1. **Nunca `git push`** sem ordem explícita (commits locais apenas).

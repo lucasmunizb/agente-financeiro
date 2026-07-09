@@ -11,60 +11,68 @@
     $estado = $estado ?? 'pronto';
 @endphp
 <x-layouts.app title="Lançamentos | Agente Financeiro" active="transacoes" heading="Lançamentos" wide>
-    <div class="w-full space-y-gutter pb-24">
-        {{-- Seletor de mês + descrição --}}
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="mx-auto w-full max-w-5xl space-y-8 pb-36">
+        {{-- Cabeçalho de conteúdo: intro e, abaixo, uma toolbar com o seletor de mês à
+             esquerda e a ação primária à direita — aproveita bem a coluna estreita
+             (o chat fixo reserva ~380px à direita). --}}
+        <div class="space-y-4">
             <p class="font-body-sm text-body-sm text-on-surface-variant">
                 Suas movimentações do mês, como num extrato. Os valores vêm conferidos do sistema.
             </p>
-            <div class="flex flex-wrap items-center gap-3">
-                <a href="{{ route('lancamentos.create') }}"
-                    class="inline-flex items-center gap-2 rounded-control bg-primary px-4 py-2.5 font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary-container">
-                    <x-icon name="plus" class="h-4 w-4" />
-                    Novo lançamento
-                </a>
-                <div class="flex items-center gap-1 self-start rounded-control border border-linha bg-superficie px-1 py-1 sm:self-auto">
-                <a href="{{ request()->fullUrlWithQuery(['mes' => $mesAnterior]) }}"
-                    class="rounded-md p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container"
-                    aria-label="Mês anterior">
-                    <x-icon name="chevron-left" class="h-5 w-5" />
-                </a>
-                <span class="min-w-[9rem] text-center font-value-label text-value-label text-on-surface">{{ $mesLabel }}</span>
-                <a href="{{ request()->fullUrlWithQuery(['mes' => $mesProximo]) }}"
-                    class="rounded-md p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container"
-                    aria-label="Próximo mês">
-                    <x-icon name="chevron-right" class="h-5 w-5" />
-                </a>
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-1 rounded-control border border-linha bg-surface-container-lowest p-1 shadow-sm">
+                    <a href="{{ request()->fullUrlWithQuery(['mes' => $mesAnterior]) }}"
+                        class="rounded-md p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container"
+                        aria-label="Mês anterior">
+                        <x-icon name="chevron-left" class="h-5 w-5" />
+                    </a>
+                    <span class="min-w-[8.5rem] text-center font-value-label text-value-label font-medium text-on-surface sm:min-w-[9.5rem]">{{ $mesLabel }}</span>
+                    <a href="{{ request()->fullUrlWithQuery(['mes' => $mesProximo]) }}"
+                        class="rounded-md p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container"
+                        aria-label="Próximo mês">
+                        <x-icon name="chevron-right" class="h-5 w-5" />
+                    </a>
                 </div>
+                <a href="{{ route('lancamentos.create') }}"
+                    class="inline-flex items-center gap-2 rounded-control bg-primary px-4 py-2.5 font-body-sm text-body-sm font-semibold text-on-primary shadow-sm transition-colors hover:bg-primary-container">
+                    <x-icon name="plus" class="h-4 w-4" />
+                    <span class="hidden sm:inline">Novo lançamento</span>
+                    <span class="sm:hidden">Novo</span>
+                </a>
             </div>
         </div>
 
-        {{-- Barra de filtros (GET, server-side). A busca e os selects submetem ao backend;
-             o status é escolhido por chips que preservam os demais filtros. --}}
-        <form method="GET" action="{{ route('lancamentos') }}" class="space-y-4">
+        {{-- Painel de filtros (GET, server-side): agrupa busca, selects e status num só
+             bloco calmo, separado da lista. O status é escolhido por chips que preservam
+             os demais filtros. --}}
+        <form method="GET" action="{{ route('lancamentos') }}"
+            class="space-y-4 rounded-card border border-linha bg-surface-container-lowest p-5 shadow-sm">
             <input type="hidden" name="mes" value="{{ $mesAtual }}">
             @if ($filtros['status'])<input type="hidden" name="status" value="{{ $filtros['status'] }}">@endif
 
-            <div class="flex flex-col gap-3 md:flex-row md:items-center">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <label class="relative flex-grow">
                     <span class="sr-only">Buscar por descrição</span>
                     <x-icon name="search" class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-outline" />
                     <input type="text" name="busca" value="{{ $filtros['busca'] }}"
                         placeholder="Buscar descrição…"
-                        class="w-full rounded-control border border-linha bg-surface-container-lowest py-2.5 pl-10 pr-4 font-body-md text-body-md outline-none transition-colors placeholder:text-outline focus:border-primary focus:ring-1 focus:ring-primary">
+                        class="h-11 w-full rounded-control border border-linha bg-superficie pl-10 pr-4 font-body-md text-body-md outline-none transition-colors placeholder:text-outline focus:border-primary focus:ring-1 focus:ring-primary">
                 </label>
 
                 <div class="flex flex-wrap items-center gap-2">
                     <select name="categoria" onchange="this.form.submit()"
-                        class="rounded-control border border-linha bg-superficie px-3 py-2.5 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
+                        class="h-11 rounded-control border border-linha bg-superficie px-3 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
+                        {{-- value criptografado (token opaco): o id real NUNCA vai na query
+                             (README §"Identificadores nas URLs"). @selected compara o id já
+                             decodificado pelo controller. --}}
                         <option value="">Categoria</option>
                         @foreach ($categorias as $categoria)
-                            <option value="{{ $categoria->id }}" @selected($filtros['categoria'] === $categoria->id)>{{ $categoria->nome }}</option>
+                            <option value="{{ $categoria->opaqueId() }}" @selected($filtros['categoria'] === $categoria->id)>{{ $categoria->nome }}</option>
                         @endforeach
                     </select>
 
                     <select name="forma" onchange="this.form.submit()"
-                        class="rounded-control border border-linha bg-superficie px-3 py-2.5 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
+                        class="h-11 rounded-control border border-linha bg-superficie px-3 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
                         <option value="">Forma</option>
                         @foreach ($formas as $tipo => $label)
                             <option value="{{ $tipo }}" @selected($filtros['forma'] === $tipo)>{{ $label }}</option>
@@ -73,16 +81,16 @@
 
                     @if ($cartoes->isNotEmpty())
                         <select name="cartao" onchange="this.form.submit()"
-                            class="rounded-control border border-linha bg-superficie px-3 py-2.5 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
+                            class="h-11 rounded-control border border-linha bg-superficie px-3 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
                             <option value="">Cartão</option>
                             @foreach ($cartoes as $cartao)
-                                <option value="{{ $cartao->id }}" @selected($filtros['cartao'] === $cartao->id)>{{ $cartao->descricao }}</option>
+                                <option value="{{ $cartao->opaqueId() }}" @selected($filtros['cartao'] === $cartao->id)>{{ $cartao->descricao }}</option>
                             @endforeach
                         </select>
                     @endif
 
                     <button type="submit"
-                        class="inline-flex items-center gap-2 rounded-control bg-primary px-4 py-2.5 font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary-container">
+                        class="inline-flex h-11 items-center gap-2 rounded-control bg-primary px-4 font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary-container">
                         <x-icon name="filter" class="h-4 w-4" />
                         Filtrar
                     </button>
@@ -90,14 +98,14 @@
             </div>
 
             {{-- Chips de status (links que preservam os demais filtros). --}}
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="mr-1 font-label-sm text-label-sm text-on-surface-variant">Status:</span>
+            <div class="flex flex-wrap items-center gap-2 border-t border-linha pt-4">
+                <span class="mr-1 font-label-sm text-label-sm uppercase tracking-wider text-outline">Status</span>
                 @foreach ($statusOpcoes as $valor => $label)
                     @php $ativo = $filtros['status'] === $valor; @endphp
                     <a href="{{ request()->fullUrlWithQuery(['status' => $ativo ? null : $valor]) }}"
                         @class([
-                            'rounded-full px-3 py-1 font-label-sm text-label-sm transition-colors',
-                            'bg-primary text-on-primary' => $ativo,
+                            'rounded-full px-3.5 py-1.5 font-label-sm text-label-sm font-medium transition-colors',
+                            'bg-primary text-on-primary shadow-sm' => $ativo,
                             'border border-linha bg-superficie text-on-surface-variant hover:bg-surface-container-high' => !$ativo,
                         ])>{{ $label }}</a>
                 @endforeach
@@ -178,11 +186,15 @@
                 </div>
             </div>
         @else
-            {{-- Lista agrupada por dia (extrato). --}}
-            <div class="space-y-8">
+            {{-- Lista agrupada por dia (extrato). Cada dia é uma seção com "régua"
+                 (cabeçalho + hairline) para a sensação de caderno contínuo. --}}
+            <div class="space-y-7">
                 @foreach ($grupos as $grupo)
                     <section class="animate-enter">
-                        <h2 class="mb-3 px-1 font-headline-md text-headline-md text-on-surface-variant">{{ $grupo['titulo'] }}</h2>
+                        <div class="mb-3 flex items-center gap-3 px-1">
+                            <h2 class="shrink-0 font-headline-md text-headline-md text-on-surface">{{ $grupo['titulo'] }}</h2>
+                            <span class="h-px flex-1 bg-linha"></span>
+                        </div>
                         <div class="overflow-hidden rounded-card border border-linha bg-surface-container-lowest shadow-sm">
                             @foreach ($grupo['itens'] as $item)
                                 <x-lancamento.row
@@ -193,17 +205,24 @@
                                     :forma-icone="$item['formaIcone']"
                                     :parcela="$item['parcela']"
                                     :status="$item['status']"
-                                    :href="$item['editUrl']" />
+                                    :show-url="$item['showUrl']"
+                                    :editar-url="$item['editarUrl']" />
                             @endforeach
                         </div>
                     </section>
                 @endforeach
             </div>
 
-            {{-- Total exibido (rodapé). Somado pelo backend — a tela só exibe (regra 4). --}}
-            <div class="sticky bottom-4 z-30 flex items-center justify-between gap-4 rounded-card border border-linha bg-surface-container-highest/95 px-6 py-4 shadow-lg backdrop-blur">
-                <span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Total exibido</span>
-                <span class="font-value-display text-value-display text-primary">{{ $totalExibido }}</span>
+            {{-- Total exibido (rodapé): o clímax da tela. Faixa de acento à esquerda, valor
+                 em destaque e a contagem (não é cálculo — vem pronta do backend, regra 4). --}}
+            <div class="sticky bottom-4 z-30 overflow-hidden rounded-card border border-primary/20 bg-surface-container-lowest shadow-lg">
+                <div class="flex items-center justify-between gap-4 border-l-4 border-primary px-6 py-4">
+                    <div class="flex flex-col">
+                        <span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Total exibido</span>
+                        <span class="font-body-sm text-[13px] text-outline">{{ $registros }} {{ $registros === 1 ? 'lançamento' : 'lançamentos' }}</span>
+                    </div>
+                    <span class="font-value-display text-[28px] font-semibold text-primary">{{ $totalExibido }}</span>
+                </div>
             </div>
         @endif
     </div>
