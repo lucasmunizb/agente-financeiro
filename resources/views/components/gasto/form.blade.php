@@ -171,8 +171,11 @@
                         class="input-field h-12 w-full rounded-lg px-4 font-body-md text-body-md text-on-surface-variant" />
                 </div>
 
-                {{-- Recorrência: no modelo, porém o backend é pós-MVP (spec §7.7b). --}}
+                {{-- Recorrência (§7.7 · spec 10): só fora de cartão. Ligar o switch cria uma
+                     recorrência mensal a partir do MÊS SEGUINTE — este mês já é lançado como o
+                     gasto acima (sem contar em dobro). O switch controla o hidden `recorrente`. --}}
                 <div class="space-y-4">
+                    <input type="hidden" name="recorrente" value="0" data-rg-recorrente-input>
                     <div class="flex items-center justify-between">
                         <span class="font-body-md text-body-md text-on-surface">Repete todo mês?</span>
                         <button type="button" data-rg-recorrencia role="switch" aria-checked="false"
@@ -180,7 +183,29 @@
                             <span class="rg-switch__knob absolute left-1 top-1 h-4 w-4 rounded-full bg-white"></span>
                         </button>
                     </div>
-                    <p class="-mt-2 font-label-sm text-label-sm text-outline">assinaturas e contas fixas (em breve)</p>
+                    <p class="-mt-2 font-label-sm text-label-sm text-outline">assinaturas e contas fixas</p>
+
+                    {{-- Revelado quando ligado: periodicidade (só mensal no MVP) + dia do mês. --}}
+                    <div data-rg-recorrencia-fields hidden class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-2">
+                            <label for="rg-periodicidade" class="font-body-sm text-body-sm text-on-surface-variant">Periodicidade</label>
+                            <div class="relative">
+                                <select id="rg-periodicidade" name="periodicidade"
+                                    class="input-field h-12 w-full cursor-pointer appearance-none rounded-lg px-4 font-body-md text-body-md text-on-surface">
+                                    <option value="mensal">mensal</option>
+                                </select>
+                                <x-icon name="chevron-down" class="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-outline" />
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label for="rg-dia_recorrencia" class="font-body-sm text-body-sm text-on-surface-variant">Dia</label>
+                            <input id="rg-dia_recorrencia" name="dia_recorrencia" type="number" inputmode="numeric" min="1" max="31" placeholder="5"
+                                class="input-field h-12 w-full rounded-lg px-4 font-value-label text-value-label text-on-surface" />
+                            <p data-rg-error="dia_recorrencia" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
+                                <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -275,6 +300,13 @@
                     <tbody class="divide-y divide-linha text-on-surface-variant" data-rg-parcelas></tbody>
                 </table>
             </div>
+
+            {{-- Nota de recorrência (quando o switch está ligado): quando a repetição começa.
+                 O mês é calculado pelo backend (regra 4); a tela só exibe. --}}
+            <p data-rg-recorrencia-nota hidden
+                class="flex items-start gap-2 rounded-lg border border-cedula/30 bg-cedula/5 p-4 font-body-sm text-body-sm text-on-surface-variant">
+                <x-icon name="refresh-cw" class="mt-0.5 h-5 w-5 shrink-0 text-cedula" /><span></span>
+            </p>
         </div>
 
         <footer class="flex flex-col gap-3 border-t border-linha bg-surface-container-low p-gutter md:flex-row-reverse">

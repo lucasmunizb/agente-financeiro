@@ -17,17 +17,25 @@ use InvalidArgumentException;
  * (regra 5) e o ponteiro `proxima_em` da próxima ocorrência (a partir de "hoje", injetado —
  * determinismo). Recusa cartão de crédito (crédito usa parcelas, não recorrência). Registra
  * auditoria. NÃO grava lançamento — o materializador é quem enfileira, no dia (regra 7).
+ *
+ * `$primeiraReferencia` (opcional) muda a data-base da 1ª ocorrência: no form de gasto o mês
+ * atual já é lançado como gasto avulso, então a recorrência começa no MÊS SEGUINTE (o caller
+ * passa o 1º dia do próximo mês) — evita contar o mês atual em dobro. Ausente ⇒ usa "hoje".
  */
 final class RegistrarRecorrencia
 {
-    public function registrar(DadosRecorrencia $dados, CarbonImmutable $hoje): Recurrence
-    {
+    public function registrar(
+        DadosRecorrencia $dados,
+        CarbonImmutable $hoje,
+        ?CarbonImmutable $primeiraReferencia = null,
+    ): Recurrence {
         $this->recusarCartaoDeCredito($dados->paymentMethodId);
 
-        return DB::transaction(function () use ($dados, $hoje): Recurrence {
-            // "hoje" chega como instante — normaliza para o calendário de São Paulo antes
+        return DB::transaction(function () use ($dados, $hoje, $primeiraReferencia): Recurrence {
+            // A referência chega como instante — normaliza para o calendário de São Paulo antes
             // de resolver o dia-do-mês (o helper trabalha em calendário puro, sem shift).
-            $proximaEm = OcorrenciaMensal::aPartirDe($dados->dia, $hoje->setTimezone(RelativeDate::TIMEZONE));
+            $referencia = ($primeiraReferencia ?? $hoje)->setTimezone(RelativeDate::TIMEZONE);
+            $proximaEm = OcorrenciaMensal::aPartirDe($dados->dia, $referencia);
 
             $recorrencia = Recurrence::create([
                 'user_id' => $dados->userId,

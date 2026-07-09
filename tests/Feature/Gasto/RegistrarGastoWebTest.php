@@ -5,6 +5,7 @@ use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -174,6 +175,90 @@ it('a prévia calcula as parcelas fora de cartão (pix em 3x) sem persistir', fu
         ->assertJsonPath('parcelas.0.label', '1/3');
 
     expect(Transaction::count())->toBe(0);
+});
+
+/* ------------------------------------------------------- recorrência (§7.7) --- */
+
+it('gasto recorrente à vista: lança AGORA e cria a recorrência a partir do mês seguinte', function () {
+    $user = User::factory()->create();
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-09 08:00', 'America/Sao_Paulo'));
+
+    $resp = $this->actingAs($user)->postJson('/gastos', [
+        'descricao' => 'Netflix',
+        'valor' => '55,90',
+        'forma' => 'pix',
+        'vencimento' => '2026-07-05',
+        'recorrente' => true,
+        'periodicidade' => 'mensal',
+        'dia_recorrencia' => 5,
+    ]);
+
+    $resp->assertOk()->assertJsonPath('ok', true);
+
+    // 1) O gasto deste mês foi lançado normalmente (não vem da fila).
+    $tx = Transaction::first();
+    expect($tx->descricao)->toBe('Netflix')
+        ->and($tx->valor_total_cents)->toBe(5590)
+        ->and($tx->origem)->toBe('manual');
+
+    // 2) A recorrência nasceu ativa, começando no mês seguinte (agosto), sem duplicar julho.
+    $rec = Recurrence::sole();
+    expect($rec->user_id)->toBe($user->id)
+        ->and($rec->status)->toBe(Recurrence::STATUS_ATIVO)
+        ->and($rec->valor_cents)->toBe(5590)
+        ->and($rec->payment_method_id)->toBe(PaymentMethod::idFor(PaymentMethod::PIX))
+        ->and($rec->dia)->toBe(5)
+        ->and($rec->proxima_em->toDateString())->toBe('2026-08-05');
+});
+
+it('não cria recorrência quando o switch está desligado', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/gastos', [
+        'descricao' => 'Mercado', 'valor' => '10,00', 'forma' => 'pix', 'vencimento' => '2026-07-05',
+    ])->assertOk();
+
+    expect(Recurrence::count())->toBe(0)
+        ->and(Transaction::count())->toBe(1);
+});
+
+it('ignora recorrência no crédito (crédito usa parcelas, não recorrência)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create();
+
+    $this->actingAs($user)->postJson('/gastos', [
+        'descricao' => 'Assinatura', 'valor' => '30,00', 'forma' => 'credito', 'card_id' => $card->id,
+        'recorrente' => true, 'periodicidade' => 'mensal', 'dia_recorrencia' => 5,
+    ])->assertOk();
+
+    expect(Recurrence::count())->toBe(0)
+        ->and(Transaction::count())->toBe(1);
+});
+
+it('recorrente exige o dia da recorrência', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/gastos', [
+        'descricao' => 'Netflix', 'valor' => '55,90', 'forma' => 'pix', 'vencimento' => '2026-07-05',
+        'recorrente' => true, 'periodicidade' => 'mensal',
+    ])->assertStatus(422)->assertJsonValidationErrors(['dia_recorrencia']);
+
+    expect(Transaction::count())->toBe(0);
+});
+
+it('a prévia de um gasto recorrente informa quando a recorrência começa', function () {
+    $user = User::factory()->create();
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-09 08:00', 'America/Sao_Paulo'));
+
+    $this->actingAs($user)->postJson('/gastos/previa', [
+        'descricao' => 'Netflix', 'valor' => '55,90', 'forma' => 'pix', 'vencimento' => '2026-07-05',
+        'recorrente' => true, 'periodicidade' => 'mensal', 'dia_recorrencia' => 5,
+    ])->assertOk()
+        ->assertJsonPath('recorrencia.dia', 5)
+        ->assertJsonPath('recorrencia.primeiraEm', 'agosto de 2026');
+
+    expect(Transaction::count())->toBe(0)
+        ->and(Recurrence::count())->toBe(0);
 });
 
 /* ------------------------------------------------------------- validação ---- */

@@ -10,7 +10,7 @@
 // exibimos os erros que ela devolve. Nada sensível persiste no cliente (regra 6).
 
 const FORMA_LABEL = { credito: 'Crédito', debito: 'Débito', pix: 'Pix', dinheiro: 'Dinheiro', boleto: 'Boleto' };
-const CAMPOS_INLINE = new Set(['descricao', 'valor', 'categoria_id']); // resto cai no aviso geral
+const CAMPOS_INLINE = new Set(['descricao', 'valor', 'categoria_id', 'dia_recorrencia']); // resto cai no aviso geral
 const instancias = new Map();
 
 /* ---- Toast (reaproveita o do shell) ------------------------------------- */
@@ -41,6 +41,7 @@ function initGastoForm(root) {
     const formaInput = root.querySelector('[data-rg-forma-input]');
     const categoriaInput = root.querySelector('[data-rg-categoria-input]');
     const valorInput = root.querySelector('#rg-valor');
+    const vencimentoInput = root.querySelector('#rg-vencimento');
     const btnReview = root.querySelector('[data-rg-review]');
     const btnStore = root.querySelector('[data-rg-store]');
     const csrf = form.querySelector('input[name="_token"]')?.value ?? '';
@@ -91,13 +92,30 @@ function initGastoForm(root) {
         const credito = forma === 'credito';
         alternarGrupo(grupoCredito, credito);
         alternarGrupo(grupoAvista, !credito);
+        if (credito) setRecorrencia(false); // crédito usa parcelas, não recorrência
     }
     formaBtns.forEach((b) => b.addEventListener('click', () => selecionarForma(b)));
 
-    /* ---- Recorrência (só à vista; pós-MVP, não enviado) ----------------- */
+    /* ---- Recorrência (só à vista): switch controla o hidden `recorrente` e revela os
+       campos (periodicidade + dia). A recorrência começa no mês seguinte — o backend
+       calcula quando (regra 4); aqui só ligamos e sugerimos o dia a partir do vencimento. -- */
     const recorrenciaBtn = root.querySelector('[data-rg-recorrencia]');
+    const recorrenteInput = root.querySelector('[data-rg-recorrente-input]');
+    const recorrenciaFields = root.querySelector('[data-rg-recorrencia-fields]');
+    const diaInput = root.querySelector('#rg-dia_recorrencia');
+
+    function setRecorrencia(ligado) {
+        if (!recorrenciaBtn) return;
+        recorrenciaBtn.setAttribute('aria-checked', String(ligado));
+        if (recorrenteInput) recorrenteInput.value = ligado ? '1' : '0';
+        if (recorrenciaFields) recorrenciaFields.hidden = !ligado;
+        // Sugere o dia a partir do vencimento informado (só copia o dia — não calcula dinheiro).
+        if (ligado && diaInput && !diaInput.value && vencimentoInput?.value) {
+            diaInput.value = String(Number(vencimentoInput.value.slice(8, 10)));
+        }
+    }
     recorrenciaBtn?.addEventListener('click', () => {
-        recorrenciaBtn.setAttribute('aria-checked', String(recorrenciaBtn.getAttribute('aria-checked') !== 'true'));
+        setRecorrencia(recorrenciaBtn.getAttribute('aria-checked') !== 'true');
     });
 
     /* ---- Categoria: chip único ------------------------------------------ */
@@ -154,7 +172,8 @@ function initGastoForm(root) {
                     el.querySelector('span').textContent = msg;
                     el.hidden = false;
                 }
-                root.querySelector(`#rg-${campo === 'categoria_id' ? 'x' : campo}`)?.classList.add('border-argila', 'focus:border-argila');
+                // Realça o input do campo, quando ele existe (categoria é chips, sem input — no-op).
+                root.querySelector(`#rg-${campo}`)?.classList.add('border-argila', 'focus:border-argila');
             } else {
                 geral.push(msg);
             }
@@ -219,6 +238,18 @@ function initGastoForm(root) {
                 `<td class="py-2 text-right text-outline">vence ${p.vencimento}</td>`;
             tbody.appendChild(tr);
         });
+
+        // Nota de recorrência (quando ligada): o backend diz quando ela começa (mês seguinte).
+        const nota = root.querySelector('[data-rg-recorrencia-nota]');
+        if (nota) {
+            if (previa.recorrencia) {
+                nota.querySelector('span').textContent =
+                    `Repete todo mês no dia ${previa.recorrencia.dia} · começa em ${previa.recorrencia.primeiraEm}.`;
+                nota.hidden = false;
+            } else {
+                nota.hidden = true;
+            }
+        }
     }
 
     /* ---- Passo 1: revisar (prévia) -------------------------------------- */

@@ -95,6 +95,21 @@ it('registra com ocorrência neste mês quando o dia ainda não chegou', functio
     expect($rec->proxima_em->format('Y-m-d'))->toBe('2026-07-20');
 });
 
+it('aceita referência explícita p/ a 1ª ocorrência (começar no mês seguinte)', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-07-09 10:00', 'America/Sao_Paulo');
+
+    // dia 20 cairia neste mês (20 >= 9); com a referência no mês seguinte, começa em agosto —
+    // é o caso do form de gasto: o mês atual já é lançado como gasto avulso (sem duplicar).
+    $rec = (new RegistrarRecorrencia)->registrar(
+        dadosRecorrencia($user, ['dia' => 20]),
+        $hoje,
+        $hoje->startOfMonth()->addMonthNoOverflow(),
+    );
+
+    expect($rec->proxima_em->format('Y-m-d'))->toBe('2026-08-20');
+});
+
 it('recusa recorrência em cartão de crédito (crédito usa parcelas) (C3)', function () {
     $user = User::factory()->create();
     $hoje = CarbonImmutable::parse('2026-07-09 10:00', 'America/Sao_Paulo');

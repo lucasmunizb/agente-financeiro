@@ -7,8 +7,10 @@ namespace App\Http\Requests;
 use App\Domain\Calendar\RelativeDate;
 use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Gasto\RegistrarGastoManual;
+use App\Domain\Recorrencia\DadosRecorrencia;
 use App\Domain\Shared\Money;
 use App\Models\PaymentMethod;
+use App\Models\Recurrence;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -39,6 +41,9 @@ class RegistrarGastoRequest extends FormRequest
     {
         $userId = $this->user()->id;
         $ehCredito = $this->input('forma') === PaymentMethod::CREDITO;
+        // Recorrência só existe fora de cartão (crédito usa parcelas); os campos do switch
+        // ("Repete todo mês?") só são exigidos quando ligado nessa condição.
+        $ehRecorrente = $this->boolean('recorrente') && ! $ehCredito;
 
         return [
             'descricao' => ['required', 'string', 'max:255'],
@@ -68,6 +73,12 @@ class RegistrarGastoRequest extends FormRequest
                         ->whereNull('deleted_at');
                 }),
             ],
+
+            // Recorrência (§7.7, spec 10) — só fora de cartão. `dia_recorrencia` é o dia-do-mês
+            // (clampado na borda do mês pelo motor); `periodicidade` é só "mensal" no MVP.
+            'recorrente' => ['nullable', 'boolean'],
+            'periodicidade' => [Rule::requiredIf($ehRecorrente), 'nullable', Rule::in([Recurrence::PERIODICIDADE_MENSAL])],
+            'dia_recorrencia' => [Rule::requiredIf($ehRecorrente), 'nullable', 'integer', 'min:1', 'max:31'],
         ];
     }
 
@@ -87,7 +98,40 @@ class RegistrarGastoRequest extends FormRequest
             'parcelas.min' => 'As parcelas vão de 1 a 24.',
             'parcelas.max' => 'As parcelas vão de 1 a 24.',
             'vencimento.required' => 'Informe a data de vencimento.',
+            'dia_recorrencia.required' => 'Informe o dia da recorrência.',
+            'dia_recorrencia.min' => 'O dia da recorrência vai de 1 a 31.',
+            'dia_recorrencia.max' => 'O dia da recorrência vai de 1 a 31.',
         ];
+    }
+
+    /**
+     * Este cadastro também cria uma recorrência? Só fora de cartão e com o switch ligado
+     * (crédito usa parcelas — o switch nem aparece no form nessa forma).
+     */
+    public function ehRecorrente(): bool
+    {
+        return $this->boolean('recorrente') && $this->input('forma') !== PaymentMethod::CREDITO;
+    }
+
+    /**
+     * Traduz os campos do switch para o DTO da recorrência — ou null quando não é recorrente.
+     * Mesma normalização de valor (centavos, regra 5) do gasto; o dia é o do form.
+     */
+    public function dadosRecorrencia(): ?DadosRecorrencia
+    {
+        if (! $this->ehRecorrente()) {
+            return null;
+        }
+
+        return new DadosRecorrencia(
+            userId: $this->user()->id,
+            descricao: trim((string) $this->input('descricao')),
+            valorCents: Money::fromHuman((string) $this->input('valor'))->cents(),
+            paymentMethodId: PaymentMethod::idFor((string) $this->input('forma')),
+            dia: (int) $this->input('dia_recorrencia'),
+            categoriaId: $this->filled('categoria_id') ? (int) $this->input('categoria_id') : null,
+            periodicidade: (string) $this->input('periodicidade', Recurrence::PERIODICIDADE_MENSAL),
+        );
     }
 
     /**
