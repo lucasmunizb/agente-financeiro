@@ -10,6 +10,7 @@ use App\Http\Controllers\GastoController;
 use App\Http\Controllers\LancamentoController;
 use App\Http\Controllers\LancamentoFormController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\RecorrenciaController;
 use App\Http\Controllers\TelegramLinkController;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Middleware\VerificaSegredoTelegram;
@@ -74,6 +75,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/confirmacoes', [ConfirmacaoPendenteController::class, 'index'])->name('confirmacoes');
     Route::post('/confirmacoes/{pendente}/confirmar', [ConfirmacaoPendenteController::class, 'confirmar'])->name('confirmacoes.confirmar');
     Route::post('/confirmacoes/{pendente}/rejeitar', [ConfirmacaoPendenteController::class, 'rejeitar'])->name('confirmacoes.rejeitar');
+
+    // Gerenciar recorrências (spec 10): listar as ativas e cancelar. Cancelar reusa o domínio
+    // (CancelarRecorrencia); {recorrencia} opaco; escopo por usuário no domínio (404 alheio).
+    Route::get('/recorrencias', [RecorrenciaController::class, 'index'])->name('recorrencias');
+    Route::post('/recorrencias/{recorrencia}/cancelar', [RecorrenciaController::class, 'cancelar'])->name('recorrencias.cancelar');
 
     // Chat financeiro (spec §7.14). Reusa o motor do Telegram (ResponderConsulta):
     // index devolve o histórico do próprio usuário; store envia a pergunta (ou um PDF,

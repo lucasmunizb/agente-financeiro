@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\Confirmacao\ConfirmarPendente;
 use App\Domain\Confirmacao\RejeitarPendente;
 use App\Domain\Recorrencia\CancelarRecorrencia;
+use App\Domain\Recorrencia\ConsultarRecorrencias;
 use App\Domain\Recorrencia\DadosRecorrencia;
 use App\Domain\Recorrencia\MaterializarRecorrencias;
 use App\Domain\Recorrencia\OcorrenciaMensal;
@@ -240,6 +241,26 @@ it('não cancela recorrência de outro usuário', function () {
 
     (new CancelarRecorrencia)->cancelar($rec->id, $outro->id, $hoje);
 })->throws(ModelNotFoundException::class);
+
+// ---- ConsultarRecorrencias (gerenciar) --------------------------------------------------
+
+it('lista só as recorrências ativas do usuário, ordenadas por dia e isoladas', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-07-09 06:00', 'America/Sao_Paulo');
+
+    (new RegistrarRecorrencia)->registrar(dadosRecorrencia($user, ['dia' => 20, 'descricao' => 'Aluguel']), $hoje);
+    (new RegistrarRecorrencia)->registrar(dadosRecorrencia($user, ['dia' => 5, 'descricao' => 'Netflix']), $hoje);
+    $cancelada = (new RegistrarRecorrencia)->registrar(dadosRecorrencia($user, ['dia' => 9, 'descricao' => 'Antiga']), $hoje);
+    (new CancelarRecorrencia)->cancelar($cancelada->id, $user->id, $hoje);
+    (new RegistrarRecorrencia)->registrar(dadosRecorrencia($outro, ['dia' => 1, 'descricao' => 'Alheia']), $hoje);
+
+    $lista = (new ConsultarRecorrencias)->para($user->id);
+
+    // Ordenado por dia (5 antes de 20); sem a cancelada nem a de outro usuário.
+    expect($lista)->toHaveCount(2)
+        ->and($lista->pluck('descricao')->all())->toBe(['Netflix', 'Aluguel']);
+});
 
 // ---- Cascata: rejeitar o pendente cancela a recorrência (C7, decisão do usuário) --------
 

@@ -131,6 +131,10 @@ class AppServiceProvider extends ServiceProvider
         // usuário fica no domínio (findOrFail via whereHas user_id).
         Route::bind('parcela', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
 
+        // Idem para {recorrencia} (recurrence) — gerenciar/cancelar (spec 10). O escopo por
+        // usuário fica no domínio (findOrFail por user_id).
+        Route::bind('recorrencia', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
+
         // Chat financeiro (3ª zona do shell, spec §7.14): injeta o histórico REAL do
         // próprio usuário na coluna de chat, sempre isolado por user_id (escopo estrito).
         View::composer('components.chat.panel', function ($view) {

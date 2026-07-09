@@ -8,7 +8,7 @@
 | Campo | Valor |
 |---|---|
 | **Bloco · Fase** | Pós-MVP · recorrência (destrava o switch "Repete todo mês?" das telas §7.7/§7.7b) |
-| **Status** | 🟡 Em andamento |
+| **Status** | ✅ Concluído (backend + frontend) |
 | **Depende de** | [[spec-02-cadastro-manual-receitas]] (RegistrarGastoManual) · [[spec-04b-confirmacao-gasto-bot]] (fila `pending_confirmations`) |
 | **Habilita** | Frontend do switch de recorrência (FE §7.7 / §7.7b) |
 | **Fonte de verdade** | [`docs/03-regras-financeiras.md`](../03-regras-financeiras.md) §4.6 (`recorrências/assinaturas: tabela específica, status ativo/cancelado`) · [`docs/04-modelo-dados.md`](../04-modelo-dados.md) (tabela `recurrences`) · FE §7.9 (a fila é a base comum que a recorrência alimenta) |
@@ -173,7 +173,15 @@ pendente** — o usuário confirma e ela vira lançamento. Nada é gravado sem o
 - **Entregue (selo na fila §7.9):** `ConfirmacaoPendenteController` passa `origemCodigo`;
   `resources/views/confirmacoes.blade.php` mostra o selo distinto (ícone `refresh-cw` + tom
   cédula + `title`) para itens de recorrência. Teste em `ConfirmacoesTelaTest` (+1).
-- **Adiado para:** tela de gerenciar recorrências (listar/cancelar).
+- **Entregue (tela de gerenciar recorrências):**
+  - Backend: `App\Domain\Recorrencia\ConsultarRecorrencias` (lista ativas, escopo, ordenado);
+    `RecorrenciaController` (index + cancelar); rotas `recorrencias`/`recorrencias.cancelar`
+    (`{recorrencia}` opaco via `Route::bind`); item de nav "Recorrências".
+  - Frontend: `resources/views/recorrencias.blade.php` (cards com valor mono, forma·todo dia
+    X, próxima ocorrência; cancelar destrutivo via `<details>` sem JS — regra 7; estado vazio).
+  - Testes: `RecorrenciasWebTest` (8) + `RecorrenciaTest` consulta (+1). Suíte: **800 verdes**.
+- **Adiado para:** nada pendente na recorrência (feature completa). Futuro opcional: editar
+  uma recorrência (hoje é cancelar + recriar) e histórico de canceladas na tela.
 - **Decisões de regra tomadas:**
   - Materialização = **enfileira 1 confirmação no dia** (just-in-time, sem materializar
     meses à frente). Casa com "fila revisável 1 a 1" + regra 7.
