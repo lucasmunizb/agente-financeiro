@@ -116,14 +116,18 @@ class RegistrarGastoRequest extends FormRequest
 
     /**
      * Traduz a entrada validada para o DTO do domínio.
+     *
+     * No crédito a data-base é "hoje" no cadastro; na EDIÇÃO, `$dataCompraCredito`
+     * preserva a data de compra original (senão os vencimentos seriam recalculados
+     * a partir de hoje). Fora de cartão, a data-base é sempre o vencimento informado.
      */
-    public function paraDominio(): DadosGastoManual
+    public function paraDominio(?CarbonImmutable $dataCompraCredito = null): DadosGastoManual
     {
         $forma = (string) $this->input('forma');
         $ehCredito = $forma === PaymentMethod::CREDITO;
 
         $dataCompra = $ehCredito
-            ? CarbonImmutable::now(RelativeDate::TIMEZONE)
+            ? ($dataCompraCredito ?? CarbonImmutable::now(RelativeDate::TIMEZONE))
             : CarbonImmutable::parse((string) $this->input('vencimento'), RelativeDate::TIMEZONE);
 
         return new DadosGastoManual(

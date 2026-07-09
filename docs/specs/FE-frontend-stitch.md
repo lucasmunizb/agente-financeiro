@@ -150,11 +150,11 @@ pt-BR, sentence case, verbos diretos, sem jargão técnico. Exemplos canônicos:
 
 **B. Núcleo financeiro**
 - [x] 5. Dashboard / Visão geral *(tela-assinatura: a régua do mês; shell aside + header — **implementado em Blade e ligado ao backend (spec-06)**: valores reais do domínio, estado vazio/pronto pelos dados, coberto por testes de feature)*
-- [x] 6. Lançamentos — lista *(**gerada no Stitch** — só a tela; falta integração ao Blade/backend)*
-- [ ] 7. Lançamento — criar/editar (com prévia de parcelas)
+- [x] 6. Lançamentos — lista *(extrato agrupado por dia; shell aside + header — **gerada no Stitch** ("Lançamentos - Lista Principal/Estado Vazio/Filtro sem resultado/Carregando") e **implementada em Blade e ligada ao backend**: nova consulta de domínio determinística `App\Domain\Lancamentos\ConsultarLancamentos` (uma linha por PARCELA vencendo no mês — mesma base do dashboard/`ConsultarGastos`; status de exibição derivado por data, spec 06b; "total exibido" já somado; filtros busca/categoria/forma/cartão/status server-side; escopo por usuário) → `LancamentoController` (rota `/lancamentos`, nav "Transações"). Estados vazio/sem-resultado/carregando tratados; seletor de mês. Coberto por testes de domínio + borda web. **Deferido:** ações de linha (editar/cancelar/excluir) e "abrir detalhe" seguem com §7.7/§7.8; o rodapé "total exibido" é sticky no conteúdo (não fixo na viewport) por causa da 3ª coluna de chat do shell.)*
+- [x] 7. Lançamento — criar/editar (com prévia de parcelas) *(**mesmo formulário do modal 7b como PÁGINA cheia** — não gerou tela nova no Stitch. Extraído para o componente compartilhado `<x-gasto.form>`: o modal (`components/modal/registrar-gasto.blade.php`) virou wrapper fino e a página usa o MESMO componente e JS (dirigido por `[data-rg-root]`, suporta redirect e `PUT` via spoof). Fluxo em dois passos idêntico (prévia calculada pelo backend → confirmar, regra 7). **Criar** reusa `gastos.previa`/`gastos.store`; **editar** tem os seus (`lancamentos.previa` + `PUT lancamentos.update` via `EditarGastoManual`, preservando a data de compra no crédito), preenchido a partir do lançamento, com **bloqueio quando há parcela paga** (aviso + submit desabilitado — spec §7.8). Rotas `/lancamentos/novo` e `/lancamentos/{id}/editar`; a lista linka cada linha para editar e tem botão "Novo lançamento". Coberto por testes de borda web (`FormularioLancamentoWebTest`). **Deferido:** marcar como pago e recorrência (backend pós-MVP); tela de **detalhe** §7.8 (hoje a linha do extrato vai direto para a edição).)*
 - [x] 7b. Registrar gasto — **modal rápido** (FAB do dashboard) *(valor, forma, cartão, vencimento, pagamento opcional, recorrente, categoria)* — **gerado no Stitch**, **implementado em Blade** e **ligado ao backend** (persiste de verdade): fluxo em dois passos (formulário → prévia calculada pelo backend → confirmar → grava, regra 7), cartões/categorias reais do usuário, validação server-side (Form Request), reuso de `RegistrarGastoManual`. Coberto por testes de borda web. **Deferido:** marcar como pago (data de pagamento) e recorrência (backend pós-MVP).
-- [ ] 8. Lançamento — detalhe (parcelas + status)
-- [ ] 9. Confirmações pendentes *(espelho web do "Confirma?" — regra 7)*
+- [x] 8. Lançamento — detalhe (parcelas + status) *(**gerada no Stitch**; ligação ao Blade/backend pendente)*
+- [x] 9. Confirmações pendentes *(espelho web do "Confirma?" — regra 7; **gerada no Stitch**; ligação ao Blade/backend pendente)*
 - [ ] 10. Receitas
 - [ ] 11. Orçamento do mês
 - [ ] 12. Categorias
@@ -224,92 +224,209 @@ Confirme que entendeu o tema e aguarde o pedido da primeira tela.
 ### 7.1 Login
 **Objetivo:** entrar com calma e confiança. **Estados:** erro de credencial; carregando.
 ```text
-Tela de LOGIN (use o tema). Mobile-first; no desktop, o card fica centralizado com bastante
-respiro, sem hero ilustrado.
+Gere a tela de LOGIN de um app de finanças pessoais em pt-BR. Ignore qualquer versão anterior —
+comece do zero. Gere a tela principal + duas variações de estado (no fim).
 
-ESTRUTURA
-- Topo enxuto: a marca em texto, "Caderno de contas", no verde-cédula, com um hairline
-  (#DDE0D7) abaixo. Nada de logo genérico.
-- Card central (superfície #FBFBF8, cantos 12px, sombra difusa):
-  - Campo "E-mail".
-  - Campo "Senha" com botão mostrar/ocultar.
-  - Link discreto "Esqueci a senha" alinhado à direita.
+━━━ CONTEXTO (tela PRÉ-LOGIN) ━━━
+Esta é uma tela ANTES do login: NÃO há navegação do app (sem barra lateral, sem header, sem coluna
+de chat). É a tela inteira: mobile-first e, no desktop, um card calmo e centrado com bastante respiro.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere navegação do app, barra lateral, header, coluna de chat, menu, logo genérico, avatar,
+  hero ilustrado, imagem ou banner.
+- NÃO adicione, remova, renomeie nem reordene NENHUM campo/elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, "entrar com Google"/social login nem
+  qualquer conteúdo que não esteja escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA ━━━
+- Topo enxuto: a marca em TEXTO "Caderno de contas" (verde-cédula #1F6E5A), com um hairline
+  (#DDE0D7) abaixo. Sem logo genérico.
+- CARD central (superfície #FBFBF8, cantos 12px, sombra difusa), campos UM POR LINHA:
+  - "E-mail" — input de e-mail.
+  - "Senha" — input de senha com um botão "mostrar/ocultar".
+  - Um link discreto "Esqueci a senha" alinhado à direita.
   - Botão primário "Entrar" (verde-cédula, largura total, alvo ≥ 44px).
-- Abaixo do card, divisor sutil e a linha "Novo por aqui? Criar conta" (link verde-cédula).
-- Rodapé minúsculo (texto secundário): "Seus números vêm do seu banco de dados — a IA nunca os inventa."
+- Abaixo do card, um divisor sutil e a linha "Novo por aqui? Criar conta" ("Criar conta" é link verde-cédula).
+- Rodapé minúsculo em texto secundário: "Seus números vêm do seu banco de dados — a IA nunca os inventa."
 
-ESTADOS (gere como variações)
-- Erro de credencial: mensagem inline direta sob os campos — "E-mail ou senha incorretos."
-- Carregando: botão com rótulo "Entrando…" e spinner sóbrio; campos desabilitados.
+━━━ VARIAÇÃO — ERRO DE CREDENCIAL ━━━
+Mensagem inline direta sob os campos, em argila: "E-mail ou senha incorretos."
+━━━ VARIAÇÃO — CARREGANDO ━━━
+O botão vira "Entrando…" com um spinner sóbrio; os campos ficam desabilitados.
 
-A calma vem do espaço e da tipografia, não de ilustração. Foco de teclado visível (anel verde-cédula).
+━━━ INVARIANTES ━━━
+A calma vem do espaço e da tipografia, não de ilustração. Acessível: contraste AA, foco de teclado
+visível (anel verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Login", "Login — erro" e "Login — carregando".
 ```
 
 ### 7.2 Criar conta
 **Objetivo:** cadastro mínimo. **Estados:** validação inline; carregando.
 ```text
-Tela CRIAR CONTA (use o tema). Mobile-first, um campo por linha; mesmo card calmo do login.
+Gere a tela CRIAR CONTA de um app de finanças pessoais em pt-BR. Ignore qualquer versão anterior —
+comece do zero. Gere a tela principal + duas variações (validação; carregando).
 
-ESTRUTURA
-- Card: "Nome", "E-mail", "Senha" (com medidor de força simples em 3 níveis — "fraca / ok /
-  forte"), "Confirmar senha".
-- Checkbox "Li e aceito os termos e a política de privacidade", com os dois links sublinhados.
-- Botão primário "Criar conta" (largura total). Abaixo: "Já tenho conta — entrar".
+━━━ CONTEXTO (tela PRÉ-LOGIN) ━━━
+Esta é uma tela ANTES do login: NÃO há navegação do app (sem barra lateral, sem header, sem coluna
+de chat). É a tela inteira: mobile-first, o mesmo card calmo e centrado do login.
 
-ESTADOS (variações)
-- Validação inline: "Use um e-mail válido."; "As senhas não conferem."; consentimento
-  obrigatório com aviso "Aceite os termos para continuar."
-- Carregando: botão "Criando conta…".
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
 
-Tom acolhedor e breve, sem upsell. Sentence case.
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere navegação do app, barra lateral, header, coluna de chat, menu, logo genérico, avatar,
+  hero ilustrado, imagem ou banner.
+- NÃO adicione, remova, renomeie nem reordene NENHUM campo/elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips, "criar com Google"/social login, upsell
+  nem qualquer conteúdo que não esteja escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA ━━━
+- CARD central (superfície #FBFBF8, cantos 12px), campos UM POR LINHA:
+  - "Nome"
+  - "E-mail"
+  - "Senha" — com um medidor de força simples em 3 níveis, rótulos "fraca" / "ok" / "forte".
+  - "Confirmar senha"
+- Checkbox "Li e aceito os termos e a política de privacidade" — com "termos" e "política de
+  privacidade" como dois links sublinhados.
+- Botão primário "Criar conta" (largura total). Abaixo, a linha "Já tenho conta — entrar"
+  ("entrar" é link verde-cédula).
+
+━━━ VARIAÇÃO — VALIDAÇÃO INLINE ━━━
+Mensagens diretas em argila: "Use um e-mail válido."; "As senhas não conferem."; e, com o
+consentimento não marcado, "Aceite os termos para continuar."
+━━━ VARIAÇÃO — CARREGANDO ━━━
+O botão vira "Criando conta…"; os campos ficam desabilitados.
+
+━━━ INVARIANTES ━━━
+Tom acolhedor e breve, sem upsell. Acessível: contraste AA, foco de teclado visível (anel
+verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Criar conta", "Criar conta — validação" e "Criar conta — carregando".
 ```
 
 ### 7.3 Onboarding + consentimento LGPD
 **Objetivo:** explicar finalidades e obter consentimento (doc 09). **Estados:** —
 ```text
-Tela ONBOARDING / CONSENTIMENTO (use o tema). Um único passo, honesto e curto — primeira
-tela depois de criar a conta.
+Gere a tela ONBOARDING / CONSENTIMENTO de um app de finanças pessoais em pt-BR. Ignore qualquer
+versão anterior — comece do zero. É UM único passo, honesto e curto — a primeira tela depois de
+criar a conta. É SÓ esta tela.
 
-ESTRUTURA
-- Título display "Antes de começar".
-- Três blocos curtos, cada um com um ícone simples (de linha, não preenchido) e uma frase:
-  1) "Acompanhe seus gastos" — registre na web ou direto no Telegram.
-  2) "IA que interpreta, não inventa" — a IA classifica e redige; os números vêm do seu
-     banco de dados, calculados pelo sistema.
-  3) "Privacidade" — PDFs de fatura são processados e descartados na hora; conversas ficam
-     por até 60 dias; nenhum dado sensível é guardado.
-- Caixa de consentimento destacada (superfície, borda fina): checkbox "Concordo com o
+━━━ CONTEXTO (tela PRÉ-LOGIN) ━━━
+Esta é uma tela ANTES de entrar no app: NÃO há navegação do app (sem barra lateral, sem header,
+sem coluna de chat). É a tela inteira, calma e centrada.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere navegação do app, barra lateral, header, coluna de chat, menu, logo genérico, avatar,
+  ilustração grande, imagem ou banner.
+- NÃO adicione, remova, renomeie nem reordene NENHUM bloco/elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips nem qualquer conteúdo que não esteja
+  escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA ━━━
+- Título display "Antes de começar" (Bricolage Grotesque).
+- TRÊS blocos curtos, cada um com um ícone de LINHA (não preenchido) e um texto:
+  1) "Acompanhe seus gastos" — "registre na web ou direto no Telegram."
+  2) "IA que interpreta, não inventa" — "a IA classifica e redige; os números vêm do seu banco
+     de dados, calculados pelo sistema."
+  3) "Privacidade" — "PDFs de fatura são processados e descartados na hora; conversas ficam por
+     até 60 dias; nenhum dado sensível é guardado."
+- CAIXA de consentimento destacada (superfície, borda fina #DDE0D7): checkbox "Concordo com o
   tratamento dos meus dados para as finalidades acima" + link "política de privacidade".
-- Botão primário "Começar" (desabilitado até marcar o consentimento).
+- Botão primário "Começar" (DESABILITADO até marcar o consentimento).
 - Link discreto ao final: "Você pode excluir seus dados quando quiser."
 
-Tom direto e tranquilo. Sem ilustração grande; os três ícones e o espaço bastam.
+━━━ INVARIANTES ━━━
+Tom direto e tranquilo; sem ilustração grande — os três ícones e o espaço bastam. Acessível:
+contraste AA, foco de teclado visível (anel verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue como UMA tela: "Onboarding".
 ```
 
 ### 7.4 Vínculo do Telegram
 **Objetivo:** parear a conta ao bot. **Estados:** pendente (token válido); expirado; **vinculado**.
 ```text
-Tela VÍNCULO DO TELEGRAM (use o tema). Mobile-first. Aqui a ORDEM dos passos importa de
-verdade, então numere os passos.
+Gere a tela VÍNCULO DO TELEGRAM de um app de finanças pessoais em pt-BR. Ignore qualquer versão
+anterior — comece do zero. Aqui a ORDEM dos passos importa de verdade — numere os passos. Gere a
+tela principal (estado PENDENTE) + duas variações (VINCULADO; EXPIRADO).
 
-ESTRUTURA (estado PENDENTE, token válido)
-- Título "Conectar o Telegram" + uma linha: "Registre e consulte gastos direto no chat."
-- Card de passos numerados (1, 2):
-  1) "Abra o bot" — botão primário "Abrir no Telegram" (deeplink t.me/seubot?start=TOKEN).
+━━━ CONTEXTO (tela PRÉ-LOGIN) ━━━
+Esta é uma tela sem navegação do app (sem barra lateral, sem header, sem coluna de chat).
+Mobile-first, um card calmo e centrado.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem e o TOKEN: "IBM Plex Mono". Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere navegação do app, barra lateral, header, coluna de chat, menu, logo genérico, avatar,
+  ilustração, imagem ou banner.
+- NÃO adicione, remova, renomeie nem reordene NENHUM passo/elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips nem qualquer conteúdo que não esteja
+  escrito aqui entre aspas.
+- Todo texto visível está entre aspas: use-o LITERALMENTE, sem parafrasear.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (estado PENDENTE, token válido) ━━━
+- Título "Conectar o Telegram" e uma linha "Registre e consulte gastos direto no chat."
+- CARD de passos NUMERADOS (1, 2):
+  1) "Abra o bot" — botão primário "Abrir no Telegram".
   2) "Confirme o telefone" — "O bot vai pedir para compartilhar seu contato. É assim que eu
      confirmo que o número é seu."
-- TOKEN em destaque MONOESPAÇADO, grande e copiável (ícone copiar), com a etiqueta
-  "código de uso único".
-- Contador "expira em 14:32" em mono; vira ocre quando faltam menos de 2 minutos.
+- TOKEN em destaque MONOESPAÇADO, grande e copiável (com um ícone de copiar de LINHA), com a
+  etiqueta "código de uso único".
+- Contador "expira em 14:32" (MONO); vira ocre quando faltam menos de 2 minutos.
 - Botão secundário "Gerar novo código".
 
-ESTADOS (variações)
-- VINCULADO: card em verde-cédula suave, selo "Conectado ✓", o @usuário em mono e botão
-  secundário "Desconectar".
-- EXPIRADO: token esmaecido, aviso direto "Este código expirou." e botão primário
-  "Gerar novo código".
+━━━ VARIAÇÃO — VINCULADO ━━━
+Card em verde-cédula suave, selo "Conectado ✓", o "@usuario" em MONO e um botão secundário "Desconectar".
+━━━ VARIAÇÃO — EXPIRADO ━━━
+Token esmaecido, aviso direto em argila "Este código expirou." e botão primário "Gerar novo código".
 
-Deixe claro que o token só aparece nesta tela e serve uma única vez.
+━━━ INVARIANTES ━━━
+Deixe claro que o token só aparece nesta tela e serve uma única vez. Acessível: contraste AA, foco
+de teclado visível (anel verde-cédula), alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Vínculo do Telegram", "Vínculo do Telegram — vinculado" e "Vínculo do Telegram — expirado".
 ```
 
 ### 7.5 Dashboard / Visão geral — *tela-assinatura*
@@ -319,50 +436,133 @@ Deixe claro que o token só aparece nesta tela e serve uma única vez.
 > gerados no Stitch e serão o layout base reutilizado por todas as telas logadas — por isso
 > este prompt (e os §7.6–§7.17) pede **apenas o conteúdo** da área principal.
 ```text
-Tela DASHBOARD / VISÃO GERAL (use o tema). ESTA É A TELA-ASSINATURA. NÃO gere barra lateral
-(aside) nem cabeçalho (header) — eles já são o SHELL PADRÃO do app. Gere APENAS o conteúdo da
-área principal, que será encaixado dentro desse shell. Mobile-first, vira grade no desktop.
+Gere a tela DASHBOARD / VISÃO GERAL de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
+principal, dentro do shell. ESTA É A TELA-ASSINATURA. Ignore qualquer versão anterior — comece do
+zero. Gere a tela principal + a variação VAZIO (no fim).
 
-ELEMENTO-ASSINATURA — "A RÉGUA DO MÊS": uma régua horizontal do dia 1 ao último dia do mês,
-com um marcador do "hoje", TICKS nas datas de vencimento (em ocre) e uma faixa sutil mostrando
-o "disponível" diminuindo ao longo do mês. Posicione logo abaixo do cabeçalho. É o herói visual.
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro), que será encaixado dentro desse shell — mobile-first, vira grade no desktop.
+NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
 
-SELETOR DE MÊS ("Junho de 2026", com setas ‹ ›) acima ou junto da régua.
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, contagem: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
 
-CARDS DE RESUMO (valores em mono, alinhados à direita):
-- "Disponível do mês" — destaque, R$ 2.480,00 (verde-cédula se positivo).
-- "Gastos do mês" — R$ 3.120,00, com mini-comparativo discreto vs. mês anterior.
-- "A vencer (7 dias)" — R$ 540,00 em ocre, "3 contas".
-- "Fatura do cartão" — "Nubank · fecha 28 de junho" R$ 1.870,00.
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips nem qualquer conteúdo que não esteja
+  escrito aqui entre aspas. Todo texto visível está entre aspas: use-o LITERALMENTE.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
 
-GRÁFICO: donut "gastos por categoria" com legenda (Mercado, Transporte, Restaurante, Moradia,
-Lazer) — cada uma com sua cor/ícone de chip.
+━━━ ELEMENTO-ASSINATURA — "A RÉGUA DO MÊS" ━━━
+Uma régua HORIZONTAL do dia 1 ao último dia do mês, logo abaixo do topo do conteúdo, com: um
+marcador do "hoje", TICKS nas datas de vencimento (em ocre #C9852A) e uma faixa sutil mostrando o
+"disponível" diminuindo ao longo do mês. É o herói visual.
 
-LISTA: "Próximas contas" (3 linhas: descrição · valor mono · "vence 30 de junho" · selo status).
+━━━ ESTRUTURA ━━━
+- SELETOR DE MÊS "Junho de 2026" com as setas "‹" e "›", acima ou junto da régua.
+- CARDS DE RESUMO (valores MONO, alinhados à direita):
+  - "Disponível do mês" — em destaque, "R$ 2.480,00" (verde-cédula por ser positivo).
+  - "Gastos do mês" — "R$ 3.120,00", com um mini-comparativo discreto "vs. mês anterior".
+  - "A vencer (7 dias)" — "R$ 540,00" em ocre, com "3 contas".
+  - "Fatura do cartão" — "Nubank · fecha 28 de junho" e "R$ 1.870,00".
+- GRÁFICO: um donut "Gastos por categoria" com legenda — "Mercado", "Transporte", "Restaurante",
+  "Moradia", "Lazer" —, cada item com a cor/ícone do seu chip.
+- LISTA "Próximas contas" — 3 linhas, colunas "descrição · valor · vencimento · status":
+      "Aluguel"    "R$ 1.500,00"   "vence 30 de junho"   selo "em aberto"
+      "Internet"   "R$ 120,00"     "vence 28 de junho"   selo "em aberto"
+      "Energia"    "R$ 210,00"     "vence 25 de junho"   selo "vencido"
 
-Estado vazio: convite "Registre seu primeiro gasto" + dica de usar o Telegram. Nada pisca; a
-régua é a única coisa que se move (animação sutil de entrada). A interface NUNCA calcula
-dinheiro — todos os valores chegam prontos do backend.
+━━━ VARIAÇÃO — VAZIO (primeiro mês) ━━━
+Sem cards preenchidos; um convite "Registre seu primeiro gasto" com a dica "você também pode usar
+o Telegram".
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro — todos os valores (disponível, gastos, a vencer, fatura, donut,
+régua) chegam prontos do backend; a tela só EXIBE. Nada pisca; só a régua se move (animação sutil de
+entrada). Acessível: contraste AA, foco de teclado visível (anel verde-cédula), alvos ≥ 44px, 360px.
+
+Entregue: "Visão geral" e "Visão geral — vazio".
 ```
 
 ### 7.6 Lançamentos — lista
 **Objetivo:** ver/filtrar/agir sobre lançamentos. **Estados:** vazio; filtro sem resultado; carregando.
 ```text
-Tela LANÇAMENTOS (use o tema). NÃO gere barra lateral (aside) nem cabeçalho (header) — eles
-são o SHELL PADRÃO já definido no Dashboard (§7.5). Gere APENAS o conteúdo da área principal,
-que será encaixado dentro desse shell (título da página desta tela: "Lançamentos").
-Estilo EXTRATO: denso, legível, valores em mono à direita.
-- Barra de filtros (chips): período (mês), categoria, cartão/forma, status (aberto/pago/atraso/
-  cancelado). Campo de busca por descrição.
-- Lista agrupada por dia. Cada linha: descrição · chip de categoria · valor (mono) · forma/
-  cartão · selo de status. Em parcelado, mostrar "2/3" em mono.
-- Toque na linha abre o detalhe; deslizar/menu com "Editar", "Cancelar", "Excluir".
-- Rodapé fixo com total filtrado (mono) — rotulado "total exibido" (apenas leitura, vem pronto).
-- Estado vazio e "nenhum lançamento neste filtro" com texto-guia para ajustar filtros.
+Gere a tela LANÇAMENTOS de um app de finanças pessoais em pt-BR — o CONTEÚDO da área principal,
+dentro do shell. Ignore qualquer versão anterior — comece do zero. Estilo EXTRATO: denso, legível,
+valores em mono à direita. Gere a tela principal + duas variações (VAZIO; FILTRO SEM RESULTADO).
+
+━━━ CONTEXTO DE LAYOUT (NÃO redesenhe estas partes) ━━━
+O app já tem um SHELL: barra lateral de navegação à esquerda, o conteúdo da tela no centro, uma
+coluna de chat fixa à direita e um cabeçalho (header) no topo. Gere APENAS o CONTEÚDO da área
+principal (o centro). NÃO desenhe a navegação esquerda, o header, nem a coluna de chat.
+
+━━━ TEMA (use EXATAMENTE estas cores/fontes; não escolha outras) ━━━
+Conceito "caderno de contas": a precisão de um extrato com a calma de um caderno.
+- Texto/quase-preto quente: #1C1B17 · Fundo do app: #EDF0E8
+- Superfície de cartões e campos: #FBFBF8 · Primária (verde-cédula): #1F6E5A · hover: #2E8B72
+- Atenção/ocre: #C9852A · Negativo/argila: #B4452F · Linhas/bordas: #DDE0D7 · Secundário: #6B6F66
+- Títulos: "Bricolage Grotesque". Texto de interface: "IBM Plex Sans".
+- TODO valor em R$, data, %, nº de parcela: "IBM Plex Mono", alinhado à direita. Sentence case.
+- Cantos: 12px em cartões, 8px em campos/botões, pill nos chips. Sombra difusa e suave.
+- Ícones: apenas de LINHA, simples. Sem ícones preenchidos, coloridos ou decorativos.
+
+━━━ PROIBIDO (para você NÃO inventar nada) ━━━
+- NÃO gere barra lateral (aside), cabeçalho (header), coluna de chat, menu, abas, breadcrumb,
+  logo, avatar, ilustração, imagem ou banner. Só o conteúdo da área central.
+- NÃO adicione, remova, renomeie nem reordene NENHUM elemento além dos listados abaixo.
+- NÃO invente valores, textos de ajuda, dicas, tooltips nem qualquer conteúdo que não esteja
+  escrito aqui entre aspas. Todo texto visível está entre aspas: use-o LITERALMENTE.
+- Se algo não foi especificado, deixe de fora — não preencha com placeholder inventado.
+
+━━━ ESTRUTURA (tela principal) ━━━
+- Título da página "Lançamentos".
+- BARRA DE FILTROS (chips): "Período" (mês), "Categoria", "Forma/Cartão" e "Status"; e um campo
+  de busca com placeholder "Buscar por descrição". Os chips de status possíveis, use APENAS
+  estes rótulos: "em aberto", "pago", "vencido", "cancelado".
+- LISTA agrupada por DIA (um subtítulo de data por grupo, ex.: "5 de julho"). Cada linha, colunas
+  "descrição · categoria · forma/cartão · valor · status", valores MONO à direita; em parcelado,
+  a fração MONO "2/3" na descrição:
+      "Mercado do mês"   chip "Mercado"      "Crédito · Nubank"   "R$ 450,00"   selo "em aberto"
+      "Uber"             chip "Transporte"   "Pix"                "R$ 32,90"    selo "pago"
+      "Geladeira 2/3"    chip "Moradia"      "Crédito · Nubank"   "R$ 800,00"   selo "em aberto"
+  Cada linha abre o detalhe ao toque; um menu por linha traz "Editar", "Cancelar" e "Excluir".
+- RODAPÉ fixo com o total filtrado MONO, rotulado "total exibido" (apenas leitura, vem pronto).
+
+━━━ VARIAÇÃO — VAZIO ━━━
+Sem lista; um estado calmo "Nenhum lançamento ainda." com a dica "registre na web ou pelo Telegram".
+━━━ VARIAÇÃO — FILTRO SEM RESULTADO ━━━
+Sem linhas; a mensagem "Nenhum lançamento neste filtro." com a ação "Limpar filtros".
+
+━━━ INVARIANTES ━━━
+A interface NUNCA calcula dinheiro: valores, frações de parcela e o "total exibido" chegam prontos
+do backend — a tela só EXIBE. Acessível: contraste AA, foco de teclado visível (anel verde-cédula),
+alvos ≥ 44px, funciona a partir de 360px.
+
+Entregue: "Lançamentos", "Lançamentos — vazio" e "Lançamentos — sem resultado".
 ```
 
 ### 7.7 Lançamento — criar/editar (com prévia de parcelas)
 **Objetivo:** capturar um gasto e **confirmar** antes de gravar (regra 7). **Estados:** validação; crédito exige cartão; prévia de parcelas.
+
+> **⚠️ Resolvido pelo modal 7b — NÃO gerar no Stitch.** Este formulário já existe, idêntico,
+> como o **modal "Registrar gasto"** (§7.7b, `components/modal/registrar-gasto.blade.php`): a
+> "tela 7" é esse mesmo form "encaixado num modal". Mesmos campos, mesmo fluxo em dois passos
+> (form → prévia calculada pelo backend → confirmar), mesma barreira anti-cálculo (regra 4) e
+> confirmação (regra 7). Uma versão **página inteira** só se justifica para **editar** um
+> lançamento existente (carregar valores + PUT), e mesmo aí reaproveita o form extraído como
+> **partial Blade** — sem desenho novo. O prompt abaixo fica **apenas como referência**.
+
 ```text
 Gere a tela CRIAR/EDITAR LANÇAMENTO de um app de finanças pessoais em pt-BR — o CONTEÚDO da área
 principal, dentro do shell. Ignore qualquer versão anterior desta tela — comece do zero. Gere
@@ -1329,16 +1529,17 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
   **afordância de entrada**: o PDF continua no fluxo de **revisão efêmera** (§7.16) e é descartado
   (regra 6); as telas dedicadas §7.15/§7.16 seguem no mini-TODO, geradas **após** o backend da
   [[spec-07-importacao-pdf]].
-- **Decisão de autoria de prompt aplicada:** os prompts §7.7 e §7.8–§7.17 (todas as telas
-  logadas restantes, incl. importação §7.15/§7.16 e configurações §7.17) foram **reescritos no
-  padrão fechado (anti-invenção)** do §7.7b/§7.14 — blocos literais TEMA · CONTEXTO DE LAYOUT (não
-  redesenhar o shell) · PROIBIDO · ESTRUTURA com todo texto entre aspas · variações condicionais
-  separadas · INVARIANTES. Domínio conferido nos docs 03/04/08: 5 formas de pagamento, crédito =
-  única em cartão, vencimento determinístico "calculado pelo cartão", datas compra/vencimento/
-  pagamento separadas, status reais (aberto/pago/agendado/vencido…), **orçamento por categoria é
-  pós-MVP** (§7.11 mostra só consumo, sem limite por categoria), cartão por descrição + 4 dígitos
-  (sem "bandeira"), PDF efêmero (§7.15/§7.16). O §7.6 (lista) foi gerado no formato antigo antes
-  desta conversão.
+- **Decisão de autoria de prompt aplicada:** **TODOS os prompts de tela (§7.1–§7.17)** foram
+  padronizados no formato **fechado (anti-invenção)** do §7.7b/§7.14 — blocos literais TEMA ·
+  CONTEXTO (shell nas logadas §7.5–§7.17 / PRÉ-LOGIN sem navegação nas §7.1–§7.4) · PROIBIDO ·
+  ESTRUTURA com todo texto entre aspas · variações de estado separadas · INVARIANTES. O prompt-base
+  de tema §7.0 permanece como referência única (é dele que sai o bloco TEMA). Domínio conferido nos
+  docs 03/04/08: 5 formas de pagamento, crédito = única em cartão, vencimento determinístico
+  "calculado pelo cartão", datas compra/vencimento/pagamento separadas, status reais
+  (em aberto/pago/agendado/vencido/cancelado), **orçamento por categoria é pós-MVP** (§7.11 mostra
+  só consumo, sem limite por categoria), cartão por descrição + 4 dígitos (sem "bandeira"), PDF
+  efêmero (§7.15/§7.16). Observação: §7.1–§7.6 já haviam sido geradas/implementadas antes desta
+  conversão — a reescrita alinha o texto do spec (referência canônica), sem exigir regeração.
 - **Decisão de design aplicada:** token `papel` ajustado `#F3F4EF` → `#EDF0E8` (§4.2 e §7.0)
   para o fundo ler claramente como verde-acinzentado e fugir do "cream" (default de IA).
 - **Adiado para etapa técnica posterior:** ligação das telas ao Laravel (Inertia/Blade, dados

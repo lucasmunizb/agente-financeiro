@@ -6,6 +6,8 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GastoController;
+use App\Http\Controllers\LancamentoController;
+use App\Http\Controllers\LancamentoFormController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\TelegramLinkController;
 use App\Http\Controllers\TelegramWebhookController;
@@ -26,6 +28,23 @@ Route::middleware('auth')->group(function () {
     // domínio e apenas formata para a tela; carrega também cartões/categorias do
     // usuário para o modal "Registrar gasto".
     Route::get('/', [DashboardController::class, 'index'])->name('home');
+
+    // Lançamentos — lista/extrato (FE §7.6). Borda fina sobre o domínio determinístico
+    // (ConsultarLancamentos): lista as parcelas do mês agrupadas por dia, com filtros e o
+    // "total exibido" já somado. Leitura apenas; a UI nunca calcula dinheiro (regra 4).
+    Route::get('/lancamentos', [LancamentoController::class, 'index'])->name('lancamentos');
+
+    // Criar/editar lançamento como PÁGINA cheia (FE §7.7). Reaproveita o formulário do
+    // modal rápido (§7.7b) via <x-gasto.form>. Criar usa os endpoints do modal
+    // (gastos.previa/store); editar tem os seus (prévia + update), que regeneram as
+    // parcelas pelo domínio (EditarGastoManual) e travam se houver parcela paga (regra 7).
+    Route::get('/lancamentos/novo', [LancamentoFormController::class, 'create'])->name('lancamentos.create');
+    Route::get('/lancamentos/{transaction}/editar', [LancamentoFormController::class, 'edit'])
+        ->whereNumber('transaction')->name('lancamentos.edit');
+    Route::post('/lancamentos/{transaction}/previa', [LancamentoFormController::class, 'previa'])
+        ->whereNumber('transaction')->name('lancamentos.previa');
+    Route::put('/lancamentos/{transaction}', [LancamentoFormController::class, 'update'])
+        ->whereNumber('transaction')->name('lancamentos.update');
 
     // Cadastro de gasto manual (modal §7.7b). Dois passos (regra 7): a prévia
     // calcula sem gravar; o store persiste após a confirmação.

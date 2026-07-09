@@ -13,7 +13,7 @@
     // backend (regra 3) — estes destinos amadurecem conforme cada tela nasce.
     $nav = [
         ['key' => 'dashboard', 'label' => 'Visão Geral', 'icon' => 'layout-dashboard', 'href' => route('home'), 'soon' => false],
-        ['key' => 'transacoes', 'label' => 'Transações', 'icon' => 'receipt', 'href' => '#', 'soon' => true],
+        ['key' => 'transacoes', 'label' => 'Transações', 'icon' => 'receipt', 'href' => route('lancamentos'), 'soon' => false],
         ['key' => 'relatorios', 'label' => 'Relatórios', 'icon' => 'bar-chart', 'href' => '#', 'soon' => true],
         ['key' => 'telegram', 'label' => 'Telegram', 'icon' => 'send', 'href' => route('telegram'), 'soon' => false],
         ['key' => 'configuracoes', 'label' => 'Configurações', 'icon' => 'settings', 'href' => '#', 'soon' => true],

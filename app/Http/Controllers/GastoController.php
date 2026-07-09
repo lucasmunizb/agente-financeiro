@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Domain\Gasto\ParcelaPrevia;
-use App\Domain\Gasto\PreviaGastoManual;
 use App\Domain\Gasto\RegistrarGastoManual;
+use App\Http\Controllers\Concerns\SerializaPreviaDeGasto;
 use App\Http\Requests\RegistrarGastoRequest;
 use Illuminate\Http\JsonResponse;
 
@@ -25,6 +24,8 @@ use Illuminate\Http\JsonResponse;
  */
 class GastoController extends Controller
 {
+    use SerializaPreviaDeGasto;
+
     public function previa(RegistrarGastoRequest $request, RegistrarGastoManual $registrar): JsonResponse
     {
         $previa = $registrar->preview($request->paraDominio());
@@ -37,31 +38,5 @@ class GastoController extends Controller
         $transaction = $registrar->confirmar($request->paraDominio());
 
         return response()->json(['ok' => true, 'id' => $transaction->id]);
-    }
-
-    /**
-     * Serializa a prévia com os valores JÁ formatados em pt-BR (formatação só na
-     * borda, regra 5). O modal apenas exibe — não recalcula.
-     *
-     * @return array<string, mixed>
-     */
-    private function previaParaJson(PreviaGastoManual $previa): array
-    {
-        return [
-            'descricao' => $previa->descricao,
-            'valorTotal' => $previa->valorTotal->formatBRL(),
-            'ehDuplicado' => $previa->ehDuplicado,
-            'parcelas' => array_map(
-                fn (ParcelaPrevia $p): array => [
-                    'numero' => $p->numero,
-                    'total' => $p->total,
-                    'label' => sprintf('%d/%d', $p->numero, $p->total),
-                    'valor' => $p->valor->formatBRL(),
-                    'vencimento' => $p->vencimento->format('d/m/Y'),
-                    'status' => $p->statusCodigo,
-                ],
-                $previa->parcelas,
-            ),
-        ];
     }
 }
