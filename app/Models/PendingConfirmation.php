@@ -23,14 +23,20 @@ class PendingConfirmation extends Model
 
     /** Origem do pendente (de onde veio). */
     public const ORIGEM_CHAT = 'chat';
+
     public const ORIGEM_TELEGRAM = 'telegram';
+
     public const ORIGEM_RECORRENCIA = 'recorrencia';
+
     public const ORIGEM_IMPORTACAO = 'importacao';
 
     /** Ciclo de vida. */
     public const STATUS_PENDENTE = 'pendente';
+
     public const STATUS_CONFIRMADO = 'confirmado';
+
     public const STATUS_REJEITADO = 'rejeitado';
+
     public const STATUS_EXPIRADO = 'expirado';
 
     /** Tipo do que se confirma (só gasto no MVP). */
@@ -44,6 +50,7 @@ class PendingConfirmation extends Model
         'payload',
         'status',
         'transaction_id',
+        'recurrence_id',
         'expira_em',
         'resolvido_em',
     ];
@@ -68,5 +75,11 @@ class PendingConfirmation extends Model
     public function transaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    /** @return BelongsTo<Recurrence, $this> */
+    public function recurrence(): BelongsTo
+    {
+        return $this->belongsTo(Recurrence::class);
     }
 }

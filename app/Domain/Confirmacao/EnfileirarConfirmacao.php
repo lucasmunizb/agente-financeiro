@@ -13,6 +13,9 @@ use Carbon\CarbonImmutable;
  * PRODUTORES — recorrência mensal e importação de PDF — que nunca gravam direto (regra 7,
  * sem auto-save no MVP): materializam aqui e esperam o "sim" do usuário. O `payload` guarda
  * o {@see DadosGastoManual} já normalizado (centavos, regra 5); nada é recalculado depois.
+ *
+ * `recurrenceId` (opcional) liga o pendente à recorrência que o produziu (spec 10) — só os
+ * produtores de recorrência preenchem; alimenta a cascata "rejeitar → cancela a recorrência".
  */
 final class EnfileirarConfirmacao
 {
@@ -20,6 +23,7 @@ final class EnfileirarConfirmacao
         DadosGastoManual $dados,
         string $origem,
         ?CarbonImmutable $expiraEm = null,
+        ?int $recurrenceId = null,
     ): PendingConfirmation {
         return PendingConfirmation::create([
             'user_id' => $dados->userId,
@@ -28,6 +32,7 @@ final class EnfileirarConfirmacao
             'payload' => PayloadDoGasto::paraArray($dados),
             'status' => PendingConfirmation::STATUS_PENDENTE,
             'expira_em' => $expiraEm,
+            'recurrence_id' => $recurrenceId,
         ]);
     }
 }

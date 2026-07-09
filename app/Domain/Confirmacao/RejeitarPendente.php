@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Confirmacao;
 
+use App\Events\PendenteRecorrenteRejeitado;
 use App\Models\AuditLog;
 use App\Models\PendingConfirmation;
 use Carbon\CarbonImmutable;
@@ -14,6 +15,9 @@ use Illuminate\Support\Facades\DB;
  * ESCOPADO por usuário (findOrFail → 404 para item alheio/inexistente) e, se ainda pendente,
  * marca `rejeitado` (mantém a linha para auditoria/histórico — nada é apagado) e registra a
  * trilha. Devolve false quando já estava resolvido (nada a fazer).
+ *
+ * Se o pendente veio de uma recorrência, dispara {@see PendenteRecorrenteRejeitado} na MESMA
+ * transação — o listener cancela a recorrência (spec 10, C7), atomicamente com o "não".
  */
 final class RejeitarPendente
 {
@@ -43,6 +47,10 @@ final class RejeitarPendente
                 'depois' => ['status' => PendingConfirmation::STATUS_REJEITADO],
                 'origem' => $pendente->origem,
             ]);
+
+            if ($pendente->recurrence_id !== null) {
+                PendenteRecorrenteRejeitado::dispatch($pendente, $agora);
+            }
 
             return true;
         });

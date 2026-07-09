@@ -5,15 +5,15 @@ namespace App\Providers;
 use App\Domain\IA\Custo\CalculadoraDeCustoIA;
 use App\Domain\IA\Intencao;
 use App\Domain\IA\Rotacao\RotacionadorDeProvedores;
-use App\Domain\Shared\Clock;
-use App\Domain\Shared\SystemClock;
 use App\Domain\Importacao\ExtratorDeTexto;
 use App\Domain\Importacao\ExtratorDeTextoPoppler;
 use App\Domain\Importacao\OcrFallback;
 use App\Domain\Importacao\OcrTesseract;
 use App\Domain\Importacao\ParserDeFatura;
 use App\Domain\Importacao\ParserItau;
+use App\Domain\Shared\Clock;
 use App\Domain\Shared\OpaqueId;
+use App\Domain\Shared\SystemClock;
 use App\Domain\Telegram\ClassificadorDeComando;
 use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\FluxoDeVinculo;
@@ -25,6 +25,8 @@ use App\Domain\Telegram\RoteadorDeComandos;
 use App\Domain\Telegram\RoteadorDeMensagem;
 use App\Domain\Telegram\Saida\ClienteTelegram;
 use App\Domain\Telegram\Saida\ClienteTelegramHttp;
+use App\Events\PendenteRecorrenteRejeitado;
+use App\Listeners\CancelarRecorrenciaAoRejeitar;
 use App\Listeners\LogarFailoverDeIA;
 use App\Listeners\PenalizarProvedorNaRotacao;
 use App\Models\ChatMessage;
@@ -110,6 +112,10 @@ class AppServiceProvider extends ServiceProvider
         // Bencha na rotação (spec 04c) o provedor que caiu — complementa o log acima, só
         // age com a rotação ligada (retrocompatível quando desligada).
         Event::listen(AgentFailedOver::class, PenalizarProvedorNaRotacao::class);
+
+        // Cascata "rejeitar → cancela a recorrência" (spec 10, C7): o "não" na fila de um
+        // pendente vindo de recorrência encerra a regra inteira (decisão do usuário).
+        Event::listen(PendenteRecorrenteRejeitado::class, CancelarRecorrenciaAoRejeitar::class);
 
         // Parâmetro {transaction} das rotas chega SEMPRE criptografado (requisito
         // inegociável — README §"Identificadores nas URLs"). Decodifica o token opaco de

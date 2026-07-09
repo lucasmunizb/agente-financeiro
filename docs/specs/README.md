@@ -40,6 +40,7 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 | 07 | [Importação de PDF (Itaú) — última feature](07-importacao-pdf.md) | 🟡 | 01 | [`07-importacao-pdf.md`](../07-importacao-pdf.md) |
 | 08 | [Segurança e LGPD — portão de fechamento](08-seguranca-lgpd.md) | ⬜ | todas | [`09-nfr-seguranca-lgpd.md`](../09-nfr-seguranca-lgpd.md) |
 | 09 | [Faturas materializadas (ciclo de fatura)](09-faturas-materializadas.md) | 🟠 | 01, 02 | [`04-modelo-dados.md`](../04-modelo-dados.md) (`invoices`) |
+| 10 | [Recorrência mensal (assinaturas/contas fixas)](10-recorrencia-mensal.md) | 🟡 (backend ✅ · frontend adiado) | 02, 04b | [`03-regras-financeiras.md`](../03-regras-financeiras.md) §4.6 · [`04-modelo-dados.md`](../04-modelo-dados.md) (`recurrences`) |
 
 **Legenda:** ✅ concluído · 🟡 em andamento · ⬜ planejado · 🟠 pendente (proposta a validar — não iniciar).
 
