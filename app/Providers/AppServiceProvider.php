@@ -139,6 +139,13 @@ class AppServiceProvider extends ServiceProvider
         // PATH; a seleção por ?cartao= (query) é decodificada à parte no controller.
         Route::bind('cartao', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
 
+        // Idem para {receita} (income) — editar/excluir na tela §7.10.
+        Route::bind('receita', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
+
+        // Idem para {categoria} (category) — editar/arquivar na tela §7.12. O escopo por
+        // usuário fica no domínio (findOrFail por user_id).
+        Route::bind('categoria', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
+
         // Chat financeiro (3ª zona do shell, spec §7.14): injeta o histórico REAL do
         // próprio usuário na coluna de chat, sempre isolado por user_id (escopo estrito).
         View::composer('components.chat.panel', function ($view) {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOpaqueRouteId;
 use Database\Factories\IncomeFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,14 +11,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Receita — base do "disponível do mês" (doc 04 / doc 03 §4.5).
- * Dinheiro em centavos inteiros; tipo fixa/variável; isolada por usuário; LGPD.
+ * Dinheiro em centavos inteiros; tipo fixa/variável; isolada por usuário; LGPD. Na borda web o
+ * id só aparece CRIPTOGRAFADO ({@see HasOpaqueRouteId}) — editar/excluir na tela §7.10.
  */
 class Income extends Model
 {
     /** @use HasFactory<IncomeFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOpaqueRouteId, SoftDeletes;
 
     public const TIPO_FIXA = 'fixa';
+
     public const TIPO_VARIAVEL = 'variavel';
 
     /** @var list<string> */

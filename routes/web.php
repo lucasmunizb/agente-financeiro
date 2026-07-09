@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\CartaoController;
+use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ConfirmacaoPendenteController;
 use App\Http\Controllers\DashboardController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\LancamentoController;
 use App\Http\Controllers\LancamentoFormController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OrcamentoController;
+use App\Http\Controllers\ReceitaController;
 use App\Http\Controllers\RecorrenciaController;
 use App\Http\Controllers\TelegramLinkController;
 use App\Http\Controllers\TelegramWebhookController;
@@ -78,6 +80,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/confirmacoes/{pendente}/confirmar', [ConfirmacaoPendenteController::class, 'confirmar'])->name('confirmacoes.confirmar');
     Route::post('/confirmacoes/{pendente}/rejeitar', [ConfirmacaoPendenteController::class, 'rejeitar'])->name('confirmacoes.rejeitar');
 
+    // Receitas (FE §7.10): listar (por competência + filtro de tipo) com o total já somado pelo
+    // domínio (ReceitasDoMes) e adicionar em dois passos (regra 7 — o store sem `confirmado`
+    // mostra o resumo; com `confirmado` grava via RegistrarReceita).
+    Route::get('/receitas', [ReceitaController::class, 'index'])->name('receitas');
+    Route::post('/receitas', [ReceitaController::class, 'store'])->name('receitas.store');
+    // Editar e excluir (cancelamento lógico — soft delete). {receita} opaco; escopo no domínio.
+    Route::put('/receitas/{receita}', [ReceitaController::class, 'update'])->name('receitas.update');
+    Route::delete('/receitas/{receita}', [ReceitaController::class, 'destroy'])->name('receitas.destroy');
+
     // Cartões & faturas (FE §7.13): listar cartões, ver a fatura do selecionado por competência
     // (total/extrato de ConsultarFaturaCartao + ciclo de CicloDaFatura) e adicionar cartão
     // (CriarCartao). Cartão selecionado por token opaco (?cartao=); mês em claro (?mes=).
@@ -92,6 +103,15 @@ Route::middleware('auth')->group(function () {
     // calcula (regra 4). Mês em claro na URL (?mes=YYYY-MM), não é id.
     Route::get('/orcamento', [OrcamentoController::class, 'index'])->name('orcamento');
     Route::post('/orcamento', [OrcamentoController::class, 'definir'])->name('orcamento.definir');
+
+    // Categorias (FE §7.12): listar com a contagem de uso já calculada (ListarCategorias; a UI
+    // nunca calcula, regra 4) e criar/editar/arquivar (CriarCategoria/EditarCategoria/
+    // ArquivarCategoria). Arquivar é lógico — não apaga o histórico. {categoria} opaco; escopo
+    // no domínio. Palavras-chave e apelidos alimentam o lookup determinístico (doc 08).
+    Route::get('/categorias', [CategoriaController::class, 'index'])->name('categorias');
+    Route::post('/categorias', [CategoriaController::class, 'store'])->name('categorias.store');
+    Route::put('/categorias/{categoria}', [CategoriaController::class, 'update'])->name('categorias.update');
+    Route::post('/categorias/{categoria}/arquivar', [CategoriaController::class, 'arquivar'])->name('categorias.arquivar');
 
     // Gerenciar recorrências (spec 10): listar as ativas e cancelar. Cancelar reusa o domínio
     // (CancelarRecorrencia); {recorrencia} opaco; escopo por usuário no domínio (404 alheio).

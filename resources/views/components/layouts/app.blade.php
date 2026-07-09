@@ -14,8 +14,10 @@
     $nav = [
         ['key' => 'dashboard', 'label' => 'Visão Geral', 'icon' => 'layout-dashboard', 'href' => route('home'), 'soon' => false],
         ['key' => 'transacoes', 'label' => 'Transações', 'icon' => 'receipt', 'href' => route('lancamentos'), 'soon' => false],
+        ['key' => 'receitas', 'label' => 'Receitas', 'icon' => 'arrow-up', 'href' => route('receitas'), 'soon' => false],
         ['key' => 'orcamento', 'label' => 'Orçamento', 'icon' => 'wallet', 'href' => route('orcamento'), 'soon' => false],
         ['key' => 'cartoes', 'label' => 'Cartões', 'icon' => 'credit-card', 'href' => route('cartoes'), 'soon' => false],
+        ['key' => 'categorias', 'label' => 'Categorias', 'icon' => 'tag', 'href' => route('categorias'), 'soon' => false],
         ['key' => 'confirmacoes', 'label' => 'Confirmações', 'icon' => 'circle-check', 'href' => route('confirmacoes'), 'soon' => false],
         ['key' => 'recorrencias', 'label' => 'Recorrências', 'icon' => 'refresh-cw', 'href' => route('recorrencias'), 'soon' => false],
         ['key' => 'relatorios', 'label' => 'Relatórios', 'icon' => 'bar-chart', 'href' => '#', 'soon' => true],
