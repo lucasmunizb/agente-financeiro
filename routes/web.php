@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\CartaoController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ConfirmacaoPendenteController;
 use App\Http\Controllers\DashboardController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\GastoController;
 use App\Http\Controllers\LancamentoController;
 use App\Http\Controllers\LancamentoFormController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\OrcamentoController;
 use App\Http\Controllers\RecorrenciaController;
 use App\Http\Controllers\TelegramLinkController;
 use App\Http\Controllers\TelegramWebhookController;
@@ -75,6 +77,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/confirmacoes', [ConfirmacaoPendenteController::class, 'index'])->name('confirmacoes');
     Route::post('/confirmacoes/{pendente}/confirmar', [ConfirmacaoPendenteController::class, 'confirmar'])->name('confirmacoes.confirmar');
     Route::post('/confirmacoes/{pendente}/rejeitar', [ConfirmacaoPendenteController::class, 'rejeitar'])->name('confirmacoes.rejeitar');
+
+    // Cartões & faturas (FE §7.13): listar cartões, ver a fatura do selecionado por competência
+    // (total/extrato de ConsultarFaturaCartao + ciclo de CicloDaFatura) e adicionar cartão
+    // (CriarCartao). Cartão selecionado por token opaco (?cartao=); mês em claro (?mes=).
+    Route::get('/cartoes', [CartaoController::class, 'index'])->name('cartoes');
+    Route::post('/cartoes', [CartaoController::class, 'store'])->name('cartoes.store');
+
+    // Orçamento do mês (FE §7.11): ver limite/consumo (por competência) e definir o limite
+    // geral (DefinirOrcamento, updateOrCreate). Leitura já avaliada pelo domínio; a UI não
+    // calcula (regra 4). Mês em claro na URL (?mes=YYYY-MM), não é id.
+    Route::get('/orcamento', [OrcamentoController::class, 'index'])->name('orcamento');
+    Route::post('/orcamento', [OrcamentoController::class, 'definir'])->name('orcamento.definir');
 
     // Gerenciar recorrências (spec 10): listar as ativas e cancelar. Cancelar reusa o domínio
     // (CancelarRecorrencia); {recorrencia} opaco; escopo por usuário no domínio (404 alheio).

@@ -36,14 +36,7 @@ final class ConsultarFaturaCartao
 
     public function para(int $userId, string $cartao, string $competencia): ResultadoConsultaFaturaCartao
     {
-        $p = PeriodoMensal::fromString($competencia);
         $card = $this->resolverCartao($userId, $cartao);
-
-        $trace = fn (int $registros): TraceDaConsulta => new TraceDaConsulta(
-            ferramenta: 'consultar_fatura_cartao',
-            filtros: ['cartao' => $cartao, 'competencia' => $competencia],
-            registros: $registros,
-        );
 
         // Cartão não encontrado: fatura vazia, sem tocar em dados de ninguém.
         if ($card === null) {
@@ -52,9 +45,29 @@ final class ConsultarFaturaCartao
                 cartaoFinal4: null,
                 totalCents: 0,
                 itens: [],
-                trace: $trace(0),
+                trace: new TraceDaConsulta(
+                    ferramenta: 'consultar_fatura_cartao',
+                    filtros: ['cartao' => $cartao, 'competencia' => $competencia],
+                    registros: 0,
+                ),
             );
         }
+
+        return $this->montar($userId, $card, $competencia, $cartao);
+    }
+
+    /**
+     * Fatura de um cartão JÁ resolvido (por id) — usado pela tela §7.13, que seleciona o cartão
+     * pelo token opaco (não por descrição/final ambíguos). Mesma itemização do {@see self::para()}.
+     */
+    public function paraCartao(int $userId, Card $card, string $competencia): ResultadoConsultaFaturaCartao
+    {
+        return $this->montar($userId, $card, $competencia, $card->descricao);
+    }
+
+    private function montar(int $userId, Card $card, string $competencia, string $cartaoLabel): ResultadoConsultaFaturaCartao
+    {
+        $p = PeriodoMensal::fromString($competencia);
 
         $excluidos = StatusPagamento::query()
             ->whereIn('codigo', self::STATUS_EXCLUIDOS)
@@ -85,6 +98,7 @@ final class ConsultarFaturaCartao
                 'cents' => $cents,
                 'numero' => $parcela->numero,
                 'total' => $parcela->total,
+                'categoria_id' => $parcela->transaction->categoria_id,
             ];
         }
 
@@ -93,7 +107,11 @@ final class ConsultarFaturaCartao
             cartaoFinal4: $card->final_4,
             totalCents: $total,
             itens: $itens,
-            trace: $trace($parcelas->count()),
+            trace: new TraceDaConsulta(
+                ferramenta: 'consultar_fatura_cartao',
+                filtros: ['cartao' => $cartaoLabel, 'competencia' => $competencia],
+                registros: $parcelas->count(),
+            ),
         );
     }
 

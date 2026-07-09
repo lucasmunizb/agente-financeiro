@@ -20,7 +20,7 @@ use Carbon\CarbonImmutable;
 final class ResultadoConsultaFaturaCartao
 {
     /**
-     * @param  list<array{descricao: string, vencimento: string, cents: int, numero: int, total: int}>  $itens  ordenada por vencimento asc
+     * @param  list<array{descricao: string, vencimento: string, cents: int, numero: int, total: int, categoria_id: ?int}>  $itens  ordenada por vencimento asc
      */
     public function __construct(
         public readonly string $cartaoDescricao,
