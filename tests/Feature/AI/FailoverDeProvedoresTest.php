@@ -29,6 +29,11 @@ it('a config de failover é um array não-vazio que começa pelo provedor padrã
 });
 
 it('todos os agentes expõem a lista de failover da config em provider()', function () {
+    // Contrato estático da spec 04: com a rotação (04c) desligada, provider() reflete
+    // exatamente config('ai.failover'). Fixamos enabled=false para o teste ser
+    // determinístico independentemente do que o .env do ambiente definir.
+    config()->set('ai.rotacao.enabled', false);
+
     $esperado = config('ai.failover');
 
     expect((new ClassificadorDeIntencao)->provider())->toBe($esperado)

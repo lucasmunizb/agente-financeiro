@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\Domain\IA\Custo\CalculadoraDeCustoIA;
 use App\Domain\IA\Intencao;
+use App\Domain\IA\Rotacao\RotacionadorDeProvedores;
+use App\Domain\Shared\Clock;
+use App\Domain\Shared\SystemClock;
 use App\Domain\Importacao\ExtratorDeTexto;
 use App\Domain\Importacao\ExtratorDeTextoPoppler;
 use App\Domain\Importacao\OcrFallback;
@@ -23,7 +26,9 @@ use App\Domain\Telegram\RoteadorDeMensagem;
 use App\Domain\Telegram\Saida\ClienteTelegram;
 use App\Domain\Telegram\Saida\ClienteTelegramHttp;
 use App\Listeners\LogarFailoverDeIA;
+use App\Listeners\PenalizarProvedorNaRotacao;
 use App\Models\ChatMessage;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
@@ -76,6 +81,22 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ExtratorDeTexto::class, ExtratorDeTextoPoppler::class);
         $this->app->bind(OcrFallback::class, OcrTesseract::class);
         $this->app->bind(ParserDeFatura::class, ParserItau::class);
+
+        // Relógio injetável para TTL determinístico (rotação de IA e afins).
+        $this->app->bind(Clock::class, SystemClock::class);
+
+        // Rotação de provedores de IA (spec 04c): fila LRU + cooldown com estado no cache
+        // store compartilhado (app↔worker), sob Cache::lock. Singleton por request — o
+        // estado real vive no cache, não em memória do processo.
+        $this->app->singleton(RotacionadorDeProvedores::class, function ($app) {
+            $config = (array) $app['config']->get('ai.rotacao', []);
+
+            return new RotacionadorDeProvedores(
+                Cache::store($config['store'] ?? $app['config']->get('cache.default')),
+                $app->make(Clock::class),
+                $config,
+            );
+        });
     }
 
     /**
@@ -85,6 +106,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Registra a indisponibilidade de provedor de IA (failover nativo da SDK).
         Event::listen(AgentFailedOver::class, LogarFailoverDeIA::class);
+
+        // Bencha na rotação (spec 04c) o provedor que caiu — complementa o log acima, só
+        // age com a rotação ligada (retrocompatível quando desligada).
+        Event::listen(AgentFailedOver::class, PenalizarProvedorNaRotacao::class);
 
         // Parâmetro {transaction} das rotas chega SEMPRE criptografado (requisito
         // inegociável — README §"Identificadores nas URLs"). Decodifica o token opaco de

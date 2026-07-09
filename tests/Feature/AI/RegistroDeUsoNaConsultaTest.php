@@ -26,6 +26,10 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->seed([PaymentMethodSeeder::class, StatusPagamentoSeeder::class]);
+
+    // Rotação (04c) desligada: a cabeça de provider() é config('ai.default'), tornando o
+    // assert do provedor registrado determinístico independentemente do .env do ambiente.
+    config()->set('ai.rotacao.enabled', false);
 });
 
 function gastoParaUso(User $user, int $valorCents, string $vencimento): void

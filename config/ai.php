@@ -47,6 +47,34 @@ return [
 
     'request_timeout' => (int) env('AI_REQUEST_TIMEOUT', 8),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Rotação de provedores (fila LRU + cooldown) — spec 04c
+    |--------------------------------------------------------------------------
+    |
+    | Distribui as chamadas entre vários free tiers, rotacionando em fila (o menos-
+    | recentemente-usado primeiro) e benchando quem falha por `cooldown` segundos.
+    | Desligado (padrão) → o trait usa o `failover` estático acima (retrocompatível,
+    | spec 04 intacta). O estado (fila + cooldowns) vive no cache `store`, compartilhado
+    | entre os contêineres `app` e `worker`, sob `Cache::lock` (atômico). Só entram na
+    | rotação os provedores COM chave presente. Ver docs/specs/04c-rotacao-provedores-ia.md.
+    |
+    */
+
+    'rotacao' => [
+        'enabled' => (bool) env('AI_ROTACAO_ENABLED', false),
+        'pool' => array_values(array_filter(array_map('trim', explode(
+            ',',
+            // Free tiers que a SDK suporta para TEXTO: groq (rápido), mistral, gemini
+            // (reserva — lento/503 frequente). Cohere fica de fora: o driver da SDK só
+            // faz reranking/embeddings, não geração de texto.
+            env('AI_ROTACAO_POOL', 'groq,mistral,gemini')
+        )))),
+        'cooldown' => (int) env('AI_ROTACAO_COOLDOWN', 60),   // segundos benched após falha
+        'store' => env('AI_ROTACAO_STORE', env('CACHE_STORE', 'database')),
+        'lock_ttl' => (int) env('AI_ROTACAO_LOCK_TTL', 5),    // segundos de espera pelo lock
+    ],
+
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
