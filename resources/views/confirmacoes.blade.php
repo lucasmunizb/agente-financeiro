@@ -39,7 +39,20 @@
                     </div>
                     <div class="flex flex-col items-end gap-1.5">
                         <span class="font-value-display text-value-display text-on-surface">{{ $item['valor'] }}</span>
-                        <span class="inline-flex items-center rounded-full bg-surface-container px-2.5 py-0.5 font-label-sm text-label-sm text-on-surface-variant">
+                        @php $ehRecorrencia = ($item['origemCodigo'] ?? null) === 'recorrencia'; @endphp
+                        {{-- Selo da origem. Recorrência ganha destaque próprio (ícone + tom
+                             cédula) para o usuário reconhecer que veio de uma cobrança mensal;
+                             as demais origens seguem no chip neutro. Não comunica só por cor:
+                             o rótulo e o title acompanham o ícone (acessibilidade). --}}
+                        <span data-origem="{{ $item['origemCodigo'] ?? '' }}" title="Origem: {{ $item['origem'] }}"
+                            @class([
+                                'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-label-sm text-label-sm',
+                                'bg-cedula/10 text-cedula' => $ehRecorrencia,
+                                'bg-surface-container text-on-surface-variant' => ! $ehRecorrencia,
+                            ])>
+                            @if ($ehRecorrencia)
+                                <x-icon name="refresh-cw" class="h-3.5 w-3.5" aria-hidden="true" />
+                            @endif
                             {{ $item['origem'] }}
                         </span>
                     </div>

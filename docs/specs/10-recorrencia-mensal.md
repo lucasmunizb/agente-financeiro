@@ -131,7 +131,7 @@ pendente** — o usuário confirma e ela vira lançamento. Nada é gravado sem o
 ## 8. Backend agora · Frontend depois
 | Backend (esta etapa) | Frontend (etapa separada e posterior) |
 |---|---|
-| `recurrences` + domínio + comando agendado + fila alimentada + CHECK origem; borda web (o `store` do gasto cria a recorrência a partir do mês seguinte, atômico) | ✅ Switch "Repete todo mês?" + Periodicidade + Dia (§7.7/§7.7b) ligados ao `store` + nota na confirmação. **Ainda deferido:** selo "recorrência" na fila §7.9; tela de gerenciar recorrências (listar/cancelar) |
+| `recurrences` + domínio + comando agendado + fila alimentada + CHECK origem; borda web (o `store` do gasto cria a recorrência a partir do mês seguinte, atômico) | ✅ Switch "Repete todo mês?" + Periodicidade + Dia (§7.7/§7.7b) ligados ao `store` + nota na confirmação. ✅ Selo "recorrência" na fila §7.9. **Ainda deferido:** tela de gerenciar recorrências (listar/cancelar) |
 
 ## 9. Definition of Done
 - [ ] Cenários C1–C10 cobertos por testes que falhavam antes e agora passam.
@@ -170,7 +170,10 @@ pendente** — o usuário confirma e ela vira lançamento. Nada é gravado sem o
     + Dia; nota na confirmação) e `resources/js/pages/registrar-gasto.js` (envia os campos,
     sugere o dia pelo vencimento, mostra a nota; corrigido o realce inline de categoria).
   - Testes: `RegistrarGastoWebTest` (+5) e `RecorrenciaTest` (+1). Suíte: **790 verdes**.
-- **Adiado para:** selo "recorrência" na fila §7.9; tela de gerenciar recorrências.
+- **Entregue (selo na fila §7.9):** `ConfirmacaoPendenteController` passa `origemCodigo`;
+  `resources/views/confirmacoes.blade.php` mostra o selo distinto (ícone `refresh-cw` + tom
+  cédula + `title`) para itens de recorrência. Teste em `ConfirmacoesTelaTest` (+1).
+- **Adiado para:** tela de gerenciar recorrências (listar/cancelar).
 - **Decisões de regra tomadas:**
   - Materialização = **enfileira 1 confirmação no dia** (just-in-time, sem materializar
     meses à frente). Casa com "fila revisável 1 a 1" + regra 7.

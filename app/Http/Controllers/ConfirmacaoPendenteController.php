@@ -64,6 +64,7 @@ class ConfirmacaoPendenteController extends Controller
                 'parcelas' => $parcelas > 1 ? $parcelas.'x' : 'à vista',
                 'forma' => self::FORMA_LABEL[$tipo] ?? 'Outros',
                 'origem' => self::ORIGEM_LABEL[$p->origem] ?? $p->origem,
+                'origemCodigo' => $p->origem, // hook de estilo do selo (ex.: recorrência)
             ];
         })->all();
 

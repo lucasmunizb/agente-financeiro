@@ -53,6 +53,16 @@ it('lista os pendentes do usuário, já formatados', function () {
         ->assertSee('Nada é gravado até você confirmar.');
 });
 
+it('destaca a origem "recorrência" com um selo próprio (hook data-origem)', function () {
+    $user = User::factory()->create();
+    enfileirarTela($user, 'Netflix', 5590); // enfileirado com origem recorrência
+
+    $this->actingAs($user)->get(route('confirmacoes'))
+        ->assertOk()
+        ->assertSee('Recorrência')                    // rótulo amigável
+        ->assertSee('data-origem="recorrencia"', false); // hook do selo distinto (estilo/ícone)
+});
+
 it('mostra o estado vazio quando não há pendentes', function () {
     $user = User::factory()->create();
 
