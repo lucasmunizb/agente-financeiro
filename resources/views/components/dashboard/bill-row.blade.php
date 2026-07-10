@@ -18,6 +18,8 @@
         'error' => 'text-error',
         default => 'text-primary',
     };
+    // Recorrência ainda não paga: "previsto" (não venceu) ou "atraso" (venceu) — nunca "pago".
+    $selo = $prevista ? ($status === 'atraso' ? 'atraso' : 'previsto') : $status;
 @endphp
 
 <div class="group -mx-2 flex items-center justify-between rounded-lg border-b border-linha px-2 py-4 transition-colors last:border-0 hover:bg-surface-container-lowest/60">
@@ -38,6 +40,6 @@
     </div>
     <div class="flex shrink-0 items-center gap-3 sm:gap-6">
         <span class="font-value-label text-value-label text-on-surface">{{ $value }}</span>
-        <x-ui.status-badge :status="$prevista ? 'previsto' : $status" />
+        <x-ui.status-badge :status="$selo" />
     </div>
 </div>

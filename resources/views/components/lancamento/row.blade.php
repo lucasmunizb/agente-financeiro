@@ -9,8 +9,15 @@
     'showUrl' => null,   // detalhe do lançamento (a linha inteira abre daqui)
     'editarUrl' => null, // detalhe já com o modal de edição aberto (?editar=1)
     'recorrente' => false, // nasceu de recorrência → ícone de repetição (spec 10)
-    'prevista' => false, // ocorrência PROJETADA de mês futuro → selo "previsto" (spec 10b)
+    'prevista' => false, // ocorrência de recorrência ainda NÃO paga (previsto/atraso, spec 10)
+    'pagarUrl' => null, // ocorrência na fila (pendente) → botão "marcar como pago" (spec 10)
 ])
+
+@php
+    // Selo da ocorrência: real usa o próprio status; a recorrência ainda não paga vira
+    // "previsto" (não venceu) ou "atraso" (venceu) — nunca "pago" enquanto não materializada.
+    $selo = $prevista ? ($status === 'atraso' ? 'atraso' : 'previsto') : $status;
+@endphp
 
 {{-- Linha de lançamento no estilo EXTRATO (spec FE §4.6/§7.6): descrição + chip de
      categoria + forma/cartão à esquerda; valor em mono e selo de status à direita. A linha
@@ -48,9 +55,31 @@
     <div class="flex shrink-0 items-center gap-2">
         <div class="pointer-events-none flex flex-col items-end gap-1.5">
             <span class="font-value-label text-value-label font-semibold text-on-surface">{{ $valor }}</span>
-            <x-ui.status-badge :status="$prevista ? 'previsto' : $status" />
+            <x-ui.status-badge :status="$selo" />
         </div>
-        @if ($editarUrl)
+        @if ($pagarUrl)
+            {{-- Ocorrência de recorrência na fila: "marcar como pago" com prévia + confirmação
+                 embutida (regra 7, sem JS) — mesmo padrão <details> do detalhe. Fica ACIMA do
+                 link esticado (z-10). Ao confirmar, materializa o lançamento pago (spec 10). --}}
+            <details class="relative z-10 text-left">
+                <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-container/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label="Marcar {{ $descricao }} como pago" title="Marcar como pago">
+                    <x-icon name="check" class="h-4 w-4" />
+                </summary>
+                <form method="POST" action="{{ $pagarUrl }}"
+                    class="absolute right-0 z-20 mt-2 flex min-w-[13rem] flex-col gap-2 rounded-control border border-linha bg-surface-container-lowest p-3 shadow-md">
+                    @csrf
+                    <p class="font-label-sm text-label-sm text-on-surface-variant">
+                        Marcar <span class="text-on-surface">{{ $descricao }}</span> como pago —
+                        <span class="font-value-label text-on-surface">{{ $valor }}</span>?
+                    </p>
+                    <button type="submit"
+                        class="inline-flex h-10 items-center justify-center rounded-control bg-primary px-4 font-body-sm text-body-sm font-semibold text-on-primary transition-colors hover:bg-primary-container focus:outline-none focus:ring-2 focus:ring-primary active:scale-95">
+                        Confirmar pagamento
+                    </button>
+                </form>
+            </details>
+        @elseif ($editarUrl)
             <a href="{{ $editarUrl }}"
                 class="relative z-10 -mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label="Editar {{ $descricao }}">

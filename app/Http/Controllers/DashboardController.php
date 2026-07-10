@@ -127,7 +127,7 @@ class DashboardController extends Controller
             'disponivelPositivo' => $disponivelCents >= 0,
 
             'gastos' => Money::fromCents($totalGastosCents)->formatBRL(),
-            'comparativo' => $this->comparativo($userId, $mes, $hoje, $totalGastosCents),
+            'comparativo' => $this->comparativo($userId, $mes, $hoje, $totalGastosCents, $agora),
 
             'aVencer7' => $this->aVencer7Dias($resumo, $hoje),
 
@@ -175,10 +175,12 @@ class DashboardController extends Controller
      *
      * @return array{texto: string, tom: string}|null
      */
-    private function comparativo(int $userId, string $mes, CarbonImmutable $hoje, int $atualCents): ?array
+    private function comparativo(int $userId, string $mes, CarbonImmutable $hoje, int $atualCents, CarbonImmutable $agora): ?array
     {
         $mesAnterior = $hoje->subMonthNoOverflow()->format('Y-m');
-        $anteriorCents = app(ConsultarGastos::class)->para($userId, $mesAnterior)->totalCents;
+        // "agora" real (não a âncora): se o mês navegado é futuro, o mês anterior também pode ser
+        // futuro e deve incluir as recorrências previstas (mesma verdade do donut/extrato).
+        $anteriorCents = app(ConsultarGastos::class)->para($userId, $mesAnterior, agora: $agora)->totalCents;
 
         if ($anteriorCents <= 0) {
             return null;

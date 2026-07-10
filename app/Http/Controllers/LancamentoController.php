@@ -10,6 +10,7 @@ use App\Domain\Gasto\PagamentoNaoPermitidoException;
 use App\Domain\Gasto\RegistrarPagamentoParcela;
 use App\Domain\Lancamentos\ConsultarLancamentoDetalhe;
 use App\Domain\Lancamentos\ConsultarLancamentos;
+use App\Domain\Recorrencia\PagarRecorrenciaPendente;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\OpaqueId;
 use App\Http\Controllers\Concerns\PreparaEdicaoDeGasto;
@@ -232,6 +233,23 @@ class LancamentoController extends Controller
     }
 
     /**
+     * Marca como paga uma ocorrência de recorrência que está na FILA (confirmação pendente,
+     * spec 10 — fila e extrato coexistem). Borda fina: delega ao domínio
+     * ({@see PagarRecorrenciaPendente}), que reusa confirmar+pagar (regra 4), isola por usuário
+     * (404 para pendente alheio) e é idempotente. A confirmação (regra 7) veio da tela antes do
+     * POST. Volta ao extrato (preserva o mês navegado).
+     */
+    public function pagarRecorrencia(Request $request, int $pendente, PagarRecorrenciaPendente $pagar): RedirectResponse
+    {
+        $transacao = $pagar->pagar($pendente, $request->user()->id, CarbonImmutable::now(RelativeDate::TIMEZONE));
+
+        return back()->with(
+            'sucesso',
+            $transacao !== null ? 'Recorrência marcada como paga.' : 'Esta ocorrência já foi resolvida.',
+        );
+    }
+
+    /**
      * Cancela o lançamento e as parcelas ainda NÃO finalizadas ("esta e as próximas"),
      * preservando as já pagas/parciais/estornadas (FE §7.8). Borda fina: delega ao domínio
      * determinístico ({@see CancelarGastoManual}), que isola por usuário (404 para lançamento
@@ -299,6 +317,11 @@ class LancamentoController extends Controller
                         'prevista' => $item['prevista'] ?? false,
                         'showUrl' => $showUrl,
                         'editarUrl' => $temDetalhe ? $showUrl.'?editar=1' : null,
+                        // Ocorrência de recorrência na fila (pendente): habilita "marcar como pago"
+                        // (o id já vem opaco do domínio). As demais linhas não têm.
+                        'pagarUrl' => ($item['pendenteId'] ?? null) !== null
+                            ? route('lancamentos.recorrencia.pagar', $item['pendenteId'])
+                            : null,
                     ];
                 }, $grupo['itens']),
             ];

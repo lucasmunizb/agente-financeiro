@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Ai\Agents;
 
 use App\Ai\Concerns\UsaFailoverDeProvedores;
+use App\Ai\Concerns\UsaRaciocinioBaixoNaGroq;
+use Laravel\Ai\Attributes\UseCheapestModel;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Promptable;
@@ -18,11 +21,18 @@ use Stringable;
  * a IA nunca produz um valor que não veio do payload. O guard pós-geração (barreira 4,
  * §3.3), que valida cada número/data do texto contra o payload, é camada NOSSA e entra no
  * Bloco 6. Implementado via Laravel AI SDK (regra inviolável 8).
+ *
+ * Custo (doc 02 §3.6): formatar um payload já calculado é tarefa MECÂNICA e sem roteamento de
+ * tools — não há retry de guard a temer ao rebaixar o modelo. Roda no modelo mais BARATO do
+ * provedor (#[UseCheapestModel]) e pede reasoning_effort baixo à Groq (corta o raciocínio dos
+ * modelos gpt-oss). Sem #[MaxTokens]: o teto incluiria o reasoning e truncaria a resposta.
  */
-class RedatorDeResposta implements Agent, Conversational, HasTools
+#[UseCheapestModel]
+class RedatorDeResposta implements Agent, Conversational, HasProviderOptions, HasTools
 {
     use Promptable;
     use UsaFailoverDeProvedores;
+    use UsaRaciocinioBaixoNaGroq;
 
     /**
      * Redige uma resposta em linguagem natural a partir do payload já calculado.

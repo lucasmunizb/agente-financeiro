@@ -1,11 +1,15 @@
 <?php
 
+use App\Domain\Confirmacao\EnfileirarConfirmacao;
+use App\Domain\Gasto\DadosGastoManual;
+use App\Domain\Shared\OpaqueId;
 use App\Domain\Lancamentos\ConsultarLancamentos;
 use App\Domain\Lancamentos\ResultadoConsultaLancamentos;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
+use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
@@ -14,6 +18,40 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\StatusPagamentoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+
+/** Enfileira uma ocorrência de recorrência na fila (o que o agendador faz), fora de cartão. */
+function pendenteRecorrenciaExtrato(User $user, int $cents, string $dataCompra, string $descricao = 'Netflix', ?Category $categoria = null): PendingConfirmation
+{
+    return (new EnfileirarConfirmacao)->enfileirar(
+        new DadosGastoManual(
+            userId: $user->id,
+            descricao: $descricao,
+            valorTotalCents: $cents,
+            dataCompra: CarbonImmutable::parse($dataCompra, 'America/Sao_Paulo'),
+            paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
+            parcelas: 1,
+            categoriaId: $categoria?->id,
+            origem: 'recorrencia',
+            recurrenceId: Recurrence::factory()->for($user)->create(['status' => Recurrence::STATUS_ATIVO])->id,
+        ),
+        PendingConfirmation::ORIGEM_RECORRENCIA,
+        expiraEm: null,
+    );
+}
+
+/** Busca um item (por descrição) em qualquer grupo do resultado. */
+function itemDoExtrato(ResultadoConsultaLancamentos $r, string $descricao): ?array
+{
+    foreach ($r->grupos as $grupo) {
+        foreach ($grupo['itens'] as $item) {
+            if ($item['descricao'] === $descricao) {
+                return $item;
+            }
+        }
+    }
+
+    return null;
+}
 
 /*
  * Consulta de extrato `consultar_lancamentos` (FE §7.6) — varredura determinística que
@@ -373,4 +411,67 @@ it('isola as previstas por usuário', function () {
 
     expect($r->registros)->toBe(1)
         ->and(itensDoExtrato($r)[0]['descricao'])->toBe('Minha');
+});
+
+// ---- Ocorrências de recorrência na FILA (confirmação pendente) no extrato (fila↔extrato) ----
+
+it('mostra a ocorrência de recorrência da fila como item PREVISTO, com o id do pendente e no total', function () {
+    $user = User::factory()->create();
+
+    // hoje = 2026-06-15; ocorrência vence 20/06 (ainda não venceu) ⇒ previsto.
+    $pendente = pendenteRecorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix');
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
+    $item = itemDoExtrato($r, 'Netflix');
+
+    expect($item)->not->toBeNull()
+        ->and($item['recorrente'])->toBeTrue()
+        ->and($item['prevista'])->toBeTrue()
+        ->and($item['status'])->toBe('previsto')
+        ->and($item['cents'])->toBe(5590)
+        ->and($item['transactionId'])->toBeNull()
+        ->and(OpaqueId::decode($item['pendenteId']))->toBe($pendente->id)
+        ->and($r->totalExibidoCents)->toBe(5590);
+});
+
+it('marca como ATRASO a ocorrência pendente cujo dia já passou', function () {
+    $user = User::factory()->create();
+
+    // hoje = 2026-06-15; ocorrência venceu 10/06 e não foi paga ⇒ atraso.
+    pendenteRecorrenciaExtrato($user, 5590, '2026-06-10', 'Netflix');
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
+
+    expect(itemDoExtrato($r, 'Netflix')['status'])->toBe('atraso');
+});
+
+it('não mostra a ocorrência pendente já confirmada (o lançamento real assume)', function () {
+    $user = User::factory()->create();
+    $pendente = pendenteRecorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix');
+    $pendente->update(['status' => PendingConfirmation::STATUS_CONFIRMADO]);
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
+
+    expect(itemDoExtrato($r, 'Netflix'))->toBeNull();
+});
+
+it('isola as ocorrências pendentes por usuário', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+    pendenteRecorrenciaExtrato($outro, 999900, '2026-06-20', 'Alheia');
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
+
+    expect(itemDoExtrato($r, 'Alheia'))->toBeNull()
+        ->and($r->totalExibidoCents)->toBe(0);
+});
+
+it('exclui a ocorrência pendente ao filtrar por cartão (recorrência é fora de cartão)', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+    pendenteRecorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix');
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato(), cartaoId: $cartao->id);
+
+    expect(itemDoExtrato($r, 'Netflix'))->toBeNull();
 });

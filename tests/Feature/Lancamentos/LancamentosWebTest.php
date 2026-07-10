@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Domain\Confirmacao\EnfileirarConfirmacao;
+use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Shared\OpaqueId;
 use App\Models\Card;
+use App\Models\PendingConfirmation;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
@@ -78,6 +81,67 @@ it('no mês FUTURO lista as recorrências previstas com o selo "Previsto" (spec 
         ->assertSee('Netflix')
         ->assertSee('Previsto')
         ->assertSee('R$ 55,90');
+});
+
+function pendenteRecorrenciaWeb(User $user, string $dataCompra = '2026-06-10'): PendingConfirmation
+{
+    $rec = Recurrence::factory()->for($user)->create([
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-05',
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+    ]);
+
+    return (new EnfileirarConfirmacao)->enfileirar(
+        new DadosGastoManual(
+            userId: $user->id, descricao: 'Netflix', valorTotalCents: 5590,
+            dataCompra: CarbonImmutable::parse($dataCompra, 'America/Sao_Paulo'),
+            paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX), parcelas: 1,
+            origem: 'recorrencia', recurrenceId: $rec->id,
+        ),
+        PendingConfirmation::ORIGEM_RECORRENCIA,
+    );
+}
+
+it('marca a recorrência da fila como paga: cria o lançamento pago e resolve o pendente', function () {
+    $user = User::factory()->create();
+    $pendente = pendenteRecorrenciaWeb($user);
+
+    $this->actingAs($user)
+        ->post(route('lancamentos.recorrencia.pagar', $pendente->opaqueId()))
+        ->assertRedirect()
+        ->assertSessionHas('sucesso');
+
+    $tx = Transaction::where('recurrence_id', $pendente->recurrence_id)->first();
+    expect($tx)->not->toBeNull()
+        ->and($tx->status_id)->toBe(StatusPagamento::idFor(StatusPagamento::PAGO))
+        ->and($pendente->fresh()->status)->toBe(PendingConfirmation::STATUS_CONFIRMADO);
+});
+
+it('mostra a ocorrência de recorrência da fila no extrato como ATRASO com botão "marcar como pago"', function () {
+    $user = User::factory()->create();
+    // hoje = 2026-06-15; ocorrência venceu 10/06 e não foi paga ⇒ atraso.
+    pendenteRecorrenciaWeb($user, '2026-06-10');
+
+    $html = $this->actingAs($user)->get('/lancamentos')
+        ->assertOk()
+        ->assertSee('Netflix')
+        ->assertSee('Atraso')
+        ->assertSee('Confirmar pagamento')
+        ->getContent();
+
+    expect($html)->toContain('/lancamentos/recorrencia/')
+        ->and($html)->toContain('/pagar');
+});
+
+it('não paga a ocorrência pendente de outro usuário (404)', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+    $pendente = pendenteRecorrenciaWeb($outro);
+
+    $this->actingAs($user)
+        ->post(route('lancamentos.recorrencia.pagar', $pendente->opaqueId()))
+        ->assertNotFound();
+
+    expect(Transaction::count())->toBe(0);
 });
 
 it('no mês CORRENTE não projeta previstas — servido pela materialização (regressão 10b)', function () {

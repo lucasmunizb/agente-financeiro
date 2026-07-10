@@ -20,6 +20,11 @@ use Carbon\CarbonImmutable;
  * `recurrenceId` liga o lançamento à recorrência que o gerou (só os produtores de
  * recorrência preenchem; ausente ⇒ lançamento avulso). É o elo que viaja com o dado
  * até a transaction — a VERDADE de "este lançamento é recorrente" (spec 10).
+ *
+ * `categoriaSugeridaPorIa` marca que a `categoriaId` foi PRÉ-SELECIONADA pela IA (fallback
+ * quando o lookup determinístico não classificou), não por uma regra aprendida. É só um
+ * sinal de procedência para a apresentação exibir a dica ("sugestão da IA — confira") e para
+ * medir acurácia rumo ao auto-save; não altera cálculo. A confirmação continua obrigatória.
  */
 final class DadosGastoManual
 {
@@ -35,5 +40,6 @@ final class DadosGastoManual
         public readonly ?int $categoriaId = null,
         public readonly string $origem = 'manual',
         public readonly ?int $recurrenceId = null,
+        public readonly bool $categoriaSugeridaPorIa = false,
     ) {}
 }

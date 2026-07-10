@@ -3,6 +3,7 @@
 use App\Ai\Tools\ConsultarGastos;
 use App\Models\Category;
 use App\Models\Installment;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -121,4 +122,19 @@ it('não lista os itens quando detalhar não é pedido', function () {
     $saida = (string) (new ConsultarGastos($user))->handle(new Request(['periodo' => '2026-07']));
 
     expect($saida)->not->toContain('05/07/2026');
+});
+
+it('inclui as recorrências previstas do mês futuro no total (mesma verdade do extrato)', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-09 10:00:00', 'America/Sao_Paulo'));
+
+    $user = User::factory()->create();
+    gastoNoMes($user, 50000, '2026-08-20');
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Aluguel', 'valor_cents' => 180000, 'dia' => 10,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-08-10',
+    ]);
+
+    $saida = (string) (new ConsultarGastos($user))->handle(new Request(['periodo' => '2026-08']));
+
+    expect($saida)->toContain('R$ 2.300,00'); // 500 real + 1.800 recorrência prevista
 });

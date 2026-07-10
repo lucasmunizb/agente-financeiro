@@ -6,6 +6,7 @@ namespace App\Domain\Lancamentos;
 
 use App\Domain\Gastos\ConsultarGastos;
 use App\Domain\Recorrencia\ProjetarRecorrencias;
+use App\Domain\Recorrencia\ProjetarRecorrenciasPendentes;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
 use App\Models\StatusPagamento;
@@ -38,8 +39,12 @@ final class ConsultarLancamentos
 
     public const STATUS_CANCELADO = 'cancelado';
 
+    /** Bucket de exibição de uma ocorrência de recorrência ainda não paga. */
+    public const STATUS_PREVISTO = 'previsto';
+
     public function __construct(
         private readonly ProjetarRecorrencias $projetarRecorrencias = new ProjetarRecorrencias,
+        private readonly ProjetarRecorrenciasPendentes $projetarPendentes = new ProjetarRecorrenciasPendentes,
     ) {}
 
     public function para(
@@ -126,6 +131,7 @@ final class ConsultarLancamentos
                 // "Verdade" de recorrente = transactions.recurrence_id (spec 10).
                 'recorrente' => $tx->recurrence_id !== null,
                 'prevista' => false,
+                'pendenteId' => null,
             ];
         }
 
@@ -158,6 +164,39 @@ final class ConsultarLancamentos
                 'vencimento' => $venc,
                 'recorrente' => true,
                 'prevista' => true,
+                'pendenteId' => null,
+            ];
+        }
+
+        // Ocorrências de recorrência que estão na FILA (confirmação pendente, spec 10): a ponte
+        // fila↔extrato. Status de exibição por data (previsto/atraso) e o id OPACO do pendente
+        // para o botão "marcar como pago". Read-only; sem lançamento real (transactionId null).
+        foreach ($this->projetarPendentes->para($userId, $periodo, $hoje) as $ocorrencia) {
+            if (! $this->pendenteCasaFiltros($ocorrencia, $status, $cartaoId, $categoriaId, $forma, $busca)) {
+                continue;
+            }
+
+            $venc = CarbonImmutable::createFromFormat('!Y-m-d', (string) $ocorrencia['vencimento'], 'America/Sao_Paulo');
+            $cents = (int) $ocorrencia['cents'];
+            $total += $cents;
+            $registros++;
+
+            $dia = $venc->toDateString();
+            $grupos[$dia] ??= ['data' => $venc->startOfDay(), 'itens' => []];
+            $grupos[$dia]['itens'][] = [
+                'transactionId' => null,
+                'descricao' => (string) $ocorrencia['descricao'],
+                'cents' => $cents,
+                'categoria' => $ocorrencia['categoria'] ?? null,
+                'forma' => $ocorrencia['forma'] ?? null,
+                'cartaoDescricao' => null,
+                'parcela' => null,
+                'status' => (string) $ocorrencia['status'], // previsto | atraso
+                'vencimento' => $venc,
+                'recorrente' => true,
+                'prevista' => true,
+                // Alvo do "marcar como pago" (id opaco do pendente); as demais linhas não têm.
+                'pendenteId' => $ocorrencia['pendenteId'],
             ];
         }
 
@@ -193,6 +232,49 @@ final class ConsultarLancamentos
 
         if ($cartaoId !== null) {
             return false;
+        }
+
+        if ($categoriaId !== null && ($ocorrencia['categoriaId'] ?? null) !== $categoriaId) {
+            return false;
+        }
+
+        if ($forma !== null && ($ocorrencia['forma'] ?? null) !== $forma) {
+            return false;
+        }
+
+        if ($busca !== null && stripos((string) $ocorrencia['descricao'], $busca) === false) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Aplica os filtros ativos a uma ocorrência de recorrência PENDENTE (fila↔extrato). Recorrência
+     * é fora de cartão (filtro de cartão a descarta); o filtro de status casa pelo bucket de
+     * exibição da ocorrência (previsto→a_vencer, atraso→atraso); categoria/forma/busca pelos
+     * próprios campos.
+     *
+     * @param  array<string, mixed>  $ocorrencia
+     */
+    private function pendenteCasaFiltros(
+        array $ocorrencia,
+        ?string $status,
+        ?int $cartaoId,
+        ?int $categoriaId,
+        ?string $forma,
+        ?string $busca,
+    ): bool {
+        if ($cartaoId !== null) {
+            return false;
+        }
+
+        if ($status !== null) {
+            $bucket = $ocorrencia['status'] === self::STATUS_ATRASO ? self::STATUS_ATRASO : self::STATUS_A_VENCER;
+
+            if ($status !== $bucket && $status !== $ocorrencia['status']) {
+                return false;
+            }
         }
 
         if ($categoriaId !== null && ($ocorrencia['categoriaId'] ?? null) !== $categoriaId) {

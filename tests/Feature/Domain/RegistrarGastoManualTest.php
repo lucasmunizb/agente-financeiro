@@ -5,6 +5,7 @@ use App\Domain\Gasto\PreviaGastoManual;
 use App\Domain\Gasto\RegistrarGastoManual;
 use App\Models\AuditLog;
 use App\Models\Card;
+use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
 use App\Models\StatusPagamento;
@@ -36,6 +37,8 @@ function dadosPix(User $user, array $over = []): DadosGastoManual
         dataCompra: $over['dataCompra'] ?? CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo'),
         paymentMethodId: $over['paymentMethodId'] ?? PaymentMethod::idFor(PaymentMethod::PIX),
         parcelas: $over['parcelas'] ?? 3,
+        categoriaId: $over['categoriaId'] ?? null,
+        categoriaSugeridaPorIa: $over['categoriaSugeridaPorIa'] ?? false,
     );
 }
 
@@ -61,6 +64,30 @@ it('preview fora de cartão: primeiro vencimento na data da compra, +1 mês cada
         ->toBe(['2026-06-10', '2026-07-10', '2026-08-10'])
         ->and(array_map(fn ($p) => $p->valor->cents(), $previa->parcelas))
         ->toBe([10000, 10000, 10000]);
+});
+
+it('preview traz o NOME da categoria e a procedência (para a dica na confirmação)', function () {
+    $user = User::factory()->create();
+    $lazer = Category::factory()->for($user)->create(['nome' => 'Lazer']);
+
+    $sugerida = (new RegistrarGastoManual)->preview(
+        dadosPix($user, ['categoriaId' => $lazer->id, 'categoriaSugeridaPorIa' => true]),
+        CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'),
+    );
+    $determinada = (new RegistrarGastoManual)->preview(
+        dadosPix($user, ['categoriaId' => $lazer->id]),
+        CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'),
+    );
+    $semCategoria = (new RegistrarGastoManual)->preview(
+        dadosPix($user),
+        CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'),
+    );
+
+    expect($sugerida->categoria)->toBe('Lazer')
+        ->and($sugerida->categoriaSugeridaPorIa)->toBeTrue()
+        ->and($determinada->categoria)->toBe('Lazer')
+        ->and($determinada->categoriaSugeridaPorIa)->toBeFalse()
+        ->and($semCategoria->categoria)->toBeNull();
 });
 
 it('preview deriva o status de cada parcela pela data', function () {

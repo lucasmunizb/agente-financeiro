@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\IA;
 
 use App\Domain\Calendar\RelativeDate;
-use App\Domain\Categoria\LookupDeCategoria;
+use App\Domain\Categoria\ResolvedorDeCategoria;
 use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\Normalizador;
@@ -25,7 +25,9 @@ use InvalidArgumentException;
  * - forma: `PaymentMethod::idFor`; não suportada → esclarecimento `forma_pagamento`.
  * - cartão (SÓ crédito): casado pelo texto contido na descrição do cartão do usuário; 0 ou
  *   ≥2 correspondências → esclarecimento `cartao`. Demais formas são "fora de cartão".
- * - categoria: lookup determinístico (nunca bloqueia; null é aceitável).
+ * - categoria: lookup determinístico e, no fallback, sugestão da IA sob guard ({@see
+ *   ResolvedorDeCategoria}); nunca bloqueia (null é aceitável). A sugestão da IA é só de
+ *   CLASSIFICAÇÃO (regra 4: a IA nunca calcula dinheiro) e vem marcada como pré-seleção.
  */
 final class NormalizadorDeGastoExtraido
 {
@@ -33,7 +35,7 @@ final class NormalizadorDeGastoExtraido
     private const STOPWORDS_CARTAO = ['cartao', 'cartoes', 'card'];
 
     public function __construct(
-        private readonly LookupDeCategoria $lookup,
+        private readonly ResolvedorDeCategoria $categoria,
     ) {}
 
     public function normalizar(GastoExtraido $extraido, int $userId, CarbonImmutable $agora): ResultadoDaNormalizacao
@@ -67,6 +69,8 @@ final class NormalizadorDeGastoExtraido
             return new ResultadoDaNormalizacao(null, $esclarecimentos);
         }
 
+        $categoria = $this->categoria->para($userId, $extraido->descricao);
+
         $dados = new DadosGastoManual(
             userId: $userId,
             descricao: $extraido->descricao,
@@ -76,7 +80,8 @@ final class NormalizadorDeGastoExtraido
             parcelas: max(1, $extraido->parcelas ?? 1),
             cardId: $cardId,
             accountId: null,
-            categoriaId: $this->lookup->para($userId, $extraido->descricao),
+            categoriaId: $categoria->categoriaId,
+            categoriaSugeridaPorIa: $categoria->sugeridaPorIa,
         );
 
         return new ResultadoDaNormalizacao($dados, []);

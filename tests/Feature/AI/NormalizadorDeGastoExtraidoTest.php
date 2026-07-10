@@ -1,5 +1,6 @@
 <?php
 
+use App\Ai\Agents\SugeridorDeCategoria;
 use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\IA\NormalizadorDeGastoExtraido;
 use App\Models\Card;
@@ -10,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\StatusPagamentoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Ai\Ai;
 
 /*
  * Normalização determinística da extração da IA (Bloco 4 item 3). Converte o GastoExtraido
@@ -229,7 +231,20 @@ it('classifica a categoria deterministicamente pela descrição', function () {
 
     $r = normalizar(gastoExtraidoFake(['descricao' => 'mercado extra']), $user->id);
 
-    expect($r->dados->categoriaId)->toBe($mercado->id);
+    expect($r->dados->categoriaId)->toBe($mercado->id)
+        ->and($r->dados->categoriaSugeridaPorIa)->toBeFalse();
+});
+
+it('cai na sugestão da IA quando o lookup não classifica e marca a flag', function () {
+    $user = User::factory()->create();
+    $lazer = Category::factory()->for($user)->create(['nome' => 'Lazer']);
+    Ai::fakeAgent(SugeridorDeCategoria::class, [['categoria' => 'Lazer']]);
+
+    $r = normalizar(gastoExtraidoFake(['descricao' => 'cinema no shopping']), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->dados->categoriaId)->toBe($lazer->id)
+        ->and($r->dados->categoriaSugeridaPorIa)->toBeTrue();
 });
 
 it('usa 1 parcela por padrão e respeita o número informado', function () {

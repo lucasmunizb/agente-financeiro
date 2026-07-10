@@ -28,6 +28,7 @@ final class PayloadDoGasto
             'cardId' => $d->cardId,
             'accountId' => $d->accountId,
             'categoriaId' => $d->categoriaId,
+            'categoriaSugeridaPorIa' => $d->categoriaSugeridaPorIa,
             'origem' => $d->origem,
             'recurrenceId' => $d->recurrenceId,
         ];
@@ -48,6 +49,7 @@ final class PayloadDoGasto
             categoriaId: isset($p['categoriaId']) ? (int) $p['categoriaId'] : null,
             origem: (string) ($p['origem'] ?? 'manual'),
             recurrenceId: isset($p['recurrenceId']) ? (int) $p['recurrenceId'] : null,
+            categoriaSugeridaPorIa: (bool) ($p['categoriaSugeridaPorIa'] ?? false),
         );
     }
 }

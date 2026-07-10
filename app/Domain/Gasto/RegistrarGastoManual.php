@@ -9,6 +9,7 @@ use App\Domain\Duplicidade\ChaveDeDuplicidade;
 use App\Domain\Duplicidade\DetectorDeDuplicidade;
 use App\Domain\Shared\Money;
 use App\Models\AuditLog;
+use App\Models\Category;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use Carbon\CarbonImmutable;
@@ -38,7 +39,25 @@ final class RegistrarGastoManual
             origem: $dados->origem,
             ehDuplicado: $this->ehDuplicado($dados),
             parcelas: $this->montarParcelas($dados, $hoje),
+            categoria: $this->nomeDaCategoria($dados),
+            categoriaSugeridaPorIa: $dados->categoriaSugeridaPorIa,
         );
+    }
+
+    /**
+     * Nome da categoria pré-selecionada, para a apresentação exibir a dica sem consultar o
+     * banco. Escopo estrito por usuário; null quando não há categoria (ou não é do usuário).
+     */
+    private function nomeDaCategoria(DadosGastoManual $dados): ?string
+    {
+        if ($dados->categoriaId === null) {
+            return null;
+        }
+
+        return Category::query()
+            ->where('id', $dados->categoriaId)
+            ->where('user_id', $dados->userId)
+            ->value('nome');
     }
 
     public function confirmar(DadosGastoManual $dados, ?CarbonImmutable $hoje = null): Transaction

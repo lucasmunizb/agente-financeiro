@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Domain\Gastos;
 
+use App\Domain\Calendar\RelativeDate;
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\Orcamento\ConsumoMensal;
+use App\Domain\Recorrencia\ProjetarRecorrencias;
+use App\Domain\Recorrencia\ProjetarRecorrenciasPendentes;
 use App\Domain\Shared\PeriodoMensal;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\StatusPagamento;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -32,6 +36,15 @@ final class ConsultarGastos
         StatusPagamento::ESTORNADO,
     ];
 
+    public function __construct(
+        private readonly ProjetarRecorrencias $projetarRecorrencias = new ProjetarRecorrencias,
+        private readonly ProjetarRecorrenciasPendentes $projetarPendentes = new ProjetarRecorrenciasPendentes,
+    ) {}
+
+    /**
+     * @param  CarbonImmutable|null  $agora  "hoje" real (injetado); omitido ⇒ relógio SP.
+     *                                       Só habilita a projeção de recorrências em mês futuro.
+     */
     public function para(
         int $userId,
         string $periodo,
@@ -39,6 +52,7 @@ final class ConsultarGastos
         ?string $cartao = null,
         ?string $status = null,
         bool $detalhar = false,
+        ?CarbonImmutable $agora = null,
     ): ResultadoConsultaGastos {
         $p = PeriodoMensal::fromString($periodo);
 
@@ -85,6 +99,46 @@ final class ConsultarGastos
             }
         }
 
+        // Ocorrências de recorrência ainda NÃO materializadas — a soma por categoria (donut e bot)
+        // tem de bater com o extrato, que já as lista. Duas fontes, sem dupla-contagem:
+        //  - mês FUTURO: molde ({@see ProjetarRecorrencias}) — o guard mantém o passado/corrente vazio;
+        //  - mês corrente/atrasado: a FILA ({@see ProjetarRecorrenciasPendentes}) — pendente ainda
+        //    não confirmado, some quando vira lançamento real. Read-only.
+        $agoraResolvido = $agora ?? CarbonImmutable::now(RelativeDate::TIMEZONE);
+        $ocorrenciasPrevistas = [
+            ...$this->projetarRecorrencias->para($userId, $periodo, $agoraResolvido)->ocorrencias,
+            ...$this->projetarPendentes->para($userId, $periodo, $agoraResolvido),
+        ];
+        $registrosPrevistos = 0;
+
+        foreach ($ocorrenciasPrevistas as $ocorrencia) {
+            if (! $this->previstaCasaFiltros($ocorrencia, $categoriaId, $cardId, $status)) {
+                continue;
+            }
+
+            $cents = (int) $ocorrencia['cents'];
+            $idCategoria = $ocorrencia['categoriaId'] ?? ConsumoMensal::SEM_CATEGORIA;
+
+            $porCategoriaId[$idCategoria] = ($porCategoriaId[$idCategoria] ?? 0) + $cents;
+            $total += $cents;
+            $registrosPrevistos++;
+
+            if ($detalhar) {
+                $itens[] = [
+                    'descricao' => (string) $ocorrencia['descricao'],
+                    'cents' => $cents,
+                    'vencimento' => CarbonImmutable::createFromFormat('!Y-m-d', (string) $ocorrencia['vencimento'], RelativeDate::TIMEZONE),
+                    'parcela' => null,
+                ];
+            }
+        }
+
+        // Reordena os itens por vencimento asc só quando previstas entraram (as reais já vêm
+        // ordenadas): mantém a lista coerente e não perturba as consultas sem recorrência.
+        if ($detalhar && $registrosPrevistos > 0) {
+            usort($itens, static fn (array $a, array $b): int => $a['vencimento'] <=> $b['vencimento']);
+        }
+
         $trace = new TraceDaConsulta(
             ferramenta: 'consultar_gastos',
             filtros: [
@@ -93,7 +147,7 @@ final class ConsultarGastos
                 'cartao' => $cartao,
                 'status' => $status,
             ],
-            registros: $parcelas->count(),
+            registros: $parcelas->count() + $registrosPrevistos,
         );
 
         return new ResultadoConsultaGastos(
@@ -102,6 +156,30 @@ final class ConsultarGastos
             trace: $trace,
             itens: $itens,
         );
+    }
+
+    /**
+     * Aplica os filtros ativos à ocorrência PREVISTA (espelha o extrato/{@see ConsultarLancamentos}):
+     * recorrência é sempre fora de cartão e "a vencer" — filtro de cartão a descarta; filtro de
+     * status só a mantém no bucket em aberto; categoria casa pelo próprio id da recorrência.
+     *
+     * @param  array<string, mixed>  $ocorrencia
+     */
+    private function previstaCasaFiltros(array $ocorrencia, ?int $categoriaId, ?int $cardId, ?string $status): bool
+    {
+        if ($cardId !== null) {
+            return false;
+        }
+
+        if ($status !== null && $status !== StatusPagamento::ABERTO) {
+            return false;
+        }
+
+        if ($categoriaId !== null && ($ocorrencia['categoriaId'] ?? null) !== $categoriaId) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

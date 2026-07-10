@@ -89,6 +89,7 @@ final class ConfirmacoesPendentes
             'cardId' => $dados->cardId,
             'accountId' => $dados->accountId,
             'categoriaId' => $dados->categoriaId,
+            'categoriaSugeridaPorIa' => $dados->categoriaSugeridaPorIa,
         ];
     }
 
@@ -107,6 +108,7 @@ final class ConfirmacoesPendentes
             cardId: isset($payload['cardId']) ? (int) $payload['cardId'] : null,
             accountId: isset($payload['accountId']) ? (int) $payload['accountId'] : null,
             categoriaId: isset($payload['categoriaId']) ? (int) $payload['categoriaId'] : null,
+            categoriaSugeridaPorIa: (bool) ($payload['categoriaSugeridaPorIa'] ?? false),
         );
     }
 }

@@ -6,9 +6,13 @@ use App\Domain\IA\Guard\PayloadDeResposta;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
+use App\Models\PaymentMethod;
+use App\Models\PendingConfirmation;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\StatusPagamentoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -266,4 +270,169 @@ it('inclui o valor e a data de cada item detalhado no payload do guard', functio
 
     expect($payload->permiteValor(6000))->toBeTrue()
         ->and($payload->permiteData(5, 7, 2026))->toBeTrue();
+});
+
+// ---- Recorrências previstas na soma do mês FUTURO (donut/bot ↔ extrato) ------------------
+// O extrato já lista as recorrências previstas de um mês futuro; a soma por categoria (donut
+// e bot) tem de INCLUIR os mesmos números — sem contar duas vezes no mês corrente/passado
+// (esses já vêm do lançamento real). "Agora" é injetado; mês corrente = 2026-07.
+
+/** "Agora" fixo do usuário: 09/07/2026 (mês corrente = 2026-07). */
+function gastosAgora(): CarbonImmutable
+{
+    return CarbonImmutable::parse('2026-07-09 10:00', 'America/Sao_Paulo');
+}
+
+/** Recorrência mensal ativa fora de cartão. */
+function recorrenciaAtiva(User $user, int $valorCents, int $dia, string $proximaEm, ?Category $categoria = null, string $descricao = 'Aluguel'): Recurrence
+{
+    return Recurrence::factory()->for($user)->create([
+        'descricao' => $descricao, 'valor_cents' => $valorCents, 'dia' => $dia,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => $proximaEm,
+        'categoria_id' => $categoria?->id,
+    ]);
+}
+
+it('inclui as recorrências previstas do mês futuro no total e na quebra por categoria', function () {
+    $user = User::factory()->create();
+    $moradia = Category::factory()->for($user)->create(['nome' => 'Moradia']);
+
+    gastoFiltravel($user, 50000, '2026-08-20');                              // gasto real futuro, sem categoria
+    recorrenciaAtiva($user, 180000, 10, '2026-08-10', categoria: $moradia); // conta fixa prevista
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-08', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(230000)
+        ->and(centsDaCategoria($r, 'Moradia'))->toBe(180000)
+        ->and(centsDaCategoria($r, 'Sem categoria'))->toBe(50000)
+        ->and($r->trace->registros)->toBe(2); // 1 real + 1 prevista
+});
+
+it('não conta a recorrência no mês corrente — guard anti-dupla-contagem', function () {
+    $user = User::factory()->create();
+
+    gastoFiltravel($user, 50000, '2026-07-20');
+    recorrenciaAtiva($user, 180000, 20, '2026-07-20');
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-07', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(50000); // só o lançamento real; recorrência do mês não é projetada
+});
+
+it('não conta a recorrência em mês passado', function () {
+    $user = User::factory()->create();
+
+    gastoFiltravel($user, 50000, '2026-06-20');
+    recorrenciaAtiva($user, 180000, 20, '2026-06-20');
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-06', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(50000);
+});
+
+it('o filtro de cartão exclui as recorrências previstas (recorrência é fora de cartão)', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'cartão pai', 'final_4' => '1234']);
+
+    gastoFiltravel($user, 70000, '2026-08-10', cartao: $cartao);
+    recorrenciaAtiva($user, 180000, 10, '2026-08-10');
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-08', cartao: 'cartão pai', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(70000);
+});
+
+it('o filtro por categoria inclui só a recorrência prevista daquela categoria', function () {
+    $user = User::factory()->create();
+    $moradia = Category::factory()->for($user)->create(['nome' => 'Moradia']);
+    $lazer = Category::factory()->for($user)->create(['nome' => 'Lazer']);
+
+    recorrenciaAtiva($user, 180000, 10, '2026-08-10', categoria: $moradia, descricao: 'Aluguel');
+    recorrenciaAtiva($user, 5590, 5, '2026-08-05', categoria: $lazer, descricao: 'Netflix');
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-08', categoria: 'Moradia', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(180000)
+        ->and($r->porCategoria)->toHaveCount(1);
+});
+
+it('não conta a recorrência prevista quando o filtro é um status já resolvido (ex.: pago)', function () {
+    $user = User::factory()->create();
+
+    recorrenciaAtiva($user, 180000, 10, '2026-08-10');
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-08', status: StatusPagamento::PAGO, agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(0);
+});
+
+it('detalha a ocorrência prevista e permite seu valor/data no payload do guard', function () {
+    $user = User::factory()->create();
+
+    recorrenciaAtiva($user, 180000, 10, '2026-08-10');
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-08', detalhar: true, agora: gastosAgora());
+
+    expect($r->itens)->toHaveCount(1)
+        ->and($r->itens[0]['descricao'])->toBe('Aluguel')
+        ->and($r->itens[0]['cents'])->toBe(180000)
+        ->and($r->itens[0]['vencimento']->format('Y-m-d'))->toBe('2026-08-10')
+        ->and($r->itens[0]['parcela'])->toBeNull();
+
+    $payload = $r->payload();
+    expect($payload->permiteValor(180000))->toBeTrue()
+        ->and($payload->permiteData(10, 8, 2026))->toBeTrue();
+});
+
+it('isola as recorrências previstas por usuário', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+
+    recorrenciaAtiva($user, 180000, 10, '2026-08-10', descricao: 'Minha');
+    recorrenciaAtiva($outro, 999900, 10, '2026-08-10', descricao: 'Alheia');
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-08', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(180000);
+});
+
+it('inclui a ocorrência de recorrência da FILA (pendente) do mês corrente no total e por categoria', function () {
+    $user = User::factory()->create();
+    $moradia = Category::factory()->for($user)->create(['nome' => 'Moradia']);
+
+    // Mês corrente (2026-07): molde não projeta (guard); a ocorrência vive na fila (pendente).
+    (new App\Domain\Confirmacao\EnfileirarConfirmacao)->enfileirar(
+        new App\Domain\Gasto\DadosGastoManual(
+            userId: $user->id, descricao: 'Aluguel', valorTotalCents: 180000,
+            dataCompra: CarbonImmutable::parse('2026-07-20', 'America/Sao_Paulo'),
+            paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX), parcelas: 1,
+            categoriaId: $moradia->id, origem: 'recorrencia',
+            recurrenceId: Recurrence::factory()->for($user)->create()->id,
+        ),
+        PendingConfirmation::ORIGEM_RECORRENCIA,
+    );
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-07', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(180000)
+        ->and(centsDaCategoria($r, 'Moradia'))->toBe(180000);
+});
+
+it('não conta a ocorrência pendente já confirmada (o lançamento real assume)', function () {
+    $user = User::factory()->create();
+
+    $pendente = (new App\Domain\Confirmacao\EnfileirarConfirmacao)->enfileirar(
+        new App\Domain\Gasto\DadosGastoManual(
+            userId: $user->id, descricao: 'Aluguel', valorTotalCents: 180000,
+            dataCompra: CarbonImmutable::parse('2026-07-20', 'America/Sao_Paulo'),
+            paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX), parcelas: 1,
+            origem: 'recorrencia', recurrenceId: Recurrence::factory()->for($user)->create()->id,
+        ),
+        PendingConfirmation::ORIGEM_RECORRENCIA,
+    );
+    $pendente->update(['status' => PendingConfirmation::STATUS_CONFIRMADO]);
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-07', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(0);
 });

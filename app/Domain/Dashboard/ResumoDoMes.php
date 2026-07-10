@@ -59,7 +59,9 @@ final class ResumoDoMes
         $agora ??= $ancora;
         $mes = $ancora->setTimezone('America/Sao_Paulo')->format('Y-m');
 
-        $gastos = $this->gastos->para($userId, $mes);
+        // Passa "agora" para o donut incluir as recorrências previstas em mês futuro (bate com o
+        // extrato); em mês corrente/passado a projeção é vazia e o resultado é o das parcelas reais.
+        $gastos = $this->gastos->para($userId, $mes, agora: $agora);
         $proximasContas = $this->proximasContas->para($userId, $ancora, $janelaProximasContas);
         // Sem janela: todas as vencidas em aberto (decisão spec 06b §10).
         $contasVencidas = $this->contasVencidas->para($userId, $ancora);

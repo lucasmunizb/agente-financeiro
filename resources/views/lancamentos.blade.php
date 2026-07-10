@@ -208,7 +208,8 @@
                                     :recorrente="$item['recorrente']"
                                     :prevista="$item['prevista']"
                                     :show-url="$item['showUrl']"
-                                    :editar-url="$item['editarUrl']" />
+                                    :editar-url="$item['editarUrl']"
+                                    :pagar-url="$item['pagarUrl']" />
                             @endforeach
                         </div>
                     </section>

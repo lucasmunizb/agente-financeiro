@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\AtualizacoesController;
 use App\Http\Controllers\CartaoController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ChatController;
@@ -36,6 +37,12 @@ Route::middleware('auth')->group(function () {
     // usuário para o modal "Registrar gasto".
     Route::get('/', [DashboardController::class, 'index'])->name('home');
 
+    // Assinatura de atualizações (polling): dashboard e extrato consultam para
+    // saber se a tela ficou desatualizada por uma confirmação vinda de outro canal
+    // (ex.: o chat do Telegram) e então recarregam. Devolve só um hash opaco do
+    // estado do usuário (regra 4 — nenhum número calculado sai por aqui).
+    Route::get('/atualizacoes', [AtualizacoesController::class, 'assinatura'])->name('atualizacoes');
+
     // Lançamentos — lista/extrato (FE §7.6). Borda fina sobre o domínio determinístico
     // (ConsultarLancamentos): lista as parcelas do mês agrupadas por dia, com filtros e o
     // "total exibido" já somado. Leitura apenas; a UI nunca calcula dinheiro (regra 4).
@@ -58,6 +65,11 @@ Route::middleware('auth')->group(function () {
     // de detalhe: grava status 'pago' + data na parcela alvo (RegistrarPagamentoParcela),
     // sem tocar nas irmãs. {parcela} opaco; escopo por usuário no domínio.
     Route::post('/lancamentos/parcela/{parcela}/pagar', [LancamentoController::class, 'pagarParcela'])->name('lancamentos.parcela.pagar');
+
+    // Marcar como paga uma ocorrência de recorrência que está na FILA (confirmação pendente,
+    // spec 10 — fila e extrato coexistem): materializa o lançamento com o recurrence_id, marca
+    // pago e resolve o pendente (PagarRecorrenciaPendente). Idempotente. {pendente} opaco.
+    Route::post('/lancamentos/recorrencia/{pendente}/pagar', [LancamentoController::class, 'pagarRecorrencia'])->name('lancamentos.recorrencia.pagar');
 
     // Cancelar "esta e as próximas" (FE §7.8): marca o lançamento e as parcelas ainda não
     // finalizadas como 'cancelado', preservando as já pagas (CancelarGastoManual). Mantém a

@@ -44,7 +44,7 @@
     {{-- Tela autenticada: nunca indexar (privacidade + sem conteúdo público). --}}
     <meta name="robots" content="noindex, nofollow">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/chat.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/chat.js', 'resources/js/pages/atualizacoes.js'])
     @stack('head')
 </head>
 
@@ -169,6 +169,11 @@
 
     {{-- Toast (feedback efêmero pós-ação) --}}
     <x-ui.toast />
+
+    {{-- Auto-atualizar: toda tela logada recarrega quando a "assinatura" de estado
+         muda por uma confirmação vinda de outro canal (ex.: o chat do Telegram).
+         Só a URL; a referência é a 1ª leitura do poller (pages/atualizacoes.js). --}}
+    <div data-poll-atualizacoes data-url="{{ route('atualizacoes') }}" hidden></div>
 
     {{-- Drawer do menu (mobile): abre/fecha o aside. JS mínimo, sem framework. --}}
     <script>

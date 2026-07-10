@@ -314,6 +314,29 @@ it('não projeta recorrências no mês corrente — chamada default fica idênti
         ->and($resumo->proximasContas->contas[0]['prevista'])->toBeFalse();
 });
 
+it('na visão de mês FUTURO o donut (gastos por categoria) inclui as recorrências previstas', function () {
+    $user = User::factory()->create();
+
+    resumoParcela($user, 50000, '2026-08-20');        // gasto real vencendo no mês futuro
+    resumoRecorrencia($user, 5590, 5, '2026-08-05');  // conta fixa prevista
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-08-01'), 30, hojeSP('2026-06-15'));
+
+    // O donut soma o real (500) + a recorrência prevista (55,90) — bate com o extrato.
+    expect($resumo->gastos->totalCents)->toBe(55590);
+});
+
+it('no mês corrente o donut (gastos) não muda — sem projeção (regressão)', function () {
+    $user = User::factory()->create();
+
+    resumoParcela($user, 50000, '2026-06-20');
+    resumoRecorrencia($user, 5590, 20, '2026-06-20'); // ocorrência deste mês — servida pela fila, não projetada
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
+
+    expect($resumo->gastos->totalCents)->toBe(50000);
+});
+
 it('a previsão respeita o escopo por usuário na visão futura (P8)', function () {
     $user = User::factory()->create();
     $outro = User::factory()->create();

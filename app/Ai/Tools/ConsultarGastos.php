@@ -56,6 +56,8 @@ final class ConsultarGastos implements Tool
             cartao: $request->filled('cartao') ? (string) $request->string('cartao') : null,
             status: $request->filled('status') ? (string) $request->string('status') : null,
             detalhar: $request->boolean('detalhar'),
+            // "Hoje" real: habilita a projeção de recorrências quando o período pedido é futuro.
+            agora: CarbonImmutable::now(RelativeDate::TIMEZONE),
         );
 
         $this->coletor?->registrar($resultado->payload(), $resultado->trace);

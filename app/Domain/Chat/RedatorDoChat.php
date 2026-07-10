@@ -74,9 +74,26 @@ final class RedatorDoChat
             $linha .= sprintf(' em %dx de %s', count($previa->parcelas), $previa->parcelas[0]->valor->formatBRL());
         }
 
+        $categoria = $this->linhaCategoria($previa);
         $duplicado = $previa->ehDuplicado ? "\nAtenção: parece um lançamento repetido." : '';
 
-        return "Confirme o gasto:\n{$linha}.{$duplicado}\nResponda \"sim\" para gravar ou \"não\" para cancelar.";
+        return "Confirme o gasto:\n{$linha}.{$categoria}{$duplicado}\nResponda \"sim\" para gravar ou \"não\" para cancelar.";
+    }
+
+    /**
+     * Linha da categoria pré-selecionada. Quando a IA sugeriu (fallback do lookup), é DICA a
+     * confirmar ("sugerida"); quando veio de regra aprendida, é afirmativa; sem categoria,
+     * nada é mostrado (não polui a confirmação). O "sim" grava com a categoria pré-selecionada.
+     */
+    private function linhaCategoria(PreviaGastoManual $previa): string
+    {
+        if ($previa->categoria === null) {
+            return '';
+        }
+
+        return $previa->categoriaSugeridaPorIa
+            ? "\nCategoria sugerida: {$previa->categoria}."
+            : "\nCategoria: {$previa->categoria}.";
     }
 
     /**
