@@ -57,13 +57,6 @@
             </details>
         </header>
 
-        @if (session('sucesso'))
-            <div role="status" class="flex items-start gap-2 rounded-card border border-primary/30 bg-primary-container/10 p-4">
-                <x-icon name="check" class="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <p class="font-body-sm text-body-sm text-on-surface">{{ session('sucesso') }}</p>
-            </div>
-        @endif
-
         @if (! $temCartao)
             {{-- Estado sem cartão. --}}
             <div class="flex flex-col items-center gap-3 rounded-card border border-dashed border-linha bg-surface-container-lowest px-6 py-16 text-center">

@@ -6,6 +6,7 @@ use App\Ai\Agents\ExtratorDeGasto;
 use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Gasto\RegistrarGastoManual;
 use App\Domain\IA\ConfirmacaoDeGasto;
+use App\Domain\IA\Esclarecimento\EsclarecimentosPendentes;
 use App\Domain\IA\Intencao;
 use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\ComandoRecebido;
@@ -129,6 +130,17 @@ it('consulta (slash /buscar): responde via chat e entrega a resposta aprovada', 
     );
 });
 
+it('sinaliza processamento ("digitando…") antes de entregar a resposta', function () {
+    $user = User::factory()->create();
+
+    Ai::fakeAgent(AssistenteDeConsulta::class, ['Olá!']);
+
+    processar($user->id, Comando::BUSCAR, 'oi', '/buscar oi', Intencao::CONSULTAR);
+
+    $this->saida->shouldHaveReceived('sinalizarProcessando')
+        ->withArgs(fn (User $u) => $u->is($user));
+});
+
 it('texto livre classificado como registrar: classifica pelo texto íntegro e segue para registro', function () {
     $user = User::factory()->create();
 
@@ -244,6 +256,80 @@ it('com pendente e resposta ambígua: mantém o pendente e não grava (§C7)', f
 
     expect(Transaction::count())->toBe(0)
         ->and(app(ConfirmacoesPendentes::class)->recuperar($user->id, CarbonImmutable::now('America/Sao_Paulo')))->not->toBeNull();
+});
+
+/* -------- slot-filling multi-turno: não repetir o que o usuário já disse -------- */
+
+it('esclarecimento multi-turno: mescla a resposta seguinte e NÃO repergunta o que já foi dito', function () {
+    $user = User::factory()->create();
+
+    // Turno 1 já trazia valor + forma + data + categoria; só faltou a descrição.
+    // Turno 2 o usuário responde só a descrição — o extrator, isolado, devolve o resto nulo.
+    Ai::fakeAgent(ExtratorDeGasto::class, [
+        ['descricao' => null, 'valor' => '263,52', 'forma_pagamento' => 'pix', 'data' => 'amanhã', 'categoria' => 'viagem'],
+        ['descricao' => 'airbnb mauricio', 'valor' => null, 'forma_pagamento' => null, 'data' => null, 'categoria' => null],
+    ]);
+
+    // Turno 1: pede só a descrição (e guarda o parcial).
+    processar($user->id, Comando::DESCONHECIDO, '', 'cobrança no pix para amanhã de 263,52 na categoria viagem', Intencao::REGISTRAR);
+
+    $this->saida->shouldHaveReceived('entregar')->withArgs(
+        fn (User $u, ResultadoDaInteracao $r) => $r->tipo === TipoDeInteracao::REGISTRO
+            && $r->registro->precisaEsclarecer()
+            && $r->registro->esclarecimentos === ['descricao'],
+    );
+
+    // Turno 2: só a descrição. Sem pendente confirmável, o esclarecimento tem precedência —
+    // o classificador NÃO roda (se rodasse, sem fake, a SDK falharia).
+    processar($user->id, Comando::DESCONHECIDO, '', 'airbnb mauricio', null);
+
+    // Agora completa: confirmável, SEM pedir valor nem forma de novo.
+    $this->saida->shouldHaveReceived('entregar')->withArgs(
+        fn (User $u, ResultadoDaInteracao $r) => $r->tipo === TipoDeInteracao::REGISTRO
+            && $r->registro->confirmavel()
+            && ! $r->registro->precisaEsclarecer(),
+    );
+
+    // E vira confirmação pendente (o próximo "sim" grava); o esclarecimento sumiu.
+    expect(app(ConfirmacoesPendentes::class)->recuperar($user->id, CarbonImmutable::now('America/Sao_Paulo')))
+        ->not->toBeNull();
+});
+
+it('aguardando esclarecimento: a próxima mensagem preenche o slot, não vira consulta', function () {
+    $user = User::factory()->create();
+
+    Ai::fakeAgent(ExtratorDeGasto::class, [
+        ['descricao' => 'uber', 'valor' => null, 'forma_pagamento' => null],
+        ['descricao' => null, 'valor' => '30', 'forma_pagamento' => 'pix'],
+    ]);
+
+    processar($user->id, Comando::DESCONHECIDO, '', 'paguei o uber', Intencao::REGISTRAR);
+    // Mensagem seguinte completa os campos; NÃO é classificada como consulta (o
+    // AssistenteDeConsulta não é fakeado — se fosse chamado, a SDK falharia).
+    processar($user->id, Comando::DESCONHECIDO, '', '30 no pix', null);
+
+    $this->saida->shouldHaveReceived('entregar')->withArgs(
+        fn (User $u, ResultadoDaInteracao $r) => $r->tipo === TipoDeInteracao::REGISTRO
+            && $r->registro->confirmavel(),
+    );
+});
+
+it('aguardando esclarecimento: "cancelar" descarta o parcial sem gravar', function () {
+    $user = User::factory()->create();
+
+    Ai::fakeAgent(ExtratorDeGasto::class, [['descricao' => 'uber', 'valor' => null, 'forma_pagamento' => null]]);
+
+    processar($user->id, Comando::DESCONHECIDO, '', 'paguei o uber', Intencao::REGISTRAR);
+    // "cancelar" é a saída explícita do esclarecimento (o extrator NÃO roda de novo).
+    processar($user->id, Comando::DESCONHECIDO, '', 'cancelar', null);
+
+    $this->saida->shouldHaveReceived('entregar')->withArgs(
+        fn (User $u, ResultadoDaInteracao $r) => $r->tipo === TipoDeInteracao::CONFIRMACAO_CANCELADA,
+    );
+
+    expect(app(EsclarecimentosPendentes::class)->recuperar($user->id, CarbonImmutable::now('America/Sao_Paulo')))
+        ->toBeNull()
+        ->and(Transaction::count())->toBe(0);
 });
 
 it('sem pendente: "sim" solto nunca grava (§C6)', function () {

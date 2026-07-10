@@ -1,19 +1,7 @@
 // Vínculo Telegram — JS mínimo de apresentação (regra 3). Nada de cálculo nem
 // de estado sensível persistido no cliente. Carregado só nesta tela (code-split).
 
-const toast = document.getElementById('toast');
-
-function mostrarToast(mensagem) {
-    if (!toast) return;
-    toast.textContent = mensagem;
-    toast.classList.remove('opacity-0', 'translate-y-4');
-    toast.classList.add('opacity-100', 'translate-y-0');
-    clearTimeout(mostrarToast._t);
-    mostrarToast._t = setTimeout(() => {
-        toast.classList.add('opacity-0', 'translate-y-4');
-        toast.classList.remove('opacity-100', 'translate-y-0');
-    }, 3000);
-}
+// Toast: fonte única no shell (window.toast, resources/js/toast.js).
 
 // Copiar o código de uso único para a área de transferência.
 const copyBtn = document.querySelector('[data-copy-token]');
@@ -22,9 +10,9 @@ if (copyBtn) {
         const token = document.querySelector('[data-token]')?.dataset.token ?? '';
         try {
             await navigator.clipboard.writeText(token);
-            mostrarToast('Código copiado');
+            window.toast?.('Código copiado', 'sucesso');
         } catch {
-            mostrarToast('Não foi possível copiar');
+            window.toast?.('Não foi possível copiar', 'erro');
         }
     });
 }

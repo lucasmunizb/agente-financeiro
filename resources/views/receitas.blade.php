@@ -56,13 +56,6 @@
             </details>
         </header>
 
-        @if (session('sucesso'))
-            <div role="status" class="flex items-start gap-2 rounded-card border border-primary/30 bg-primary-container/10 p-4">
-                <x-icon name="check" class="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <p class="font-body-sm text-body-sm text-on-surface">{{ session('sucesso') }}</p>
-            </div>
-        @endif
-
         {{-- Passo 2 (regra 7): confirmação com o resumo do que será salvo. --}}
         @if ($confirmar)
             <article class="notebook-card flex flex-col gap-4 rounded-card border-2 border-cedula p-6">

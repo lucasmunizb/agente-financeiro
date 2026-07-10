@@ -356,6 +356,43 @@ body.modal-aberto .paper-texture {
     animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
+/* Toast — feedback efêmero pós-ação (confirmação de criação/edição/etc.).
+   Substitui os banners inline de sucesso; mantém a MESMA linguagem visual:
+   card verde (primary/cédula) com "conferido" (check). Variante de erro em
+   argila. Flutua ao pé da tela, centrado, e some sozinho. A cor entra opaca
+   sobre a superfície (não alpha puro) para legibilidade sobre qualquer
+   conteúdo. Posição/entrada ficam aqui para não brigar com utilitários. */
+.toast {
+    transform: translate(-50%, 1rem);
+    opacity: 0;
+    border: 1px solid transparent;
+    background-color: var(--color-superficie);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.toast--show {
+    transform: translate(-50%, 0);
+    opacity: 1;
+}
+.toast [data-toast-icon] {
+    display: none;
+}
+.toast--sucesso {
+    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+    background-color: color-mix(in srgb, var(--color-primary-container) 10%, var(--color-superficie));
+}
+.toast--sucesso [data-toast-icon='sucesso'] {
+    display: inline-flex;
+    color: var(--color-primary);
+}
+.toast--erro {
+    border-color: color-mix(in srgb, var(--color-argila) 30%, transparent);
+    background-color: color-mix(in srgb, var(--color-argila) 10%, var(--color-superficie));
+}
+.toast--erro [data-toast-icon='erro'] {
+    display: inline-flex;
+    color: var(--color-argila);
+}
+
 /* =====================================================================
    Dashboard / Visão geral (spec FE §7.5) — a "régua do mês" é o único
    elemento que se move; o resto entra com um fade+rise sóbrio.
@@ -537,5 +574,9 @@ dialog.modal-dialog::backdrop {
     .rg-switch,
     .rg-switch__knob {
         transition: none;
+    }
+    .toast {
+        transform: translate(-50%, 0);
+        transition: opacity 0.2s ease;
     }
 }

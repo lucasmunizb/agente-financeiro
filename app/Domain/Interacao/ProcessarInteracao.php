@@ -9,6 +9,8 @@ use App\Ai\Agents\ExtratorDeGasto;
 use App\Domain\Chat\ResponderNoChat;
 use App\Domain\IA\ConfirmacaoDeGasto;
 use App\Domain\IA\Consulta\ResponderConsulta;
+use App\Domain\IA\Esclarecimento\EsclarecimentosPendentes;
+use App\Domain\IA\GastoParcial;
 use App\Domain\IA\Intencao;
 use App\Domain\IA\PrepararConfirmacaoDeGasto;
 use App\Domain\Telegram\Comando;
@@ -45,6 +47,7 @@ final class ProcessarInteracao
         private readonly PrepararConfirmacaoDeGasto $preparar,
         private readonly ResponderConsulta $responder,
         private readonly ConfirmacoesPendentes $pendentes,
+        private readonly EsclarecimentosPendentes $esclarecimentos,
         private readonly InterpretadorDeConfirmacao $interpretador,
         private readonly ConfirmarGastoPendente $confirmar,
     ) {}
@@ -53,10 +56,18 @@ final class ProcessarInteracao
     {
         $agora = CarbonImmutable::now(self::TZ);
 
-        // Confirmação tem precedência: havendo um pendente, a mensagem é a resposta sim/não.
+        // Confirmação confirmável tem precedência máxima: a mensagem é a resposta sim/não.
         $pendente = $this->pendentes->recuperar($user->id, $agora);
         if ($pendente !== null) {
             return $this->resolverConfirmacao($pendente, $comando, $user->id, $agora);
+        }
+
+        // Esclarecimento pendente: enquanto faltar campo, a mensagem PREENCHE os slots do
+        // gasto em curso — não classificamos de novo nem pulamos para outra intenção. Assim
+        // o bot não repergunta o que o usuário já disse (slot-filling multi-turno, 04 §3.3).
+        $parcialPendente = $this->esclarecimentos->recuperar($user->id, $agora);
+        if ($parcialPendente !== null) {
+            return $this->continuarEsclarecimento($parcialPendente, $comando, $user->id, $agora);
         }
 
         $texto = $this->textoParaIA($comando);
@@ -64,7 +75,7 @@ final class ProcessarInteracao
         $intencao = $forcada ?? $this->classificador->classificar($comando->textoOriginal);
 
         return match ($intencao) {
-            Intencao::REGISTRAR => $this->registrar($comando, $user->id, $texto, $agora),
+            Intencao::REGISTRAR => $this->registrar($user->id, $texto, $agora),
             Intencao::CONSULTAR => ResultadoDaInteracao::consulta($this->responder->responder($user, $texto)),
             default => ResultadoDaInteracao::naoEntendi(),
         };
@@ -114,25 +125,61 @@ final class ProcessarInteracao
             : $comando->argumentos;
     }
 
-    private function registrar(
+    private function registrar(int $userId, string $texto, CarbonImmutable $agora): ResultadoDaInteracao
+    {
+        return $this->resolverExtracao($this->extrator->extrairParcial($texto), $userId, $agora);
+    }
+
+    /**
+     * Turno seguinte de um gasto que ficou incompleto: mescla a nova mensagem sobre o
+     * parcial acumulado e reavalia. "Não/cancelar" é a saída explícita (descarta o parcial);
+     * qualquer outra coisa é tratada como preenchimento dos campos que faltam.
+     */
+    private function continuarEsclarecimento(
+        GastoParcial $acumulado,
         ComandoRecebido $comando,
         int $userId,
-        string $texto,
         CarbonImmutable $agora,
     ): ResultadoDaInteracao {
-        $extracao = $this->extrator->extrair($texto);
+        if ($this->interpretador->interpretar($comando->textoOriginal) === RespostaDeConfirmacao::NAO) {
+            $this->esclarecimentos->descartar($userId);
 
-        if ($extracao->precisaEsclarecer()) {
-            return ResultadoDaInteracao::registro(
-                new ConfirmacaoDeGasto(null, null, $extracao->camposFaltantes),
-            );
+            return ResultadoDaInteracao::confirmacaoCancelada();
         }
 
-        $confirmacao = $this->preparar->preparar($extracao->gasto, $userId, $agora);
+        $novo = $this->extrator->extrairParcial($this->textoParaIA($comando));
 
-        // Prévia confirmável vira pendente: o próximo "sim" a persiste (regra 7, §6.b/§C6).
+        return $this->resolverExtracao($acumulado->mesclar($novo), $userId, $agora);
+    }
+
+    /**
+     * Núcleo comum do registro: ou ainda falta campo obrigatório (guarda o parcial e pede o
+     * que falta — barreira 1), ou o gasto está completo e vira prévia. A normalização
+     * determinística ({@see PrepararConfirmacaoDeGasto}) ainda pode pedir esclarecimento
+     * (valor inválido, cartão ambíguo, data ruim); nesse caso o parcial segue guardado para
+     * o próximo turno. Só a prévia confirmável guarda a confirmação para o "sim" (regra 7).
+     */
+    private function resolverExtracao(
+        GastoParcial $parcial,
+        int $userId,
+        CarbonImmutable $agora,
+    ): ResultadoDaInteracao {
+        $faltantes = $parcial->faltantes();
+
+        if ($faltantes !== []) {
+            $this->esclarecimentos->guardar($userId, $parcial, $agora);
+
+            return ResultadoDaInteracao::registro(new ConfirmacaoDeGasto(null, null, $faltantes));
+        }
+
+        $confirmacao = $this->preparar->preparar($parcial->paraExtraido(), $userId, $agora);
+
         if ($confirmacao->confirmavel()) {
+            $this->esclarecimentos->descartar($userId);
             $this->pendentes->guardar($userId, $confirmacao, $agora);
+        } else {
+            // Esclarecimento vindo da normalização: mantém o parcial para o usuário corrigir.
+            $this->esclarecimentos->guardar($userId, $parcial, $agora);
         }
 
         return ResultadoDaInteracao::registro($confirmacao);

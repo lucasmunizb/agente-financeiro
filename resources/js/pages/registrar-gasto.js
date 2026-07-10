@@ -13,19 +13,8 @@ const FORMA_LABEL = { credito: 'Crédito', debito: 'Débito', pix: 'Pix', dinhei
 const CAMPOS_INLINE = new Set(['descricao', 'valor', 'categoria_id', 'dia_recorrencia']); // resto cai no aviso geral
 const instancias = new Map();
 
-/* ---- Toast (reaproveita o do shell) ------------------------------------- */
-function mostrarToast(mensagem) {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
-    toast.textContent = mensagem;
-    toast.classList.remove('opacity-0', 'translate-y-4');
-    toast.classList.add('opacity-100', 'translate-y-0');
-    clearTimeout(mostrarToast._t);
-    mostrarToast._t = setTimeout(() => {
-        toast.classList.add('opacity-0', 'translate-y-4');
-        toast.classList.remove('opacity-100', 'translate-y-0');
-    }, 3000);
-}
+// Toast: fonte única no shell (window.toast, resources/js/toast.js).
+const mostrarToast = (mensagem) => window.toast?.(mensagem, 'sucesso');
 
 /* ======================================================================== */
 /* Inicializa o formulário de gasto de um root ([data-rg-root]).            */

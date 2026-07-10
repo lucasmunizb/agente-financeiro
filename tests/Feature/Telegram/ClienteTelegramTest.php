@@ -58,6 +58,18 @@ it('lança quando a Bot API responde com erro', function () {
     (new ClienteTelegramHttp('TOKEN123'))->enviarMensagem(555, 'x');
 })->throws(Illuminate\Http\Client\RequestException::class);
 
+it('sinaliza "digitando…" via sendChatAction', function () {
+    Http::fake(['*' => Http::response(['ok' => true])]);
+
+    (new ClienteTelegramHttp('TOKEN123'))->enviarAcao(555);
+
+    Http::assertSent(function (Request $req) {
+        return $req->url() === 'https://api.telegram.org/botTOKEN123/sendChatAction'
+            && $req['chat_id'] === 555
+            && $req['action'] === 'typing';
+    });
+});
+
 /* -------- ClienteTelegramFake (testes) -------- */
 
 it('o fake registra as mensagens e os pedidos de contato', function () {
@@ -72,6 +84,14 @@ it('o fake registra as mensagens e os pedidos de contato', function () {
         ->and($fake->ultimaMensagem()['removerTeclado'])->toBeTrue()
         ->and($fake->pedidosDeContato)->toHaveCount(1)
         ->and($fake->pedidosDeContato[0]['rotulo'])->toBe('Contato');
+});
+
+it('o fake registra as ações de chat (digitando…)', function () {
+    $fake = new ClienteTelegramFake;
+
+    $fake->enviarAcao(555);
+
+    expect($fake->acoes)->toBe([['chatId' => 555, 'acao' => 'typing']]);
 });
 
 it('o fake é injetável como o contrato ClienteTelegram', function () {

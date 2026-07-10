@@ -167,10 +167,8 @@
          folha deslizante no mobile. --}}
     <x-chat.panel />
 
-    {{-- Toast (feedback efêmero) --}}
-    <div id="toast" role="status" aria-live="polite"
-        class="pointer-events-none fixed bottom-10 left-1/2 z-[100] -translate-x-1/2 translate-y-4 rounded-full bg-inverse-surface px-6 py-3 font-body-sm text-body-sm text-inverse-on-surface opacity-0 shadow-xl transition-all duration-300">
-    </div>
+    {{-- Toast (feedback efêmero pós-ação) --}}
+    <x-ui.toast />
 
     {{-- Drawer do menu (mobile): abre/fecha o aside. JS mínimo, sem framework. --}}
     <script>

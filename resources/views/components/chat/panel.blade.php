@@ -82,17 +82,17 @@
         <div class="flex flex-col gap-3">
             <div>
                 <button type="button" id="chat-attach"
-                    class="inline-flex min-h-[44px] items-center gap-2 rounded-control px-2 py-2 text-on-surface-variant transition-colors hover:text-on-surface">
+                    class="inline-flex min-h-[44px] items-center gap-2 rounded-control px-2 py-2 text-on-surface-variant transition-colors hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-40">
                     <x-icon name="paperclip" class="h-5 w-5" />
                     <span class="font-label-sm text-label-sm">Anexar PDF</span>
                 </button>
                 <input type="file" id="chat-file" accept="application/pdf,.pdf" class="hidden">
             </div>
 
-            <div class="flex items-end gap-2 rounded-control border border-linha bg-superficie transition-colors focus-within:border-primary-container">
+            <div class="flex items-end gap-2 rounded-control border border-linha bg-superficie transition-colors focus-within:border-primary-container has-[textarea:disabled]:opacity-60">
                 <label for="chat-input" class="sr-only">Registre um gasto ou pergunte sobre suas finanças</label>
                 <textarea id="chat-input" rows="1" placeholder="Registre um gasto ou pergunte…"
-                    class="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-4 py-3 font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"></textarea>
+                    class="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-4 py-3 font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none disabled:cursor-not-allowed"></textarea>
                 <button type="button" id="chat-send" disabled
                     class="m-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-primary-container text-on-primary transition-colors hover:bg-cedula-clara disabled:cursor-not-allowed disabled:opacity-40">
                     <x-icon name="arrow-up" class="h-5 w-5" />

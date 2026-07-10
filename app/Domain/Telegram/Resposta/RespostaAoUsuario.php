@@ -16,4 +16,11 @@ use App\Models\User;
 interface RespostaAoUsuario
 {
     public function entregar(User $user, ResultadoDaInteracao $resultado): void;
+
+    /**
+     * Sinaliza ao usuário que a mensagem chegou e está sendo processada, ANTES do trabalho
+     * pesado (indicador "digitando…" no Telegram). É só feedback efêmero de presentação
+     * (regra 3); no-op onde não há canal de saída.
+     */
+    public function sinalizarProcessando(User $user): void;
 }

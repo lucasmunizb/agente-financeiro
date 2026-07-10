@@ -25,6 +25,9 @@ final class ConfirmacoesPendentes
 {
     public const TTL_MINUTOS = 15;
 
+    /** Discriminador na fila compartilhada `telegram_pending_confirmations` (ver EsclarecimentosPendentes). */
+    public const TIPO = 'confirmacao';
+
     private const TZ = 'America/Sao_Paulo';
 
     public function __construct(
@@ -38,6 +41,7 @@ final class ConfirmacoesPendentes
         TelegramPendingConfirmation::updateOrCreate(
             ['user_id' => $userId],
             [
+                'tipo' => self::TIPO,
                 'token' => $token,
                 'payload' => $this->serializar($confirmacao->dados),
                 'expira_em' => $agora->addMinutes(self::TTL_MINUTOS)->setTimezone('UTC'),
@@ -51,6 +55,7 @@ final class ConfirmacoesPendentes
     {
         $pendente = TelegramPendingConfirmation::query()
             ->where('user_id', $userId)
+            ->where('tipo', self::TIPO)
             ->where('expira_em', '>=', $agora->setTimezone('UTC'))
             ->first();
 

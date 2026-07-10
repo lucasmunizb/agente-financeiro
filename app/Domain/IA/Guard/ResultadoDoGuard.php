@@ -20,6 +20,5 @@ final class ResultadoDoGuard
         public readonly bool $aprovado,
         public readonly array $valoresDivergentes = [],
         public readonly array $datasDivergentes = [],
-    ) {
-    }
+    ) {}
 }

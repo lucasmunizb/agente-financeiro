@@ -90,3 +90,24 @@ it('não vaza entre usuários: usa o vínculo do próprio usuário', function ()
 
     expect($cliente->ultimaMensagem()['chatId'])->toBe(100);
 });
+
+/* -------- indicador "digitando…" (sendChatAction) antes de processar -------- */
+
+it('sinaliza "digitando…" ao chat do vínculo ativo', function () {
+    $user = User::factory()->create();
+    linkAtivo($user, 999);
+
+    $cliente = new ClienteTelegramFake;
+    (new RespostaTelegram(new RedatorDoChat, $cliente))->sinalizarProcessando($user);
+
+    expect($cliente->acoes)->toBe([['chatId' => 999, 'acao' => 'typing']]);
+});
+
+it('não sinaliza "digitando…" sem vínculo ativo', function () {
+    $user = User::factory()->create();
+
+    $cliente = new ClienteTelegramFake;
+    (new RespostaTelegram(new RedatorDoChat, $cliente))->sinalizarProcessando($user);
+
+    expect($cliente->acoes)->toBe([]);
+});

@@ -18,4 +18,11 @@ interface ClienteTelegram
 
     /** Pede o telefone via teclado nativo request_contact (uso único). */
     public function pedirContato(int $chatId, string $texto, string $rotuloBotao): void;
+
+    /**
+     * Indicador efêmero de status no chat (sendChatAction), ex.: "digitando…" enquanto
+     * a mensagem é processada. Expira sozinho em ~5s no Telegram e some quando a resposta
+     * chega — feedback puro, sem persistência.
+     */
+    public function enviarAcao(int $chatId, string $acao = 'typing'): void;
 }

@@ -28,17 +28,38 @@ final class RespostaTelegram implements RespostaAoUsuario
 
     public function entregar(User $user, ResultadoDaInteracao $resultado): void
     {
-        $link = TelegramLink::query()
-            ->where('user_id', $user->id)
-            ->where('status', TelegramLink::ATIVO)
-            ->first();
+        $link = $this->linkAtivo($user);
 
-        if ($link === null || $link->telegram_user_id === null) {
+        if ($link === null) {
             return;
         }
 
         $texto = $this->redator->redigir($resultado)->texto;
 
         $this->cliente->enviarMensagem((int) $link->telegram_user_id, $texto);
+    }
+
+    public function sinalizarProcessando(User $user): void
+    {
+        $link = $this->linkAtivo($user);
+
+        if ($link === null) {
+            return;
+        }
+
+        // "digitando…" — feedback imediato de que a mensagem está sendo processada. O
+        // Telegram o descarta sozinho quando a resposta chega (ou em ~5s).
+        $this->cliente->enviarAcao((int) $link->telegram_user_id);
+    }
+
+    /** Vínculo ATIVO (com chat) do próprio usuário — escopo estrito, nunca de terceiros. */
+    private function linkAtivo(User $user): ?TelegramLink
+    {
+        $link = TelegramLink::query()
+            ->where('user_id', $user->id)
+            ->where('status', TelegramLink::ATIVO)
+            ->first();
+
+        return $link !== null && $link->telegram_user_id !== null ? $link : null;
     }
 }

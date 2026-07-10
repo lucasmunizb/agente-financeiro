@@ -21,8 +21,7 @@ final class TraceDaConsulta
         public readonly string $ferramenta,
         public readonly array $filtros,
         public readonly int $registros,
-    ) {
-    }
+    ) {}
 
     /**
      * Resumo textual da fonte, para compor o payload entregue ao modelo.

@@ -24,6 +24,9 @@
 
     {{ $slot }}
 
+    {{-- Toast (feedback efêmero pós-ação) — ex.: "Sua conta foi excluída." no login. --}}
+    <x-ui.toast />
+
     @stack('scripts')
 </body>
 

@@ -19,13 +19,6 @@
         </header>
 
         {{-- Feedback (POST server-rendered → flash). --}}
-        @if (session('sucesso'))
-            <div role="status" class="flex items-start gap-2 rounded-card border border-primary/30 bg-primary-container/10 p-4">
-                <x-icon name="check" class="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <p class="font-body-sm text-body-sm text-on-surface">{{ session('sucesso') }}</p>
-            </div>
-        @endif
-
         @forelse ($itens as $item)
             {{-- Card de prévia (superfície, cantos 12px). É a própria confirmação (regra 7): a
                  tela é o resumo do que será salvo; "Confirmar" grava direto. --}}

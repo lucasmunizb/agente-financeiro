@@ -148,8 +148,19 @@ if (panel) {
     const input = document.getElementById('chat-input');
     const sendBtn = document.getElementById('chat-send');
 
+    // Enquanto uma mensagem processa, o envio fica bloqueado (barra duplo-envio) e a entrada
+    // é desabilitada visualmente. A confirmação/gravação continua no servidor (regra 7).
+    let enviando = false;
+
     function atualizarEnviar() {
-        if (sendBtn) sendBtn.disabled = (input?.value.trim() ?? '') === '' && !arquivo;
+        if (sendBtn) sendBtn.disabled = enviando || ((input?.value.trim() ?? '') === '' && !arquivo);
+    }
+
+    function setEnviando(estado) {
+        enviando = estado;
+        if (input) input.disabled = estado;
+        if (attachBtn) attachBtn.disabled = estado;
+        atualizarEnviar();
     }
     input?.addEventListener('input', () => {
         input.style.height = 'auto';
@@ -165,12 +176,10 @@ if (panel) {
     sendBtn?.addEventListener('click', enviar);
 
     /* ---- Envio → POST /chat/mensagens (mesmo motor do Telegram). ---- */
-    let enviando = false;
-
     async function enviar() {
         const texto = input?.value.trim() ?? '';
         if (enviando || (texto === '' && !arquivo)) return;
-        enviando = true;
+        setEnviando(true);
 
         const temAnexo = !!arquivo;
         const fd = new FormData();
@@ -214,7 +223,7 @@ if (panel) {
             pensando.remove();
             anexar(avisoInstavel());
         } finally {
-            enviando = false;
+            setEnviando(false);
         }
     }
 

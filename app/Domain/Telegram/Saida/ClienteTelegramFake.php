@@ -18,6 +18,9 @@ final class ClienteTelegramFake implements ClienteTelegram
     /** @var list<array{chatId:int, texto:string, rotulo:string}> */
     public array $pedidosDeContato = [];
 
+    /** @var list<array{chatId:int, acao:string}> */
+    public array $acoes = [];
+
     public function enviarMensagem(int $chatId, string $texto, bool $removerTeclado = false): void
     {
         $this->mensagens[] = ['chatId' => $chatId, 'texto' => $texto, 'removerTeclado' => $removerTeclado];
@@ -26,6 +29,11 @@ final class ClienteTelegramFake implements ClienteTelegram
     public function pedirContato(int $chatId, string $texto, string $rotuloBotao): void
     {
         $this->pedidosDeContato[] = ['chatId' => $chatId, 'texto' => $texto, 'rotulo' => $rotuloBotao];
+    }
+
+    public function enviarAcao(int $chatId, string $acao = 'typing'): void
+    {
+        $this->acoes[] = ['chatId' => $chatId, 'acao' => $acao];
     }
 
     /** @return array{chatId:int, texto:string, removerTeclado:bool}|null */

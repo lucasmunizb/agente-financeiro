@@ -39,6 +39,10 @@ final class ProcessarMensagemDoBot implements ShouldQueue
     {
         $user = User::findOrFail($this->userId);
 
+        // "digitando…" antes do trabalho pesado (extração/consulta com IA), para o usuário
+        // ver que a mensagem foi recebida e está sendo processada (frontend, regra 3).
+        $saida->sinalizarProcessando($user);
+
         $resultado = $orquestrar->processar($user, $this->comando, $this->intencaoForcada);
 
         $saida->entregar($user, $resultado);

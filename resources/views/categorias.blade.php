@@ -31,13 +31,6 @@
         </header>
 
         {{-- Feedback (POST/PUT server-rendered → flash). --}}
-        @if (session('sucesso'))
-            <div role="status" class="flex items-start gap-2 rounded-card border border-primary/30 bg-primary-container/10 p-4">
-                <x-icon name="check" class="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <p class="font-body-sm text-body-sm text-on-surface">{{ session('sucesso') }}</p>
-            </div>
-        @endif
-
         @if (count($categorias) > 0)
             {{-- Grade de categorias. Cada card: chip (cor + ícone de linha), nome, contagem em mono
                  e o botão "Editar" ancorado à direita da linha, alinhado ao mesmo padding do card

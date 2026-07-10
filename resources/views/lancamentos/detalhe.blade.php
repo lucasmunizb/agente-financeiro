@@ -18,13 +18,7 @@
             Lançamentos
         </a>
 
-        {{-- Feedback do pagamento por parcela (POST server-rendered → flash). --}}
-        @if (session('sucesso'))
-            <div role="status" class="flex items-start gap-2 rounded-card border border-primary/30 bg-primary-container/10 p-4">
-                <x-icon name="check" class="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <p class="font-body-sm text-body-sm text-on-surface">{{ session('sucesso') }}</p>
-            </div>
-        @endif
+        {{-- Erro de validação do pagamento por parcela (server-rendered, junto do fluxo). --}}
         @error('data_pagamento')
             <div role="alert" class="flex items-start gap-2 rounded-card border border-error/30 bg-error/5 p-4">
                 <x-icon name="alert" class="mt-0.5 h-5 w-5 shrink-0 text-error" />

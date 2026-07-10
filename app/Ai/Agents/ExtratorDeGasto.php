@@ -6,7 +6,7 @@ namespace App\Ai\Agents;
 
 use App\Ai\Concerns\UsaFailoverDeProvedores;
 use App\Ai\Concerns\UsaRaciocinioBaixoNaGroq;
-use App\Domain\IA\GastoExtraido;
+use App\Domain\IA\GastoParcial;
 use App\Domain\IA\ResultadoDaExtracao;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -50,51 +50,36 @@ class ExtratorDeGasto implements Agent, Conversational, HasProviderOptions, HasS
      */
     public function extrair(string $texto): ResultadoDaExtracao
     {
+        $parcial = $this->extrairParcial($texto);
+
+        return $parcial->completo()
+            ? new ResultadoDaExtracao($parcial->paraExtraido(), [])
+            : new ResultadoDaExtracao(null, $parcial->faltantes());
+    }
+
+    /**
+     * Extração CRUA e possivelmente incompleta de UMA mensagem — sem decidir obrigatoriedade.
+     * É a unidade do slot-filling multi-turno: cada mensagem é extraída isolada e depois
+     * ACUMULADA ({@see GastoParcial::mesclar()}) sobre o que já se sabia, para não repetir
+     * perguntas cujas respostas o usuário já deu. A IA nunca calcula/normaliza (regra 4).
+     */
+    public function extrairParcial(string $texto): GastoParcial
+    {
         /** @var StructuredAgentResponse $resposta */
         $resposta = $this->prompt($texto);
 
         $dados = $resposta->toArray();
-
-        $descricao = self::limpar($dados['descricao'] ?? null);
-        $valor = self::limpar($dados['valor'] ?? null);
-        $forma = self::limpar($dados['forma_pagamento'] ?? null);
-        $cartao = self::limpar($dados['cartao'] ?? null);
-
-        $faltantes = [];
-
-        if ($descricao === null) {
-            $faltantes[] = 'descricao';
-        }
-
-        if ($valor === null) {
-            $faltantes[] = 'valor';
-        }
-
-        if ($forma === null) {
-            $faltantes[] = 'forma_pagamento';
-        }
-
-        if ($forma === 'credito' && $cartao === null) {
-            $faltantes[] = 'cartao';
-        }
-
-        if ($faltantes !== []) {
-            return new ResultadoDaExtracao(null, $faltantes);
-        }
-
         $parcelas = $dados['parcelas'] ?? null;
 
-        $gasto = new GastoExtraido(
-            descricao: $descricao,
-            valorTexto: $valor,
-            formaPagamento: $forma,
-            cartao: $cartao,
+        return new GastoParcial(
+            descricao: self::limpar($dados['descricao'] ?? null),
+            valorTexto: self::limpar($dados['valor'] ?? null),
+            formaPagamento: self::limpar($dados['forma_pagamento'] ?? null),
+            cartao: self::limpar($dados['cartao'] ?? null),
             categoria: self::limpar($dados['categoria'] ?? null),
             dataTexto: self::limpar($dados['data'] ?? null),
             parcelas: $parcelas !== null ? (int) $parcelas : null,
         );
-
-        return new ResultadoDaExtracao($gasto, []);
     }
 
     /**

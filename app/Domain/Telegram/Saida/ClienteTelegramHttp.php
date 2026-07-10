@@ -27,6 +27,11 @@ final class ClienteTelegramHttp implements ClienteTelegram
         $this->chamar('sendMessage', $params);
     }
 
+    public function enviarAcao(int $chatId, string $acao = 'typing'): void
+    {
+        $this->chamar('sendChatAction', ['chat_id' => $chatId, 'action' => $acao]);
+    }
+
     public function pedirContato(int $chatId, string $texto, string $rotuloBotao): void
     {
         $this->chamar('sendMessage', [

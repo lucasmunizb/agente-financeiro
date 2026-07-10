@@ -39,15 +39,11 @@
     $labelGravar = $mode === 'edit' ? 'Confirmar alterações' : 'Confirmar e gravar';
     $toastOk = $mode === 'edit' ? 'Lançamento atualizado' : 'Gasto registrado';
 
-    // Ícone da categoria: mapeia o `icone` guardado (livre) para o conjunto SVG inline;
-    // cai em 'tag' quando não houver correspondência (sem CDN — regra 6).
-    $iconeCategoria = fn (?string $i) => match ($i) {
-        'car', 'transporte' => 'car',
-        'food', 'restaurant', 'alimentacao', 'utensils' => 'utensils',
-        'home', 'moradia' => 'home',
-        'shopping-cart', 'mercado' => 'shopping-cart',
-        default => 'tag',
-    };
+    // Ícone da categoria: usa o MESMO resolvedor do sistema de categorias
+    // ({@see PaletaDeCategoria::icone}) — o chip aqui mostra exatamente o ícone escolhido ao
+    // criar a categoria (cobre legados, cai em 'tag' quando órfão). Fonte única; sem mapa
+    // paralelo divergente. SVG inline (regra 6).
+    $iconeCategoria = fn (?string $i) => \App\Domain\Categoria\PaletaDeCategoria::icone($i);
 @endphp
 
 {{-- Formulário de gasto COMPARTILHADO (spec FE §7.7 página · §7.7b modal). Fonte única

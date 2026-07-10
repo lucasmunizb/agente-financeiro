@@ -18,4 +18,9 @@ final class RespostaInerte implements RespostaAoUsuario
     {
         // no-op até o frontend do bot (mensagens + envio ao Telegram).
     }
+
+    public function sinalizarProcessando(User $user): void
+    {
+        // no-op: sem canal de saída, não há indicador de "digitando…".
+    }
 }

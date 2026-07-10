@@ -16,6 +16,7 @@ class TelegramPendingConfirmation extends Model
     /** @var list<string> */
     protected $fillable = [
         'user_id',
+        'tipo',
         'token',
         'payload',
         'expira_em',
