@@ -7,6 +7,7 @@ use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -62,6 +63,33 @@ function lancamentoWeb(
 
 it('exige login', function () {
     $this->get('/lancamentos')->assertRedirect(route('login'));
+});
+
+it('no mês FUTURO lista as recorrências previstas com o selo "Previsto" (spec 10b)', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 5,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-05',
+    ]);
+
+    // hoje = 2026-06-15; agosto é estritamente futuro.
+    $this->actingAs($user)->get('/lancamentos?mes=2026-08')
+        ->assertOk()
+        ->assertSee('Netflix')
+        ->assertSee('Previsto')
+        ->assertSee('R$ 55,90');
+});
+
+it('no mês CORRENTE não projeta previstas — servido pela materialização (regressão 10b)', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 20,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-06-20',
+    ]);
+
+    $this->actingAs($user)->get('/lancamentos')
+        ->assertOk()
+        ->assertDontSee('Previsto');
 });
 
 it('mostra o estado vazio quando o usuário não tem lançamentos', function () {

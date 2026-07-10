@@ -6,12 +6,13 @@ namespace App\Domain\ContasVencidas;
 
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\IA\Guard\PayloadDeResposta;
+use App\Domain\ProximasContas\ResultadoConsultaProximasContas;
 use App\Domain\Shared\Money;
 use Carbon\CarbonImmutable;
 
 /**
  * Resultado da consulta `consultar_contas_vencidas` (spec 06b) — espelho retrospectivo
- * de {@see \App\Domain\ProximasContas\ResultadoConsultaProximasContas}.
+ * de {@see ResultadoConsultaProximasContas}.
  *
  * Carrega o total e a lista de contas EM ATRASO (vencimento anterior a hoje, ainda a
  * pagar) JÁ calculados pelo domínio ({@see ConsultarContasVencidas}) mais o
@@ -21,14 +22,13 @@ use Carbon\CarbonImmutable;
 final class ResultadoConsultaContasVencidas
 {
     /**
-     * @param  list<array{descricao: string, vencimento: string, cents: int}>  $contas  ordenada por vencimento asc
+     * @param  list<array{descricao: string, vencimento: string, cents: int, recorrente?: bool}>  $contas  ordenada por vencimento asc
      */
     public function __construct(
         public readonly int $totalCents,
         public readonly array $contas,
         public readonly TraceDaConsulta $trace,
-    ) {
-    }
+    ) {}
 
     /**
      * Conjunto que a resposta da IA pode citar (barreira 4, doc 02 §3.3): o total e o

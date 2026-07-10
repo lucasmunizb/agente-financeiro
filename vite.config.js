@@ -12,6 +12,7 @@ export default defineConfig({
                 'resources/js/pages/onboarding.js',
                 'resources/js/pages/telegram.js',
                 'resources/js/pages/registrar-gasto.js',
+                'resources/js/pages/categorias.js',
                 'resources/js/pages/chat.js',
             ],
             refresh: true,

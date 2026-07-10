@@ -8,6 +8,9 @@
         // Buckets do EXTRATO/lista (spec 06b): derivados por data.
         'pago' => ['rotulo' => 'Pago', 'classe' => 'bg-primary-container/10 text-primary'],
         'a_vencer' => ['rotulo' => 'A vencer', 'classe' => 'bg-ocre/10 text-ocre'],
+        // Ocorrência PROJETADA de recorrência (mês futuro, ainda não materializada, spec 10b):
+        // contorno em vez de preenchido — sinaliza "previsto", não confirmado.
+        'previsto' => ['rotulo' => 'Previsto', 'classe' => 'border border-ocre/40 text-ocre'],
         'atraso' => ['rotulo' => 'Atraso', 'classe' => 'bg-error/10 text-error'],
         'cancelado' => ['rotulo' => 'Cancelado', 'classe' => 'bg-surface-container-high text-on-surface-variant'],
         // Status POR PARCELA do detalhe (§7.8): distingue "em aberto" (vence hoje) de

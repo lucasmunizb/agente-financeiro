@@ -115,10 +115,12 @@ class LancamentoController extends Controller
         $override = in_array($request->query('estado'), ['vazio', 'sem-resultado', 'carregando'], true)
             ? $request->query('estado')
             : null;
+        // Há registros (inclusive recorrências PREVISTAS de mês futuro) ⇒ pronto — mesmo que o
+        // usuário ainda não tenha nenhum lançamento materializado (só molde de recorrência).
         $estado = $override ?? match (true) {
+            $resultado->registros > 0 => 'pronto',
             ! $temAlgum => 'vazio',
-            $resultado->registros === 0 => 'sem-resultado',
-            default => 'pronto',
+            default => 'sem-resultado',
         };
 
         $filtros = [
@@ -276,20 +278,29 @@ class LancamentoController extends Controller
         return array_map(function (array $grupo) use ($hoje): array {
             return [
                 'titulo' => $this->rotuloDia($grupo['data'], $hoje),
-                'itens' => array_map(fn (array $item): array => [
-                    'descricao' => $item['descricao'],
-                    'valor' => Money::fromCents($item['cents'])->formatBRL(),
-                    'categoria' => $item['categoria'],
-                    'forma' => $item['forma'],
-                    'formaLabel' => $item['cartaoDescricao'] ?? (self::FORMA_LABEL[$item['forma']] ?? 'Outros'),
-                    'formaIcone' => self::FORMA_ICONE[$item['forma']] ?? 'wallet',
-                    'parcela' => $item['parcela'],
-                    'status' => $item['status'],
+                'itens' => array_map(function (array $item): array {
+                    // Previstas (recorrência projetada de mês futuro) não têm lançamento real:
+                    // sem id ⇒ sem detalhe/edição (a linha não abre).
+                    $temDetalhe = $item['transactionId'] !== null;
                     // Id criptografado no path (nunca o valor real — README §"Identificadores
                     // nas URLs"). O domínio devolve o id inteiro; opacificamos na borda.
-                    'showUrl' => route('lancamentos.show', OpaqueId::encode($item['transactionId'])),
-                    'editarUrl' => route('lancamentos.show', OpaqueId::encode($item['transactionId'])).'?editar=1',
-                ], $grupo['itens']),
+                    $showUrl = $temDetalhe ? route('lancamentos.show', OpaqueId::encode($item['transactionId'])) : null;
+
+                    return [
+                        'descricao' => $item['descricao'],
+                        'valor' => Money::fromCents($item['cents'])->formatBRL(),
+                        'categoria' => $item['categoria'],
+                        'forma' => $item['forma'],
+                        'formaLabel' => $item['cartaoDescricao'] ?? (self::FORMA_LABEL[$item['forma']] ?? 'Outros'),
+                        'formaIcone' => self::FORMA_ICONE[$item['forma']] ?? 'wallet',
+                        'parcela' => $item['parcela'],
+                        'status' => $item['status'],
+                        'recorrente' => $item['recorrente'] ?? false,
+                        'prevista' => $item['prevista'] ?? false,
+                        'showUrl' => $showUrl,
+                        'editarUrl' => $temDetalhe ? $showUrl.'?editar=1' : null,
+                    ];
+                }, $grupo['itens']),
             ];
         }, $grupos);
     }

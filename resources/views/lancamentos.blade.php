@@ -205,6 +205,8 @@
                                     :forma-icone="$item['formaIcone']"
                                     :parcela="$item['parcela']"
                                     :status="$item['status']"
+                                    :recorrente="$item['recorrente']"
+                                    :prevista="$item['prevista']"
                                     :show-url="$item['showUrl']"
                                     :editar-url="$item['editarUrl']" />
                             @endforeach

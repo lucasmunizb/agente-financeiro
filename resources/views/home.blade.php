@@ -75,11 +75,14 @@
             @endif
         </div>
 
-        {{-- Meio: gastos por categoria (donut) + próximas contas. --}}
+        {{-- Meio: gastos por categoria (donut) + próximas contas. O quadro de contas aparece
+             no mês atual e também em mês FUTURO quando há contas/recorrências previstas
+             (spec 10b) — os valores já vêm mesclados e conferidos do backend (regra 4). --}}
+        @php $mostrarContas = $vm['ehMesAtual'] || ($vm['ehFuturo'] && count($vm['proximasContas']) > 0); @endphp
         <div class="grid animate-enter grid-cols-1 gap-gutter lg:grid-cols-3" style="animation-delay: 0.2s">
             {{-- Donut "gastos por categoria" (mensal — aparece em qualquer competência). Ocupa
-                 a largura toda quando o quadro de contas some (mês histórico). --}}
-            <div class="notebook-card flex flex-col items-center rounded-card p-8 {{ $vm['ehMesAtual'] ? 'lg:col-span-1' : 'lg:col-span-3' }}">
+                 a largura toda quando o quadro de contas some (mês histórico sem previstas). --}}
+            <div class="notebook-card flex flex-col items-center rounded-card p-8 {{ $mostrarContas ? 'lg:col-span-1' : 'lg:col-span-3' }}">
                 <h3 class="mb-8 w-full font-headline-md text-headline-md text-on-surface">Gastos por categoria</h3>
 
                 @if (count($vm['donut']['segmentos']) === 0)
@@ -115,14 +118,19 @@
             {{-- Contas: dividido em "em atraso" (o que já venceu) + "a vencer" (spec 06b).
                  Em atraso vem primeiro, com acento argila (error), por ser o estado de
                  alerta. Valores/contagens chegam PRONTOS do backend (regras 4/5).
-                 Relativo ao HOJE real → só no mês atual (regra "mesmomês"). --}}
-            @if ($vm['ehMesAtual'])
+                 "Em atraso" é relativo ao HOJE real → só no mês atual (regra "mesmomês");
+                 "A vencer" aparece também em mês futuro, com as recorrências previstas. --}}
+            @if ($mostrarContas)
             <div class="notebook-card rounded-card p-8 lg:col-span-2">
                 <div class="mb-2 flex items-center justify-between">
                     <h3 class="font-headline-md text-headline-md text-on-surface">Contas</h3>
                 </div>
 
-                @php $temAtraso = count($vm['contasVencidas']) > 0; $temAVencer = count($vm['proximasContas']) > 0; @endphp
+                @php
+                    // Atraso só faz sentido no mês corrente (vencidas relativas ao hoje real).
+                    $temAtraso = $vm['ehMesAtual'] && count($vm['contasVencidas']) > 0;
+                    $temAVencer = count($vm['proximasContas']) > 0;
+                @endphp
 
                 @if (! $temAtraso && ! $temAVencer)
                     <p class="py-8 text-center font-body-sm text-body-sm text-outline">Nenhuma conta em atraso ou a vencer nos próximos dias.</p>
@@ -141,7 +149,8 @@
                             </div>
                             @foreach ($vm['contasVencidas'] as $conta)
                                 <x-dashboard.bill-row icon="alert" :icon-tone="$conta['iconTone']"
-                                    :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="atraso" />
+                                    :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="atraso"
+                                    :recorrente="$conta['recorrente']" />
                             @endforeach
                         </div>
                     @endif
@@ -161,7 +170,8 @@
                         @if ($temAVencer)
                             @foreach ($vm['proximasContas'] as $conta)
                                 <x-dashboard.bill-row icon="receipt" :icon-tone="$conta['iconTone']"
-                                    :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="a_vencer" />
+                                    :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="a_vencer"
+                                    :recorrente="$conta['recorrente']" :prevista="$conta['prevista']" />
                             @endforeach
                         @else
                             <p class="py-6 text-center font-body-sm text-body-sm text-outline">Nenhuma conta a vencer nos próximos dias.</p>

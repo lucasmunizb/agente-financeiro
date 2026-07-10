@@ -8,6 +8,8 @@
     'status' => 'a_vencer', // pago | a_vencer | atraso | cancelado
     'showUrl' => null,   // detalhe do lançamento (a linha inteira abre daqui)
     'editarUrl' => null, // detalhe já com o modal de edição aberto (?editar=1)
+    'recorrente' => false, // nasceu de recorrência → ícone de repetição (spec 10)
+    'prevista' => false, // ocorrência PROJETADA de mês futuro → selo "previsto" (spec 10b)
 ])
 
 {{-- Linha de lançamento no estilo EXTRATO (spec FE §4.6/§7.6): descrição + chip de
@@ -21,7 +23,13 @@
     @endif
 
     <div class="pointer-events-none flex min-w-0 flex-col gap-1.5">
-        <span class="truncate font-body-md text-body-md font-medium text-on-surface">{{ $descricao }}</span>
+        <span class="flex items-center gap-1.5 truncate font-body-md text-body-md font-medium text-on-surface">
+            <span class="truncate">{{ $descricao }}</span>
+            @if ($recorrente)
+                <x-icon name="refresh-cw" class="h-3.5 w-3.5 shrink-0 text-nevoa" title="Recorrente" />
+                <span class="sr-only">recorrente</span>
+            @endif
+        </span>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             @if ($categoria)
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-surface-container px-2.5 py-0.5 font-label-sm text-label-sm text-on-surface-variant">
@@ -40,7 +48,7 @@
     <div class="flex shrink-0 items-center gap-2">
         <div class="pointer-events-none flex flex-col items-end gap-1.5">
             <span class="font-value-label text-value-label font-semibold text-on-surface">{{ $valor }}</span>
-            <x-ui.status-badge :status="$status" />
+            <x-ui.status-badge :status="$prevista ? 'previsto' : $status" />
         </div>
         @if ($editarUrl)
             <a href="{{ $editarUrl }}"

@@ -120,6 +120,20 @@ it('na visão de mês FUTURO abate o disponível com as recorrências previstas 
         ->assertDontSee('R$ 3.500,00'); // sem a previsão seria só 4000 − 500
 });
 
+it('na visão de mês FUTURO lista as recorrências previstas no quadro de contas (spec 10b)', function () {
+    $user = User::factory()->create();
+    competenciaGasto($user, 50000, '2026-08-20'); // gasto real de agosto (estado "pronto")
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 5,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-08-05',
+    ]);
+
+    $this->actingAs($user)->get('/?mes=2026-08')
+        ->assertOk()
+        ->assertSee('Netflix')    // ocorrência prevista aparece na listagem
+        ->assertSee('Previsto');  // com o selo de projeção
+});
+
 it('no mês ATUAL não abate por recorrência — previsão é só futura (regressão 10b)', function () {
     $user = User::factory()->create();
     Income::factory()->for($user)->create(['valor_cents' => 400000, 'data' => '2026-06-05']);

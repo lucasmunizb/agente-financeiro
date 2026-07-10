@@ -16,11 +16,15 @@ use Carbon\CarbonImmutable;
  * Cada item é um array já com o essencial para a linha de extrato: descrição, valor em
  * centavos, categoria (nome + cor), forma de pagamento, cartão (quando houver), rótulo de
  * parcela ("2/3") e o status de EXIBIÇÃO derivado (pago | a_vencer | atraso | cancelado).
+ *
+ * Recorrência (spec 10b): `recorrente` marca o item nascido de recorrência; `prevista` marca
+ * a ocorrência PROJETADA de um mês futuro (ainda não materializada) — nesta, `transactionId`
+ * é null (não abre detalhe). O total exibido e a contagem já incluem as previstas.
  */
 final class ResultadoConsultaLancamentos
 {
     /**
-     * @param  list<array{data: CarbonImmutable, itens: list<array{transactionId: int, descricao: string, cents: int, categoria: ?array{nome: string, cor: ?string}, forma: ?string, cartaoDescricao: ?string, parcela: ?string, status: string, vencimento: CarbonImmutable}>}>  $grupos
+     * @param  list<array{data: CarbonImmutable, itens: list<array{transactionId: ?int, descricao: string, cents: int, categoria: ?array{nome: string, cor: ?string}, forma: ?string, cartaoDescricao: ?string, parcela: ?string, status: string, vencimento: CarbonImmutable, recorrente: bool, prevista: bool}>}>  $grupos
      */
     public function __construct(
         public readonly int $totalExibidoCents,

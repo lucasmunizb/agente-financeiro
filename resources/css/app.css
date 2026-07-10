@@ -131,6 +131,28 @@ body {
     border-radius: var(--radius-control);
 }
 
+/* Cursor "mãozinha" em tudo que tem ação. O Tailwind v4 deixou de aplicar
+   cursor:pointer em <button> por padrão (só o <a href> herda do navegador); aqui
+   devolvemos a afordância no sistema TODO — botões, switches, radios/labels de
+   opção, <summary> e o seletor de arquivo. Desabilitado usa "not-allowed". */
+:where(
+    button,
+    [role='button'],
+    [role='switch'],
+    [role='radio'],
+    [role='option'],
+    summary,
+    label:has(input[type='radio']),
+    label:has(input[type='checkbox']),
+    label:has(input[type='file'])
+):not(:disabled, [aria-disabled='true']) {
+    cursor: pointer;
+}
+
+:where(button, [role='button'], [role='switch']):is(:disabled, [aria-disabled='true']) {
+    cursor: not-allowed;
+}
+
 /* =====================================================================
    Componentes do design system (spec FE §4.6)
    ===================================================================== */
@@ -436,6 +458,25 @@ body.modal-aberto .paper-texture {
 }
 .modal-card-enter {
     animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Modal genérico via <dialog> nativo (categorias: criar/editar). Reaproveita o backdrop
+   esfumaçado e a entrada fade+zoom do modal de gasto, mas com foco preso, Esc e semântica
+   de modal nativos do elemento — menos JS (regra 3). O <dialog> é transparente/sem borda;
+   o card interno (.notebook-card) desenha a superfície. */
+dialog.modal-dialog {
+    width: min(640px, calc(100vw - 2rem));
+    max-height: 92vh;
+    margin: auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
+}
+dialog.modal-dialog::backdrop {
+    background-color: color-mix(in srgb, var(--color-surface-dim) 82%, transparent);
+    animation: modal-backdrop-in 0.2s ease-out;
 }
 
 /* Grupo de campos condicionais (crédito × à vista) — desliza de cima. */

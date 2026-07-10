@@ -62,6 +62,9 @@ final class ConsultarProximasContas
                 'descricao' => $parcela->transaction->descricao ?? 'Conta',
                 'vencimento' => $parcela->vencimento->toDateString(),
                 'cents' => $cents,
+                // "Verdade" de recorrente = transactions.recurrence_id (spec 10). Marca a
+                // conta materializada para o selo/ícone no dashboard (etapa de frontend).
+                'recorrente' => $parcela->transaction->recurrence_id !== null,
             ];
         }
 

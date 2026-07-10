@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\ContasVencidas;
 
 use App\Domain\IA\Consulta\TraceDaConsulta;
+use App\Domain\ProximasContas\ConsultarProximasContas;
 use App\Models\Installment;
 use App\Models\StatusPagamento;
 use Carbon\CarbonImmutable;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Camada de consulta `consultar_contas_vencidas` (spec 06b) — espelho RETROSPECTIVO de
- * {@see \App\Domain\ProximasContas\ConsultarProximasContas}: varredura determinística que
+ * {@see ConsultarProximasContas}: varredura determinística que
  * itemiza e soma as contas EM ATRASO do usuário — parcelas com `vencimento` ANTERIOR a
  * "hoje" que ainda são conta a pagar.
  *
@@ -69,6 +70,9 @@ final class ConsultarContasVencidas
                 'descricao' => $parcela->transaction->descricao ?? 'Conta',
                 'vencimento' => $parcela->vencimento->toDateString(),
                 'cents' => $cents,
+                // "Verdade" de recorrente = transactions.recurrence_id (spec 10). Marca a
+                // conta materializada para o selo/ícone no dashboard (etapa de frontend).
+                'recorrente' => $parcela->transaction->recurrence_id !== null,
             ];
         }
 

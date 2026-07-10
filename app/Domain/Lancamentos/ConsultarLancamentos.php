@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Lancamentos;
 
 use App\Domain\Gastos\ConsultarGastos;
+use App\Domain\Recorrencia\ProjetarRecorrencias;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
 use App\Models\StatusPagamento;
@@ -36,6 +37,10 @@ final class ConsultarLancamentos
     public const STATUS_ATRASO = 'atraso';
 
     public const STATUS_CANCELADO = 'cancelado';
+
+    public function __construct(
+        private readonly ProjetarRecorrencias $projetarRecorrencias = new ProjetarRecorrencias,
+    ) {}
 
     public function para(
         int $userId,
@@ -118,14 +123,91 @@ final class ConsultarLancamentos
                 'parcela' => $parcela->total > 1 ? "{$parcela->numero}/{$parcela->total}" : null,
                 'status' => $statusExibicao,
                 'vencimento' => $parcela->vencimento,
+                // "Verdade" de recorrente = transactions.recurrence_id (spec 10).
+                'recorrente' => $tx->recurrence_id !== null,
+                'prevista' => false,
             ];
         }
+
+        // Recorrências PREVISTAS de um mês FUTURO (spec 10b): mescladas na listagem como itens
+        // `prevista=true`. Mesmo guard anti-dupla-contagem do dashboard — mês corrente/passado
+        // ⇒ projeção vazia (servido pela materialização just-in-time). Não grava nada (regra 7).
+        $previsao = $this->projetarRecorrencias->para($userId, $periodo, $hoje);
+        foreach ($previsao->ocorrencias as $ocorrencia) {
+            if (! $this->previstaCasaFiltros($ocorrencia, $status, $cartaoId, $categoriaId, $forma, $busca)) {
+                continue;
+            }
+
+            $venc = CarbonImmutable::createFromFormat('!Y-m-d', (string) $ocorrencia['vencimento'], 'America/Sao_Paulo');
+            $cents = (int) $ocorrencia['cents'];
+            $total += $cents;
+            $registros++;
+
+            $dia = $venc->toDateString();
+            $grupos[$dia] ??= ['data' => $venc->startOfDay(), 'itens' => []];
+            $grupos[$dia]['itens'][] = [
+                // Previsão não tem lançamento real: sem id (a linha não abre detalhe).
+                'transactionId' => null,
+                'descricao' => (string) $ocorrencia['descricao'],
+                'cents' => $cents,
+                'categoria' => $ocorrencia['categoria'] ?? null,
+                'forma' => $ocorrencia['forma'] ?? null,
+                'cartaoDescricao' => null,
+                'parcela' => null,
+                'status' => self::STATUS_A_VENCER,
+                'vencimento' => $venc,
+                'recorrente' => true,
+                'prevista' => true,
+            ];
+        }
+
+        // Ordena os grupos por dia (desc): as previstas entram no dia certo entre as reais.
+        uasort($grupos, static fn (array $a, array $b): int => $b['data']->toDateString() <=> $a['data']->toDateString());
 
         return new ResultadoConsultaLancamentos(
             totalExibidoCents: $total,
             grupos: array_values($grupos),
             registros: $registros,
         );
+    }
+
+    /**
+     * Aplica os filtros ativos do extrato a uma ocorrência PREVISTA. Recorrência é sempre fora
+     * de cartão e a_vencer (mês estritamente futuro): filtro de cartão — ou de status ≠ a_vencer
+     * — a descarta. Categoria/forma/busca casam pelos próprios campos da recorrência (busca é
+     * parcial, case-insensitive, espelhando o `ilike` das reais).
+     *
+     * @param  array<string, mixed>  $ocorrencia
+     */
+    private function previstaCasaFiltros(
+        array $ocorrencia,
+        ?string $status,
+        ?int $cartaoId,
+        ?int $categoriaId,
+        ?string $forma,
+        ?string $busca,
+    ): bool {
+        if ($status !== null && $status !== self::STATUS_A_VENCER) {
+            return false;
+        }
+
+        if ($cartaoId !== null) {
+            return false;
+        }
+
+        if ($categoriaId !== null && ($ocorrencia['categoriaId'] ?? null) !== $categoriaId) {
+            return false;
+        }
+
+        if ($forma !== null && ($ocorrencia['forma'] ?? null) !== $forma) {
+            return false;
+        }
+
+        if ($busca !== null && stripos((string) $ocorrencia['descricao'], $busca) === false) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

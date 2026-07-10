@@ -20,14 +20,13 @@ use Carbon\CarbonImmutable;
 final class ResultadoConsultaProximasContas
 {
     /**
-     * @param  list<array{descricao: string, vencimento: string, cents: int}>  $contas  ordenada por vencimento asc
+     * @param  list<array{descricao: string, vencimento: string, cents: int, recorrente?: bool}>  $contas  ordenada por vencimento asc
      */
     public function __construct(
         public readonly int $totalCents,
         public readonly array $contas,
         public readonly TraceDaConsulta $trace,
-    ) {
-    }
+    ) {}
 
     /**
      * Conjunto que a resposta da IA pode citar (barreira 4, doc 02 §3.3): o total e o

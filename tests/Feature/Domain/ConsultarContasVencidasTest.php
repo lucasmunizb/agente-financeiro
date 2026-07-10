@@ -6,6 +6,7 @@ use App\Domain\ContasVencidas\ConsultarContasVencidas;
 use App\Domain\ContasVencidas\ResultadoConsultaContasVencidas;
 use App\Domain\IA\Guard\PayloadDeResposta;
 use App\Models\Installment;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -59,6 +60,21 @@ function contaVencida(
 
     return $transaction;
 }
+
+it('marca a conta vencida como recorrente quando a transação tem recurrence_id', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create();
+
+    $recorrente = contaVencida($user, 5000, '2026-06-20', 'Netflix');
+    $recorrente->update(['recurrence_id' => $rec->id]);
+    contaVencida($user, 3000, '2026-06-19', 'Padaria');
+
+    $contas = collect(app(ConsultarContasVencidas::class)->para($user->id, hojeVenc())->contas)
+        ->keyBy('descricao');
+
+    expect($contas['Netflix']['recorrente'])->toBeTrue()
+        ->and($contas['Padaria']['recorrente'])->toBeFalse();
+});
 
 it('soma só as contas com vencimento anterior a hoje (C1)', function () {
     $user = User::factory()->create();

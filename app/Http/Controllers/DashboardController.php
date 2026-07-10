@@ -113,6 +113,9 @@ class DashboardController extends Controller
             // Navegação por competência (FE §7.5). Fora do mês atual, a régua não marca "hoje"
             // e a view esconde os blocos relativos ao dia (a vencer/contas) — regra "mesmomês".
             'ehMesAtual' => $ehMesAtual,
+            // Mês estritamente futuro: habilita a listagem de contas/recorrências PREVISTAS
+            // (spec 10b). Histórico continua sendo só o retrato fechado do mês.
+            'ehFuturo' => $hoje->format('Y-m') > $agora->format('Y-m'),
             'mesAnterior' => $hoje->subMonthNoOverflow()->format('Y-m'),
             'mesSeguinte' => $hoje->addMonthNoOverflow()->format('Y-m'),
             'today' => $ehMesAtual ? $hoje->day : null,
@@ -280,7 +283,7 @@ class DashboardController extends Controller
      * A flag `prevista` (recorrência projetada na visão de mês futuro, spec 10b) é propagada
      * como dado — o selo/"~" é etapa de frontend (regra 3).
      *
-     * @return list<array{title: string, due: string, value: string, iconTone: string, prevista: bool}>
+     * @return list<array{title: string, due: string, value: string, iconTone: string, prevista: bool, recorrente: bool}>
      */
     private function proximasContas(ResumoDoMesResultado $resumo, CarbonImmutable $hoje): array
     {
@@ -288,13 +291,16 @@ class DashboardController extends Controller
 
         return array_map(function (array $conta) use ($limite7): array {
             $venc = CarbonImmutable::parse($conta['vencimento'], 'America/Sao_Paulo');
+            $prevista = $conta['prevista'] ?? false;
 
             return [
                 'title' => $conta['descricao'],
                 'due' => 'vence '.$this->dataExtenso($venc),
                 'value' => Money::fromCents($conta['cents'])->formatBRL(),
                 'iconTone' => $conta['vencimento'] <= $limite7 ? 'ocre' : 'primary',
-                'prevista' => $conta['prevista'] ?? false,
+                'prevista' => $prevista,
+                // Prevista é sempre recorrência (projeção do molde); a real herda a flag.
+                'recorrente' => ($conta['recorrente'] ?? false) || $prevista,
             ];
         }, array_slice($resumo->proximasContas->contas, 0, 5));
     }
@@ -303,7 +309,7 @@ class DashboardController extends Controller
      * Linhas de "Contas em atraso" (até 5), já formatadas — o que venceu e segue em
      * aberto (spec 06b). Tom `error` (argila) em todas: atraso é o estado de alerta.
      *
-     * @return list<array{title: string, due: string, value: string, iconTone: string}>
+     * @return list<array{title: string, due: string, value: string, iconTone: string, recorrente: bool}>
      */
     private function contasVencidas(ResumoDoMesResultado $resumo): array
     {
@@ -315,6 +321,7 @@ class DashboardController extends Controller
                 'due' => 'venceu '.$this->dataExtenso($venc),
                 'value' => Money::fromCents($conta['cents'])->formatBRL(),
                 'iconTone' => 'error',
+                'recorrente' => $conta['recorrente'] ?? false,
             ];
         }, array_slice($resumo->contasVencidas->contas, 0, 5));
     }

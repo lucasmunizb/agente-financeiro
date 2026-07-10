@@ -6,6 +6,7 @@ use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -235,4 +236,141 @@ it('é isolado por usuário', function () {
     expect($r->totalExibidoCents)->toBe(30000)
         ->and(itensDoExtrato($r))->toHaveCount(1)
         ->and(itensDoExtrato($r)[0]['descricao'])->toBe('Meu gasto');
+});
+
+/*
+ * Recorrência no extrato (F10 frontend / spec 10b): o item MATERIALIZADO ganha a flag
+ * `recorrente`; num mês FUTURO as ocorrências PREVISTAS (ProjetarRecorrencias, read-only)
+ * são MESCLADAS na listagem como itens `prevista=true` — mesmo guard anti-dupla-contagem
+ * (mês corrente/passado ⇒ nada projetado, servido pela materialização just-in-time).
+ */
+
+it('marca o lançamento materializado como recorrente (e os demais como não)', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create();
+
+    $tx = lancamentoExtrato($user, 5000, '2026-06-10', descricao: 'Netflix');
+    $tx->update(['recurrence_id' => $rec->id]);
+    lancamentoExtrato($user, 3000, '2026-06-11', descricao: 'Padaria');
+
+    $itens = collect(itensDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato())))
+        ->keyBy('descricao');
+
+    expect($itens['Netflix']['recorrente'])->toBeTrue()
+        ->and($itens['Netflix']['prevista'])->toBeFalse()
+        ->and($itens['Padaria']['recorrente'])->toBeFalse();
+});
+
+it('projeta as recorrências previstas de um mês futuro como itens do extrato', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Aluguel', 'valor_cents' => 180000, 'dia' => 10,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-10',
+    ]);
+
+    // hoje = 2026-06-15; 2026-08 é estritamente futuro.
+    $item = itensDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-08', hojeExtrato()))[0];
+
+    expect($item)->toMatchArray([
+        'descricao' => 'Aluguel',
+        'cents' => 180000,
+        'status' => 'a_vencer',
+        'prevista' => true,
+        'recorrente' => true,
+        'transactionId' => null,
+    ]);
+    expect($item['vencimento']->toDateString())->toBe('2026-08-10');
+});
+
+it('soma as previstas no total exibido e na contagem de registros', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create(['valor_cents' => 5590, 'dia' => 5, 'proxima_em' => '2026-07-05']);
+    Recurrence::factory()->for($user)->create(['valor_cents' => 180000, 'dia' => 10, 'proxima_em' => '2026-07-10']);
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-08', hojeExtrato());
+
+    expect($r->totalExibidoCents)->toBe(185590)
+        ->and($r->registros)->toBe(2);
+});
+
+it('não projeta recorrência no mês corrente — sem dupla contagem com a materializada', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create(['dia' => 20, 'proxima_em' => '2026-06-20']);
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
+
+    expect($r->registros)->toBe(0);
+});
+
+it('mescla parcelas reais e previstas do mês futuro, ordenando os grupos por dia (desc)', function () {
+    $user = User::factory()->create();
+    lancamentoExtrato($user, 60000, '2026-08-20', statusCodigo: StatusPagamento::AGENDADO, descricao: 'Parcela');
+    Recurrence::factory()->for($user)->create(['descricao' => 'Aluguel', 'valor_cents' => 180000, 'dia' => 10, 'proxima_em' => '2026-07-10']);
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-08', hojeExtrato());
+
+    expect(array_column(itensDoExtrato($r), 'descricao'))->toBe(['Parcela', 'Aluguel'])
+        ->and($r->registros)->toBe(2);
+});
+
+it('exclui as previstas ao filtrar por cartão (recorrência é fora de cartão)', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+    Recurrence::factory()->for($user)->create(['dia' => 10, 'proxima_em' => '2026-07-10']);
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-08', hojeExtrato(), cartaoId: $cartao->id);
+
+    expect($r->registros)->toBe(0);
+});
+
+it('filtra as previstas por categoria', function () {
+    $user = User::factory()->create();
+    $moradia = Category::factory()->for($user)->create(['nome' => 'Moradia']);
+    $lazer = Category::factory()->for($user)->create(['nome' => 'Lazer']);
+    Recurrence::factory()->for($user)->create(['descricao' => 'Aluguel', 'dia' => 10, 'proxima_em' => '2026-07-10', 'categoria_id' => $moradia->id]);
+
+    $svc = app(ConsultarLancamentos::class);
+
+    expect($svc->para($user->id, '2026-08', hojeExtrato(), categoriaId: $moradia->id)->registros)->toBe(1)
+        ->and($svc->para($user->id, '2026-08', hojeExtrato(), categoriaId: $lazer->id)->registros)->toBe(0);
+});
+
+it('filtra as previstas por forma e por busca', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Aluguel', 'dia' => 10, 'proxima_em' => '2026-07-10',
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::BOLETO),
+    ]);
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'dia' => 5, 'proxima_em' => '2026-07-05',
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+    ]);
+
+    $svc = app(ConsultarLancamentos::class);
+
+    expect($svc->para($user->id, '2026-08', hojeExtrato(), forma: PaymentMethod::BOLETO)->registros)->toBe(1)
+        ->and($svc->para($user->id, '2026-08', hojeExtrato(), busca: 'flix')->registros)->toBe(1)
+        ->and(itensDoExtrato($svc->para($user->id, '2026-08', hojeExtrato(), busca: 'flix'))[0]['descricao'])->toBe('Netflix');
+});
+
+it('exclui as previstas quando o status filtrado não é a_vencer', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create(['dia' => 10, 'proxima_em' => '2026-07-10']);
+
+    $svc = app(ConsultarLancamentos::class);
+
+    expect($svc->para($user->id, '2026-08', hojeExtrato(), status: 'a_vencer')->registros)->toBe(1)
+        ->and($svc->para($user->id, '2026-08', hojeExtrato(), status: 'pago')->registros)->toBe(0);
+});
+
+it('isola as previstas por usuário', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+    Recurrence::factory()->for($user)->create(['descricao' => 'Minha', 'dia' => 10, 'proxima_em' => '2026-07-10']);
+    Recurrence::factory()->for($outro)->create(['descricao' => 'Alheia', 'dia' => 10, 'proxima_em' => '2026-07-10']);
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-08', hojeExtrato());
+
+    expect($r->registros)->toBe(1)
+        ->and(itensDoExtrato($r)[0]['descricao'])->toBe('Minha');
 });

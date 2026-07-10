@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Domain\Recorrencia\ProjetarRecorrencias;
 use App\Domain\Recorrencia\ResultadoProjecaoRecorrencias;
+use App\Models\Category;
+use App\Models\PaymentMethod;
 use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
 use App\Models\Transaction;
@@ -130,6 +132,32 @@ it('isola a projeção por usuário (P8)', function () {
 
     expect($resultado->ocorrencias)->toHaveCount(1)
         ->and($resultado->ocorrencias[0]['descricao'])->toBe('Minha');
+});
+
+it('enriquece a ocorrência com categoria (nome+cor) e forma — para o extrato de mês futuro', function () {
+    $user = User::factory()->create();
+    $cat = Category::factory()->for($user)->create(['nome' => 'Moradia', 'cor' => '#C9852A']);
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Aluguel', 'valor_cents' => 180000, 'dia' => 10, 'proxima_em' => '2026-08-10',
+        'categoria_id' => $cat->id,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::BOLETO),
+    ]);
+
+    $oc = (new ProjetarRecorrencias)->para($user->id, '2026-08', agoraFixo())->ocorrencias[0];
+
+    expect($oc['categoria'])->toBe(['nome' => 'Moradia', 'cor' => '#C9852A'])
+        ->and($oc['forma'])->toBe(PaymentMethod::BOLETO)
+        ->and($oc['categoriaId'])->toBe($cat->id);
+});
+
+it('deixa a categoria da ocorrência null quando a recorrência não tem categoria', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create(['dia' => 5, 'proxima_em' => '2026-08-05', 'categoria_id' => null]);
+
+    $oc = (new ProjetarRecorrencias)->para($user->id, '2026-08', agoraFixo())->ocorrencias[0];
+
+    expect($oc['categoria'])->toBeNull()
+        ->and($oc['categoriaId'])->toBeNull();
 });
 
 it('é read-only: projetar não grava confirmação nem lançamento (P9/regra 7)', function () {

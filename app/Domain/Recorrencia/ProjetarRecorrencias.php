@@ -40,6 +40,8 @@ final class ProjetarRecorrencias
             ->where('status', Recurrence::STATUS_ATIVO)
             ->whereNotNull('proxima_em')
             ->whereDate('proxima_em', '<=', $inicioMesAlvo->endOfMonth()->toDateString())
+            // Categoria/forma alimentam a linha e os filtros do extrato de mês futuro (F10).
+            ->with(['categoria', 'paymentMethod'])
             ->get();
 
         $ocorrencias = [];
@@ -55,6 +57,12 @@ final class ProjetarRecorrencias
                 'vencimento' => $vencimento->format('Y-m-d'),
                 'cents' => $cents,
                 'prevista' => true,
+                // Enriquecimento para o extrato (o dashboard ignora estas chaves extras).
+                'categoriaId' => $recorrencia->categoria_id,
+                'categoria' => $recorrencia->categoria !== null
+                    ? ['nome' => (string) $recorrencia->categoria->nome, 'cor' => $recorrencia->categoria->cor]
+                    : null,
+                'forma' => $recorrencia->paymentMethod?->tipo,
             ];
         }
 

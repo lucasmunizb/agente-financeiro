@@ -65,4 +65,10 @@ class Recurrence extends Model
     {
         return $this->belongsTo(PaymentMethod::class);
     }
+
+    /** @return BelongsTo<Category, $this> */
+    public function categoria(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'categoria_id');
+    }
 }
