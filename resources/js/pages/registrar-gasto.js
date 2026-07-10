@@ -13,8 +13,10 @@ const FORMA_LABEL = { credito: 'Crédito', debito: 'Débito', pix: 'Pix', dinhei
 const CAMPOS_INLINE = new Set(['descricao', 'valor', 'categoria_id', 'dia_recorrencia']); // resto cai no aviso geral
 const instancias = new Map();
 
-// Toast: fonte única no shell (window.toast, resources/js/toast.js).
-const mostrarToast = (mensagem) => window.toast?.(mensagem, 'sucesso');
+// Toast: fonte única no shell (resources/js/toast.js). Aqui usamos o toast
+// AGENDADO (toastAposNavegar): como o gravar sempre recarrega/redireciona, o
+// toast deve nascer na NOVA tela (valores já atualizados), não sobre a atual.
+const agendarToast = (mensagem) => window.toastAposNavegar?.(mensagem, 'sucesso');
 
 /* ======================================================================== */
 /* Inicializa o formulário de gasto de um root ([data-rg-root]).            */
@@ -294,10 +296,11 @@ function initGastoForm(root) {
             const { status, body } = await enviar(storeUrl, method === 'PUT' ? 'PUT' : null);
             if (status === 200) {
                 const dest = body.redirect || redirect;
-                if (isModal) fecharModal(root);
-                mostrarToast(toastOk);
-                // Pequeno atraso para o toast ser visto antes de sair.
-                setTimeout(() => (dest ? window.location.assign(dest) : window.location.reload()), 800);
+                // SPA-like: atualiza a tela AGORA (valores o quanto antes) e agenda o
+                // toast para aparecer na nova tela, já montada — não sobre valores velhos.
+                agendarToast(toastOk);
+                if (dest) window.location.assign(dest);
+                else window.location.reload();
                 return;
             }
             mostrarPainel('form');

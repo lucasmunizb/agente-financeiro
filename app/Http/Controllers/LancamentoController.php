@@ -57,7 +57,7 @@ class LancamentoController extends Controller
     private const FORMA_ICONE = [
         PaymentMethod::CREDITO => 'credit-card',
         PaymentMethod::DEBITO => 'wallet',
-        PaymentMethod::PIX => 'zap',
+        PaymentMethod::PIX => 'banknote',
         PaymentMethod::DINHEIRO => 'wallet',
         PaymentMethod::BOLETO => 'file-text',
     ];
