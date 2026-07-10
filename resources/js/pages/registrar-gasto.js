@@ -103,9 +103,13 @@ function initGastoForm(root) {
     const recorrenteInput = root.querySelector('[data-rg-recorrente-input]');
     const recorrenciaFields = root.querySelector('[data-rg-recorrencia-fields]');
     const diaInput = root.querySelector('#rg-dia_recorrencia');
+    // Lançamento que já é recorrente: switch marcado e imutável (o servidor renderiza
+    // aria-checked=true + disabled). O backend ignora o switch nesse caso; aqui só garantimos
+    // que nada — clique, troca de forma, mudança de parcelas — reabra ou desmarque.
+    const recorrenteTravado = recorrenciaBtn?.dataset.rgRecorrenteLock === '1';
 
     function setRecorrencia(ligado) {
-        if (!recorrenciaBtn) return;
+        if (!recorrenciaBtn || recorrenteTravado) return;
         recorrenciaBtn.setAttribute('aria-checked', String(ligado));
         if (recorrenteInput) recorrenteInput.value = ligado ? '1' : '0';
         if (recorrenciaFields) recorrenciaFields.hidden = !ligado;
@@ -115,8 +119,26 @@ function initGastoForm(root) {
         }
     }
     recorrenciaBtn?.addEventListener('click', () => {
+        if (recorrenteTravado) return;
         setRecorrencia(recorrenciaBtn.getAttribute('aria-checked') !== 'true');
     });
+
+    /* ---- Parcelamento × recorrência: mutuamente exclusivos (o backend também barra).
+       Com 2+ parcelas o "Repete todo mês?" não faz sentido (dividir ≠ repetir): desliga
+       o switch se estava ligado e o desabilita; volta a habilitar em 1 (à vista). -------- */
+    const parcelasInput = root.querySelector('#rg-parcelas');
+    const recorrenciaBloqueada = root.querySelector('[data-rg-recorrencia-bloqueada]');
+
+    function aplicarLimiteRecorrencia() {
+        if (!recorrenciaBtn || recorrenteTravado) return; // travado fica marcado + desabilitado
+        const parcelado = Number(parcelasInput?.value || 1) >= 2;
+        if (parcelado) setRecorrencia(false); // desmarca se estava ligado
+        recorrenciaBtn.disabled = parcelado;
+        recorrenciaBtn.setAttribute('aria-disabled', String(parcelado));
+        if (recorrenciaBloqueada) recorrenciaBloqueada.hidden = !parcelado;
+    }
+    parcelasInput?.addEventListener('input', aplicarLimiteRecorrencia);
+    aplicarLimiteRecorrencia(); // estado inicial (edição pode vir com 2+ parcelas)
 
     /* ---- Categoria: chip único ------------------------------------------ */
     const categoriaBtns = root.querySelectorAll('[data-rg-categoria]');

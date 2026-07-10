@@ -7,6 +7,7 @@ use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -68,6 +69,28 @@ it('exige login', function () {
     $tx = txDetalheWeb($user, 5000, [['numero' => 1, 'total' => 1, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::ABERTO]]);
 
     $this->get(route('lancamentos.show', $tx))->assertRedirect(route('login'));
+});
+
+it('mostra o quadro de recorrência (dia + próxima) quando o lançamento é recorrente', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create(['dia' => 10, 'proxima_em' => '2026-07-10', 'status' => Recurrence::STATUS_ATIVO]);
+    $tx = txDetalheWeb($user, 5000, [['numero' => 1, 'total' => 1, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::ABERTO]]);
+    $tx->update(['recurrence_id' => $rec->id]);
+
+    $this->actingAs($user)->get(route('lancamentos.show', $tx))
+        ->assertOk()
+        ->assertSee('Lançamento recorrente')
+        ->assertSee('no dia 10')
+        ->assertSee('10/07/2026');
+});
+
+it('não mostra o quadro de recorrência num lançamento comum', function () {
+    $user = User::factory()->create();
+    $tx = txDetalheWeb($user, 5000, [['numero' => 1, 'total' => 1, 'vencimento' => '2026-06-20', 'status' => StatusPagamento::ABERTO]]);
+
+    $this->actingAs($user)->get(route('lancamentos.show', $tx))
+        ->assertOk()
+        ->assertDontSee('Lançamento recorrente');
 });
 
 it('mostra os dados reais do lançamento formatados em pt-BR', function () {

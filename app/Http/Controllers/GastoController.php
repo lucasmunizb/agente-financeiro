@@ -59,7 +59,11 @@ class GastoController extends Controller
             if ($dados = $request->dadosRecorrencia()) {
                 $hoje = CarbonImmutable::now(RelativeDate::TIMEZONE);
                 // Este mês já virou gasto acima; a recorrência começa no mês seguinte.
-                $recorrencias->registrar($dados, $hoje, $hoje->startOfMonth()->addMonthNoOverflow());
+                $recorrencia = $recorrencias->registrar($dados, $hoje, $hoje->startOfMonth()->addMonthNoOverflow());
+                // Liga o gasto DESTE mês à recorrência que nasceu junto: assim ele já aparece como
+                // recorrente na tela (com dia/próxima) e a edição oferece o alcance "este e os
+                // próximos". Os meses seguintes materializam outros lançamentos, todos vinculados.
+                $tx->update(['recurrence_id' => $recorrencia->id]);
             }
 
             return $tx;

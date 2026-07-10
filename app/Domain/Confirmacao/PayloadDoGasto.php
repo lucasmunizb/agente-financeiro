@@ -29,6 +29,7 @@ final class PayloadDoGasto
             'accountId' => $d->accountId,
             'categoriaId' => $d->categoriaId,
             'origem' => $d->origem,
+            'recurrenceId' => $d->recurrenceId,
         ];
     }
 
@@ -46,6 +47,7 @@ final class PayloadDoGasto
             accountId: isset($p['accountId']) ? (int) $p['accountId'] : null,
             categoriaId: isset($p['categoriaId']) ? (int) $p['categoriaId'] : null,
             origem: (string) ($p['origem'] ?? 'manual'),
+            recurrenceId: isset($p['recurrenceId']) ? (int) $p['recurrenceId'] : null,
         );
     }
 }

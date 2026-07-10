@@ -16,6 +16,10 @@ use Carbon\CarbonImmutable;
  * `origem` registra de onde veio o lançamento (`manual` por padrão; `telegram`
  * via bot; `pdf` na importação de fatura). Não altera o cálculo — só a auditoria
  * e a procedência gravada na transaction.
+ *
+ * `recurrenceId` liga o lançamento à recorrência que o gerou (só os produtores de
+ * recorrência preenchem; ausente ⇒ lançamento avulso). É o elo que viaja com o dado
+ * até a transaction — a VERDADE de "este lançamento é recorrente" (spec 10).
  */
 final class DadosGastoManual
 {
@@ -30,6 +34,6 @@ final class DadosGastoManual
         public readonly ?int $accountId = null,
         public readonly ?int $categoriaId = null,
         public readonly string $origem = 'manual',
-    ) {
-    }
+        public readonly ?int $recurrenceId = null,
+    ) {}
 }

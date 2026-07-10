@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Income;
 use App\Models\Installment;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -100,6 +102,37 @@ it('oferece navegação para o mês anterior e o seguinte', function () {
         ->assertOk()
         ->assertSee('mes=2026-05', false)  // link para maio (mês anterior)
         ->assertSee('mes=2026-07', false); // link para julho (mês seguinte)
+});
+
+it('na visão de mês FUTURO abate o disponível com as recorrências previstas (spec 10b)', function () {
+    $user = User::factory()->create();
+    Income::factory()->for($user)->create(['valor_cents' => 400000, 'data' => '2026-08-05']);
+    competenciaGasto($user, 50000, '2026-08-20'); // gasto real de agosto (dá estado "pronto")
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 5,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-08-05',
+    ]);
+
+    $this->actingAs($user)->get('/?mes=2026-08')
+        ->assertOk()
+        ->assertSee('Agosto de 2026')
+        ->assertSee('R$ 3.444,10')     // 4000 − 500 − 55,90 (prevista abatida)
+        ->assertDontSee('R$ 3.500,00'); // sem a previsão seria só 4000 − 500
+});
+
+it('no mês ATUAL não abate por recorrência — previsão é só futura (regressão 10b)', function () {
+    $user = User::factory()->create();
+    Income::factory()->for($user)->create(['valor_cents' => 400000, 'data' => '2026-06-05']);
+    competenciaGasto($user, 50000, '2026-06-20');
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 20,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-06-20',
+    ]);
+
+    $this->actingAs($user)->get('/')
+        ->assertOk()
+        ->assertSee('Junho de 2026')
+        ->assertSee('R$ 3.500,00'); // 4000 − 500, sem abater a recorrência do mês corrente
 });
 
 it('mantém o isolamento por usuário ao navegar por competência', function () {

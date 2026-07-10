@@ -56,6 +56,7 @@ final class RegistrarGastoManual
                 'card_id' => $dados->cardId,
                 'account_id' => $dados->accountId,
                 'categoria_id' => $dados->categoriaId,
+                'recurrence_id' => $dados->recurrenceId,
                 'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
                 'origem' => $dados->origem,
                 'moeda' => 'BRL',

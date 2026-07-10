@@ -53,10 +53,10 @@ final class MaterializarRecorrencias
                         parcelas: 1,
                         categoriaId: $recorrencia->categoria_id,
                         origem: 'recorrencia',
+                        recurrenceId: $recorrencia->id,
                     ),
                     PendingConfirmation::ORIGEM_RECORRENCIA,
                     expiraEm: null,
-                    recurrenceId: $recorrencia->id,
                 );
 
                 $recorrencia->update([

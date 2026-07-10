@@ -49,6 +49,28 @@
             </div>
         </header>
 
+        {{-- Recorrência: quadro de destaque quando o lançamento é vinculado a uma recorrência.
+             Os dados (dia + próxima) vêm prontos do backend (regra 4). --}}
+        @if (($dados['recorrencia'] ?? null))
+            @php $rec = $dados['recorrencia']; @endphp
+            <section class="flex items-start gap-3 rounded-card border border-cedula/30 bg-cedula/5 p-gutter">
+                <x-icon name="refresh-cw" class="mt-0.5 h-5 w-5 shrink-0 text-cedula" />
+                <div class="flex flex-col gap-1">
+                    <p class="font-body-md text-body-md font-medium text-on-surface">Lançamento recorrente</p>
+                    @if ($rec['ativa'])
+                        <p class="font-body-sm text-body-sm text-on-surface-variant">
+                            Repete todo mês no dia {{ $rec['dia'] }}@if ($rec['proximaEm']) · próxima em {{ $rec['proximaEm'] }}@endif.
+                        </p>
+                    @else
+                        <p class="font-body-sm text-body-sm text-on-surface-variant">A recorrência foi encerrada — este lançamento nasceu dela.</p>
+                    @endif
+                    <a href="{{ route('recorrencias') }}" class="w-fit font-label-sm text-label-sm font-medium text-cedula hover:underline">
+                        Gerenciar recorrências
+                    </a>
+                </div>
+            </section>
+        @endif
+
         {{-- Metadados (rótulo → valor; datas e números em mono). --}}
         <section class="notebook-card relative overflow-hidden rounded-card p-gutter">
             <div class="absolute inset-y-0 left-0 w-2 border-r border-linha bg-primary/5"></div>

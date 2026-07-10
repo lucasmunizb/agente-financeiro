@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\CartaoController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ConfiguracoesController;
 use App\Http\Controllers\ConfirmacaoPendenteController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GastoController;
@@ -136,6 +137,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/telegram/status', [TelegramLinkController::class, 'status'])->name('telegram.status');
     Route::post('/telegram/gerar', [TelegramLinkController::class, 'gerar'])->name('telegram.gerar');
     Route::post('/telegram/desconectar', [TelegramLinkController::class, 'desconectar'])->name('telegram.desconectar');
+
+    Route::get('/configuracoes', [ConfiguracoesController::class, 'show'])->name('configuracoes');
+    Route::put('/configuracoes/perfil', [ConfiguracoesController::class, 'atualizarPerfil'])->name('configuracoes.perfil');
+    Route::put('/configuracoes/senha', [ConfiguracoesController::class, 'alterarSenha'])->name('configuracoes.senha');
+    Route::get('/configuracoes/exportar', [ConfiguracoesController::class, 'exportar'])->name('configuracoes.exportar');
+    Route::delete('/configuracoes/conta', [ConfiguracoesController::class, 'excluirConta'])->name('configuracoes.excluir');
 
     Route::post('/logout', LogoutController::class)->name('logout');
 });

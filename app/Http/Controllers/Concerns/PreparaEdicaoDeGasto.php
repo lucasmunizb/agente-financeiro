@@ -9,6 +9,7 @@ use App\Http\Controllers\LancamentoFormController;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\PaymentMethod;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Model;
@@ -59,6 +60,33 @@ trait PreparaEdicaoDeGasto
             'parcelas' => max(1, $tx->installments->count()),
             'vencimento' => $ehCredito ? null : $primeira?->vencimento?->toDateString(),
             'categoria_id' => $tx->categoria_id,
+            // Lançamento vinculado a uma recorrência: a tela mostra um quadro com os dados da
+            // regra (dia + próxima) e trava o switch; o backend ignora o switch nesse caso.
+            'recorrente' => $tx->ehRecorrente(),
+            'recorrencia' => $this->recorrenciaExibicao($tx),
+        ];
+    }
+
+    /**
+     * Dados da recorrência vinculada, já formatados para a tela (regra 4/5) — ou null quando o
+     * lançamento não é recorrente. `proximaEm` só faz sentido enquanto a recorrência está ativa.
+     *
+     * @return array{ativa: bool, dia: int, proximaEm: ?string}|null
+     */
+    protected function recorrenciaExibicao(Transaction $tx): ?array
+    {
+        $rec = $tx->recurrence;
+
+        if ($rec === null) {
+            return null;
+        }
+
+        $ativa = $rec->status === Recurrence::STATUS_ATIVO;
+
+        return [
+            'ativa' => $ativa,
+            'dia' => $rec->dia,
+            'proximaEm' => $ativa ? $rec->proxima_em?->format('d/m/Y') : null,
         ];
     }
 

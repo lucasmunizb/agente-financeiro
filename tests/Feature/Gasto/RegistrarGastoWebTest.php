@@ -203,6 +203,10 @@ it('gasto recorrente à vista: lança AGORA e cria a recorrência a partir do m�
 
     // 2) A recorrência nasceu ativa, começando no mês seguinte (agosto), sem duplicar julho.
     $rec = Recurrence::sole();
+
+    // 3) O gasto deste mês fica VINCULADO à recorrência — já aparece como recorrente na tela.
+    expect($tx->fresh()->recurrence_id)->toBe($rec->id)
+        ->and($tx->fresh()->ehRecorrente())->toBeTrue();
     expect($rec->user_id)->toBe($user->id)
         ->and($rec->status)->toBe(Recurrence::STATUS_ATIVO)
         ->and($rec->valor_cents)->toBe(5590)
@@ -244,6 +248,33 @@ it('recorrente exige o dia da recorrência', function () {
     ])->assertStatus(422)->assertJsonValidationErrors(['dia_recorrencia']);
 
     expect(Transaction::count())->toBe(0);
+});
+
+it('recusa parcelamento combinado com recorrência (parcelas ≥ 2 + repete todo mês)', function () {
+    $user = User::factory()->create();
+
+    // Parcelar (dividir um gasto em N) e repetir todo mês são coisas diferentes: combinar
+    // as duas não faz sentido de negócio (spec §7.7). A borda barra e nada é gravado.
+    $this->actingAs($user)->postJson('/gastos', [
+        'descricao' => 'Sofá', 'valor' => '1.200,00', 'forma' => 'pix', 'vencimento' => '2026-07-05',
+        'parcelas' => 3,
+        'recorrente' => true, 'periodicidade' => 'mensal', 'dia_recorrencia' => 5,
+    ])->assertStatus(422)->assertJsonValidationErrors(['recorrente']);
+
+    expect(Transaction::count())->toBe(0)
+        ->and(Recurrence::count())->toBe(0);
+});
+
+it('a prévia também recusa parcelamento com recorrência', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson('/gastos/previa', [
+        'descricao' => 'Sofá', 'valor' => '1.200,00', 'forma' => 'pix', 'vencimento' => '2026-07-05',
+        'parcelas' => 2, 'recorrente' => true, 'periodicidade' => 'mensal', 'dia_recorrencia' => 5,
+    ])->assertStatus(422)->assertJsonValidationErrors(['recorrente']);
+
+    expect(Transaction::count())->toBe(0)
+        ->and(Recurrence::count())->toBe(0);
 });
 
 it('a prévia de um gasto recorrente informa quando a recorrência começa', function () {

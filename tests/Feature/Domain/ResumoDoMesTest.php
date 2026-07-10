@@ -11,6 +11,7 @@ use App\Domain\ProximasContas\ConsultarProximasContas;
 use App\Models\Card;
 use App\Models\Income;
 use App\Models\Installment;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -260,4 +261,68 @@ it('usuário sem nada em atraso tem contasVencidas zeradas e lista vazia (C8 —
 
     expect($resumo->totalContasVencidasCents())->toBe(0)
         ->and($resumo->contasVencidas->contas)->toBe([]);
+});
+
+// ---- Previsão de recorrências na visão de mês FUTURO (spec 10b) --------------------------
+
+/** Recorrência ativa fora de cartão com ponteiro na 1ª ocorrência dada. */
+function resumoRecorrencia(User $user, int $valorCents, int $dia, string $proximaEm, string $descricao = 'Netflix'): Recurrence
+{
+    return Recurrence::factory()->for($user)->create([
+        'descricao' => $descricao, 'valor_cents' => $valorCents, 'dia' => $dia,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => $proximaEm,
+    ]);
+}
+
+it('na visão de mês FUTURO injeta as recorrências previstas nas próximas contas e abate o disponível (P1/P2/P10)', function () {
+    $user = User::factory()->create();
+
+    resumoReceita($user, 400000, '2026-08-05');       // receita do mês futuro
+    resumoParcela($user, 50000, '2026-08-20');        // gasto real vencendo no mês futuro
+    resumoRecorrencia($user, 5590, 5, '2026-08-05');  // conta fixa prevista (dia 5)
+
+    $agora = hojeSP('2026-06-15');                     // hoje real
+    $ancora = hojeSP('2026-08-01');                    // mês navegado (futuro)
+    $resumo = app(ResumoDoMes::class)->para($user->id, $ancora, 30, $agora);
+
+    // Próximas contas = real (Aug 20) + prevista (Aug 5), ordenadas por vencimento.
+    expect($resumo->totalProximasContasCents())->toBe(55590)
+        ->and($resumo->proximasContas->contas)->toHaveCount(2)
+        ->and($resumo->proximasContas->contas[0]['descricao'])->toBe('Netflix')
+        ->and($resumo->proximasContas->contas[0]['vencimento'])->toBe('2026-08-05')
+        ->and($resumo->proximasContas->contas[0]['prevista'])->toBeTrue()
+        ->and($resumo->proximasContas->contas[1]['vencimento'])->toBe('2026-08-20')
+        ->and($resumo->proximasContas->contas[1]['prevista'])->toBeFalse();
+
+    // Disponível projetado abate o gasto real (500) + a prevista (55,90): 4000 - 500 - 55,90.
+    expect($resumo->disponivelCents())->toBe(344410);
+});
+
+it('não projeta recorrências no mês corrente — chamada default fica idêntica ao atual (P3, regressão)', function () {
+    $user = User::factory()->create();
+
+    resumoReceita($user, 400000, '2026-06-05');
+    resumoParcela($user, 50000, '2026-06-20');
+    resumoRecorrencia($user, 5590, 20, '2026-06-20'); // ocorrência neste mês — servida pela fila, não projetada
+
+    // Chamada default (sem "agora"): âncora == agora == mês corrente ⇒ sem previsão.
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
+
+    expect($resumo->totalProximasContasCents())->toBe(50000)      // só a real
+        ->and($resumo->disponivelCents())->toBe(350000)           // 4000 - 500, sem abater a recorrência
+        ->and($resumo->proximasContas->contas)->toHaveCount(1)
+        ->and($resumo->proximasContas->contas[0]['prevista'])->toBeFalse();
+});
+
+it('a previsão respeita o escopo por usuário na visão futura (P8)', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+    resumoRecorrencia($user, 5590, 5, '2026-08-05', 'Minha');
+    resumoRecorrencia($outro, 999900, 5, '2026-08-05', 'Alheia');
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-08-01'), 30, hojeSP('2026-06-15'));
+
+    expect($resumo->totalProximasContasCents())->toBe(5590)
+        ->and($resumo->proximasContas->contas)->toHaveCount(1)
+        ->and($resumo->proximasContas->contas[0]['descricao'])->toBe('Minha');
 });

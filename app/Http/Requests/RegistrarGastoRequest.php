@@ -12,6 +12,7 @@ use App\Domain\Shared\Money;
 use App\Models\PaymentMethod;
 use App\Models\Recurrence;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -29,6 +30,11 @@ use Illuminate\Validation\Rule;
  */
 class RegistrarGastoRequest extends FormRequest
 {
+    /** Escopo da edição de um lançamento recorrente ("perguntar na hora", spec 10). */
+    public const ESCOPO_ESTE = 'este';
+
+    public const ESCOPO_ESTE_E_PROXIMOS = 'este_e_proximos';
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -79,7 +85,26 @@ class RegistrarGastoRequest extends FormRequest
             'recorrente' => ['nullable', 'boolean'],
             'periodicidade' => [Rule::requiredIf($ehRecorrente), 'nullable', Rule::in([Recurrence::PERIODICIDADE_MENSAL])],
             'dia_recorrencia' => [Rule::requiredIf($ehRecorrente), 'nullable', 'integer', 'min:1', 'max:31'],
+
+            // Edição de um lançamento JÁ recorrente: até onde a mudança vale (spec 10). Só na
+            // edição; ausente ⇒ "só este mês" (padrão conservador — não reescreve a regra sem pedir).
+            'escopo_recorrencia' => ['nullable', Rule::in([self::ESCOPO_ESTE, self::ESCOPO_ESTE_E_PROXIMOS])],
         ];
+    }
+
+    /**
+     * Regra cruzada: parcelamento e recorrência são mutuamente exclusivos. Dividir um gasto
+     * em N parcelas é diferente de repeti-lo todo mês (spec §7.7) — combinar os dois não tem
+     * sentido de negócio. A tela já impede (JS desabilita o switch com 2+ parcelas), mas a
+     * borda é a fonte da verdade: barra o POST e devolve um erro genérico (banner geral).
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($this->ehRecorrente() && (int) $this->input('parcelas', 1) >= 2) {
+                $validator->errors()->add('recorrente', 'Um lançamento parcelado não pode repetir todo mês — escolha parcelas ou recorrência.');
+            }
+        });
     }
 
     /**

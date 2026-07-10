@@ -164,7 +164,7 @@ class LancamentoController extends Controller
         $detalhe = $consulta->para($userId, $transaction, CarbonImmutable::now('America/Sao_Paulo'));
 
         // Recarrega a transação (escopo por usuário) para alimentar o modal de edição.
-        $tx = Transaction::with(['installments', 'paymentMethod'])
+        $tx = Transaction::with(['installments', 'paymentMethod', 'recurrence'])
             ->where('user_id', $userId)->findOrFail($transaction);
 
         // Só é possível marcar pago FORA DE CARTÃO (cartão quita pela fatura, §4.3).

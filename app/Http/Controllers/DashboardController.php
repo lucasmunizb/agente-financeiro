@@ -67,7 +67,9 @@ class DashboardController extends Controller
         ];
 
         if ($estado === 'pronto') {
-            $dados['vm'] = $this->viewModel($userId, $ancora, $ehMesAtual, $resumoDoMes);
+            // $hoje é o "agora" real; $ancora é o mês navegado. A distinção habilita a previsão
+            // de recorrências na visão de mês futuro (spec 10b) — no mês atual são iguais.
+            $dados['vm'] = $this->viewModel($userId, $ancora, $hoje, $ehMesAtual, $resumoDoMes);
         } else {
             $dados['mesLabel'] = $this->rotuloMes($ancora);
         }
@@ -96,9 +98,11 @@ class DashboardController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function viewModel(int $userId, CarbonImmutable $hoje, bool $ehMesAtual, ResumoDoMes $resumoDoMes): array
+    private function viewModel(int $userId, CarbonImmutable $hoje, CarbonImmutable $agora, bool $ehMesAtual, ResumoDoMes $resumoDoMes): array
     {
-        $resumo = $resumoDoMes->para($userId, $hoje);
+        // $hoje é a âncora (mês navegado); $agora é o "hoje" real. Em mês futuro eles diferem e
+        // a projeção de recorrências previstas (spec 10b) entra nas próximas contas + disponível.
+        $resumo = $resumoDoMes->para($userId, $hoje, 30, $agora);
         $mes = $resumo->mes;
 
         $disponivelCents = $resumo->disponivelCents();
@@ -273,8 +277,10 @@ class DashboardController extends Controller
 
     /**
      * Linhas de "Próximas contas" (até 5), já formatadas. Urgência (≤7 dias) muda o tom.
+     * A flag `prevista` (recorrência projetada na visão de mês futuro, spec 10b) é propagada
+     * como dado — o selo/"~" é etapa de frontend (regra 3).
      *
-     * @return list<array{title: string, due: string, value: string, iconTone: string}>
+     * @return list<array{title: string, due: string, value: string, iconTone: string, prevista: bool}>
      */
     private function proximasContas(ResumoDoMesResultado $resumo, CarbonImmutable $hoje): array
     {
@@ -288,6 +294,7 @@ class DashboardController extends Controller
                 'due' => 'vence '.$this->dataExtenso($venc),
                 'value' => Money::fromCents($conta['cents'])->formatBRL(),
                 'iconTone' => $conta['vencimento'] <= $limite7 ? 'ocre' : 'primary',
+                'prevista' => $conta['prevista'] ?? false,
             ];
         }, array_slice($resumo->proximasContas->contas, 0, 5));
     }

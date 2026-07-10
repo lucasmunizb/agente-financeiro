@@ -27,6 +27,13 @@
     $valVencimento = $dados['vencimento'] ?? '';
     $valCardId = $dados['card_id'] ?? null;
     $valCategoria = $dados['categoria_id'] ?? null;
+    // Lançamento que já é recorrente (vinculado a uma recorrência): a tela mostra um QUADRO com
+    // os dados da regra (dia + próxima), sem o switch — não se recorre de novo o que já é
+    // recorrente. `$recData` (dia/proximaEm/ativa) vem pronto do backend (regra 4). O hidden
+    // `recorrente` segue "0" (o backend ignora o switch), então não caímos no requiredIf.
+    $recData = $dados['recorrencia'] ?? null;
+    $recorrenteTravado = ($dados['recorrente'] ?? false) === true;
+    $recAtiva = (bool) ($recData['ativa'] ?? false);
 
     $labelRevisar = 'Revisar e confirmar';
     $labelGravar = $mode === 'edit' ? 'Confirmar alterações' : 'Confirmar e gravar';
@@ -171,42 +178,75 @@
                         class="input-field h-12 w-full rounded-lg px-4 font-body-md text-body-md text-on-surface-variant" />
                 </div>
 
-                {{-- Recorrência (§7.7 · spec 10): só fora de cartão. Ligar o switch cria uma
-                     recorrência mensal a partir do MÊS SEGUINTE — este mês já é lançado como o
-                     gasto acima (sem contar em dobro). O switch controla o hidden `recorrente`. --}}
-                <div class="space-y-4">
+                {{-- Recorrência (§7.7 · spec 10): só fora de cartão. --}}
+                @if ($recorrenteTravado)
+                    {{-- Lançamento JÁ recorrente: quadro informativo com os dados da regra (dia +
+                         próxima ocorrência), calculados pelo backend (regra 4). Sem switch — não se
+                         recorre de novo o que já é recorrente; o alcance da edição é escolhido no
+                         painel de confirmação ("só este mês" × "este e os próximos"). --}}
                     <input type="hidden" name="recorrente" value="0" data-rg-recorrente-input>
-                    <div class="flex items-center justify-between">
-                        <span class="font-body-md text-body-md text-on-surface">Repete todo mês?</span>
-                        <button type="button" data-rg-recorrencia role="switch" aria-checked="false"
-                            aria-label="Repete todo mês?" class="rg-switch relative h-6 w-12 rounded-full">
-                            <span class="rg-switch__knob absolute left-1 top-1 h-4 w-4 rounded-full bg-white"></span>
-                        </button>
+                    <div data-rg-recorrencia-quadro class="flex items-start gap-3 rounded-lg border border-cedula/30 bg-cedula/5 p-4">
+                        <x-icon name="refresh-cw" class="mt-0.5 h-5 w-5 shrink-0 text-cedula" />
+                        <div class="flex flex-col gap-1">
+                            <p class="font-body-md text-body-md font-medium text-on-surface">Lançamento recorrente</p>
+                            @if ($recAtiva)
+                                <p class="font-body-sm text-body-sm text-on-surface-variant">
+                                    Repete todo mês no dia {{ $recData['dia'] }}@if ($recData['proximaEm']) · próxima em {{ $recData['proximaEm'] }}@endif.
+                                </p>
+                            @else
+                                <p class="font-body-sm text-body-sm text-on-surface-variant">
+                                    A recorrência foi encerrada — este lançamento nasceu dela.
+                                </p>
+                            @endif
+                            <a href="{{ route('recorrencias') }}" class="w-fit font-label-sm text-label-sm font-medium text-cedula hover:underline">
+                                Gerenciar recorrências
+                            </a>
+                        </div>
                     </div>
-                    <p class="-mt-2 font-label-sm text-label-sm text-outline">assinaturas e contas fixas</p>
+                @else
+                    {{-- Lançamento comum: ligar o switch cria uma recorrência mensal a partir do MÊS
+                         SEGUINTE — este mês já é lançado como o gasto acima (sem contar em dobro). --}}
+                    <div class="space-y-4">
+                        <input type="hidden" name="recorrente" value="0" data-rg-recorrente-input>
+                        <div class="flex items-center justify-between">
+                            <span class="font-body-md text-body-md text-on-surface">Repete todo mês?</span>
+                            <button type="button" data-rg-recorrencia role="switch"
+                                data-rg-recorrente-lock="0" aria-checked="false"
+                                aria-label="Repete todo mês?" class="rg-switch relative h-6 w-12 rounded-full transition-opacity disabled:cursor-not-allowed disabled:opacity-40">
+                                <span class="rg-switch__knob absolute left-1 top-1 h-4 w-4 rounded-full bg-white"></span>
+                            </button>
+                        </div>
+                        <p class="-mt-2 font-label-sm text-label-sm text-outline">assinaturas e contas fixas</p>
+                        {{-- Parcelamento e recorrência não combinam: com 2+ parcelas o switch é
+                             desligado e desabilitado pelo JS (o backend também recusa). --}}
+                        <p data-rg-recorrencia-bloqueada hidden class="-mt-2 flex items-center gap-1.5 font-label-sm text-label-sm text-outline">
+                            <x-icon name="alert" class="h-4 w-4 shrink-0" />
+                            <span>Um lançamento parcelado não repete todo mês. Deixe em 1 parcela para ativar.</span>
+                        </p>
 
-                    {{-- Revelado quando ligado: periodicidade (só mensal no MVP) + dia do mês. --}}
-                    <div data-rg-recorrencia-fields hidden class="grid grid-cols-2 gap-4">
-                        <div class="flex flex-col gap-2">
-                            <label for="rg-periodicidade" class="font-body-sm text-body-sm text-on-surface-variant">Periodicidade</label>
-                            <div class="relative">
-                                <select id="rg-periodicidade" name="periodicidade"
-                                    class="input-field h-12 w-full cursor-pointer appearance-none rounded-lg px-4 font-body-md text-body-md text-on-surface">
-                                    <option value="mensal">mensal</option>
-                                </select>
-                                <x-icon name="chevron-down" class="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-outline" />
+                        {{-- Revelado quando ligado: periodicidade (só mensal no MVP) + dia do mês. --}}
+                        <div data-rg-recorrencia-fields hidden class="grid grid-cols-2 gap-4">
+                            <div class="flex flex-col gap-2">
+                                <label for="rg-periodicidade" class="font-body-sm text-body-sm text-on-surface-variant">Periodicidade</label>
+                                <div class="relative">
+                                    <select id="rg-periodicidade" name="periodicidade"
+                                        class="input-field h-12 w-full cursor-pointer appearance-none rounded-lg px-4 font-body-md text-body-md text-on-surface">
+                                        <option value="mensal">mensal</option>
+                                    </select>
+                                    <x-icon name="chevron-down" class="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-outline" />
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <label for="rg-dia_recorrencia" class="font-body-sm text-body-sm text-on-surface-variant">Dia</label>
+                                <input id="rg-dia_recorrencia" name="dia_recorrencia" type="number" inputmode="numeric" min="1" max="31" placeholder="5"
+                                    class="input-field h-12 w-full rounded-lg px-4 font-value-label text-value-label text-on-surface" />
+                                <p data-rg-error="dia_recorrencia" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
+                                    <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
+                                </p>
                             </div>
                         </div>
-                        <div class="flex flex-col gap-2">
-                            <label for="rg-dia_recorrencia" class="font-body-sm text-body-sm text-on-surface-variant">Dia</label>
-                            <input id="rg-dia_recorrencia" name="dia_recorrencia" type="number" inputmode="numeric" min="1" max="31" placeholder="5"
-                                class="input-field h-12 w-full rounded-lg px-4 font-value-label text-value-label text-on-surface" />
-                            <p data-rg-error="dia_recorrencia" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
-                                <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
-                            </p>
-                        </div>
                     </div>
-                </div>
+                @endif
             </div>
 
             {{-- Categoria (opcional; chips reais do usuário) --}}
@@ -307,6 +347,32 @@
                 class="flex items-start gap-2 rounded-lg border border-cedula/30 bg-cedula/5 p-4 font-body-sm text-body-sm text-on-surface-variant">
                 <x-icon name="refresh-cw" class="mt-0.5 h-5 w-5 shrink-0 text-cedula" /><span></span>
             </p>
+
+            {{-- Editar um lançamento recorrente: até onde a mudança vale (spec 10, "perguntar na
+                 hora"). Os radios ficam FORA do <form> mas ligados a ele por form="rg-form", então
+                 entram no FormData sem JS. Padrão "só este mês" (não reescreve a regra sem pedir).
+                 O backend ignora este campo em lançamentos não recorrentes. --}}
+            @if ($recorrenteTravado && $recAtiva)
+                <fieldset class="space-y-3 rounded-lg border border-linha bg-surface-container-lowest p-4">
+                    <legend class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+                        <x-icon name="refresh-cw" class="h-4 w-4 text-cedula" /> Aplicar a
+                    </legend>
+                    <label class="flex cursor-pointer items-start gap-3">
+                        <input type="radio" name="escopo_recorrencia" value="este" form="rg-form" checked
+                            class="mt-0.5 h-4 w-4 accent-cedula" />
+                        <span class="font-body-sm text-body-sm text-on-surface">Só este mês
+                            <span class="block font-label-sm text-label-sm text-outline">altera apenas este lançamento</span>
+                        </span>
+                    </label>
+                    <label class="flex cursor-pointer items-start gap-3">
+                        <input type="radio" name="escopo_recorrencia" value="este_e_proximos" form="rg-form"
+                            class="mt-0.5 h-4 w-4 accent-cedula" />
+                        <span class="font-body-sm text-body-sm text-on-surface">Este e os próximos
+                            <span class="block font-label-sm text-label-sm text-outline">atualiza a recorrência (valor, dia, descrição) para os meses futuros</span>
+                        </span>
+                    </label>
+                </fieldset>
+            @endif
         </div>
 
         <footer class="flex flex-col gap-3 border-t border-linha bg-surface-container-low p-gutter md:flex-row-reverse">

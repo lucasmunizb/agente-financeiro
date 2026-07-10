@@ -10,6 +10,8 @@ use App\Domain\Recorrencia\DadosRecorrencia;
 use App\Domain\Recorrencia\MaterializarRecorrencias;
 use App\Domain\Recorrencia\OcorrenciaMensal;
 use App\Domain\Recorrencia\RegistrarRecorrencia;
+use App\Domain\Recorrencia\SincronizarRecorrencia;
+use App\Domain\Gasto\DadosGastoManual;
 use App\Models\AuditLog;
 use App\Models\PaymentMethod;
 use App\Models\PendingConfirmation;
@@ -143,6 +145,7 @@ it('materializa: enfileira 1 confirmação no dia, avança o ponteiro e não gra
         ->and($pendente->payload['valorTotalCents'])->toBe(5590)
         ->and($pendente->payload['parcelas'])->toBe(1)
         ->and($pendente->payload['origem'])->toBe('recorrencia')
+        ->and($pendente->payload['recurrenceId'])->toBe($rec->id) // o elo viaja no payload
         ->and($pendente->payload['dataCompra'])->toBe('2026-07-09');
 
     // Ponteiro avança para a ocorrência do mês seguinte.
@@ -202,7 +205,7 @@ it('isola a materialização por usuário (C9)', function () {
 it('confirmar o pendente vira lançamento com origem recorrencia (C6)', function () {
     $user = User::factory()->create();
     $hoje = CarbonImmutable::parse('2026-07-09 06:00', 'America/Sao_Paulo');
-    (new RegistrarRecorrencia)->registrar(dadosRecorrencia($user, ['dia' => 9]), $hoje);
+    $rec = (new RegistrarRecorrencia)->registrar(dadosRecorrencia($user, ['dia' => 9]), $hoje);
     (new MaterializarRecorrencias)->paraTodos($hoje);
     $pendente = PendingConfirmation::where('user_id', $user->id)->sole();
 
@@ -211,7 +214,52 @@ it('confirmar o pendente vira lançamento com origem recorrencia (C6)', function
     expect($tx)->toBeInstanceOf(Transaction::class)
         ->and($tx->origem)->toBe('recorrencia')
         ->and($tx->valor_total_cents)->toBe(5590)
-        ->and($tx->installments)->toHaveCount(1);
+        ->and($tx->installments)->toHaveCount(1)
+        // O lançamento carrega o VÍNCULO com a recorrência de origem (não só a procedência).
+        ->and($tx->recurrence_id)->toBe($rec->id)
+        ->and($tx->ehRecorrente())->toBeTrue()
+        ->and($tx->recurrence->is($rec))->toBeTrue();
+});
+
+// ---- SincronizarRecorrencia ("este e os próximos") --------------------------------------
+
+it('sincroniza o molde da recorrência ao propagar "este e os próximos" e recalcula o dia', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 4500,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'categoria_id' => null, 'dia' => 10, 'proxima_em' => '2026-08-10',
+        'status' => Recurrence::STATUS_ATIVO,
+    ]);
+    $novos = new DadosGastoManual(
+        userId: $user->id, descricao: 'Netflix 4K', valorTotalCents: 5500,
+        dataCompra: CarbonImmutable::parse('2026-07-15', 'America/Sao_Paulo'),
+        paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
+    );
+
+    $ok = (new SincronizarRecorrencia)->sincronizar($rec, $novos);
+
+    expect($ok)->toBeTrue();
+    $rec->refresh();
+    expect($rec->descricao)->toBe('Netflix 4K')
+        ->and($rec->valor_cents)->toBe(5500)
+        ->and($rec->dia)->toBe(15)
+        ->and($rec->proxima_em->format('Y-m-d'))->toBe('2026-08-15') // novo dia, mesmo mês
+        ->and(AuditLog::where('entidade', 'recurrence')->where('entidade_id', $rec->id)
+            ->where('acao', AuditLog::ACAO_EDITAR)->exists())->toBeTrue();
+});
+
+it('não sincroniza recorrência cancelada (não há futuro a alterar)', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->cancelado()->create(['valor_cents' => 4500]);
+    $novos = new DadosGastoManual(
+        userId: $user->id, descricao: 'X', valorTotalCents: 9999,
+        dataCompra: CarbonImmutable::parse('2026-07-15', 'America/Sao_Paulo'),
+        paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
+    );
+
+    expect((new SincronizarRecorrencia)->sincronizar($rec, $novos))->toBeFalse()
+        ->and($rec->fresh()->valor_cents)->toBe(4500); // intacta
 });
 
 // ---- Cancelar ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@
         ['key' => 'recorrencias', 'label' => 'Recorrências', 'icon' => 'refresh-cw', 'href' => route('recorrencias'), 'soon' => false],
         ['key' => 'relatorios', 'label' => 'Relatórios', 'icon' => 'bar-chart', 'href' => '#', 'soon' => true],
         ['key' => 'telegram', 'label' => 'Telegram', 'icon' => 'send', 'href' => route('telegram'), 'soon' => false],
-        ['key' => 'configuracoes', 'label' => 'Configurações', 'icon' => 'settings', 'href' => '#', 'soon' => true],
+        ['key' => 'configuracoes', 'label' => 'Configurações', 'icon' => 'settings', 'href' => route('configuracoes'), 'soon' => false],
     ];
 
     // Iniciais para o avatar (fallback "AF"). Nome nunca é exposto em meta/OG.

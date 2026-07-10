@@ -24,6 +24,7 @@ class AuditLog extends Model
     public const ACAO_IMPORTAR = 'importar';
     public const ACAO_CONFIRMAR = 'confirmar';
     public const ACAO_REJEITAR = 'rejeitar';
+    public const ACAO_EXPORTAR = 'exportar';
 
     protected $table = 'audit_log';
 

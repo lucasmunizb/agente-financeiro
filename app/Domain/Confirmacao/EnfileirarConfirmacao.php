@@ -14,8 +14,10 @@ use Carbon\CarbonImmutable;
  * sem auto-save no MVP): materializam aqui e esperam o "sim" do usuário. O `payload` guarda
  * o {@see DadosGastoManual} já normalizado (centavos, regra 5); nada é recalculado depois.
  *
- * `recurrenceId` (opcional) liga o pendente à recorrência que o produziu (spec 10) — só os
- * produtores de recorrência preenchem; alimenta a cascata "rejeitar → cancela a recorrência".
+ * O vínculo com a recorrência que o produziu (spec 10) viaja no próprio `$dados`
+ * ({@see DadosGastoManual::$recurrenceId}) — fonte ÚNICA: a coluna `recurrence_id` do pendente
+ * (que alimenta a cascata "rejeitar → cancela a recorrência") e o elo gravado no lançamento no
+ * "sim" saem do mesmo lugar. Ausente ⇒ pendente avulso (chat/telegram/importação).
  */
 final class EnfileirarConfirmacao
 {
@@ -23,7 +25,6 @@ final class EnfileirarConfirmacao
         DadosGastoManual $dados,
         string $origem,
         ?CarbonImmutable $expiraEm = null,
-        ?int $recurrenceId = null,
     ): PendingConfirmation {
         return PendingConfirmation::create([
             'user_id' => $dados->userId,
@@ -32,7 +33,7 @@ final class EnfileirarConfirmacao
             'payload' => PayloadDoGasto::paraArray($dados),
             'status' => PendingConfirmation::STATUS_PENDENTE,
             'expira_em' => $expiraEm,
-            'recurrence_id' => $recurrenceId,
+            'recurrence_id' => $dados->recurrenceId,
         ]);
     }
 }
