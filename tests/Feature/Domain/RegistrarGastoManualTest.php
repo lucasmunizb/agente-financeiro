@@ -137,6 +137,27 @@ it('confirmar persiste as parcelas com numero/total/vencimento/status e valor de
         ->and($parcelas->first()->valor()->cents())->toBe(10000);
 });
 
+it('confirmar registra parcelamento RETROATIVO: gera todas as N parcelas e as já vencidas nascem vencidas', function () {
+    $user = User::factory()->create();
+
+    // Compra parcelada bem no passado (10/jan) lançada só em julho: o motor gera as N
+    // parcelas a partir da data informada — inclusive as que já venceram (doc 03 §4.1).
+    // Nenhuma é pulada; todas nascem VENCIDO por já estarem no passado.
+    $dados = dadosPix($user, [
+        'dataCompra' => CarbonImmutable::parse('2026-01-10', 'America/Sao_Paulo'),
+        'parcelas' => 3,
+    ]);
+
+    $tx = (new RegistrarGastoManual)->confirmar($dados, CarbonImmutable::parse('2026-07-10', 'America/Sao_Paulo'));
+    $parcelas = $tx->installments()->orderBy('numero')->get();
+
+    expect($parcelas)->toHaveCount(3)
+        ->and($parcelas->map(fn ($p) => $p->vencimento->toDateString())->all())
+        ->toBe(['2026-01-10', '2026-02-10', '2026-03-10'])
+        ->and($parcelas->pluck('status_id')->unique()->values()->all())
+        ->toBe([StatusPagamento::idFor(StatusPagamento::VENCIDO)]);
+});
+
 it('confirmar respeita a origem informada (ex.: pdf da importação de fatura)', function () {
     $user = User::factory()->create();
 

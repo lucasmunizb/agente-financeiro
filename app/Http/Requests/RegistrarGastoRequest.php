@@ -68,6 +68,11 @@ class RegistrarGastoRequest extends FormRequest
             // calculado pelo cartão (campo ignorado).
             'vencimento' => [Rule::requiredIf(! $ehCredito), 'nullable', 'date'],
 
+            // Data da compra no crédito (opcional): permite lançar uma compra RETROATIVA —
+            // o motor gera todas as parcelas a partir do ciclo do cartão, inclusive as já
+            // vencidas (doc 03 §4.1). Omitida ⇒ hoje. Ignorada fora de cartão (usa `vencimento`).
+            'data_compra' => ['nullable', 'date'],
+
             'categoria_id' => [
                 'nullable', 'integer',
                 // Closure: o boolean `arquivada` precisa do query builder real —
@@ -160,6 +165,19 @@ class RegistrarGastoRequest extends FormRequest
     }
 
     /**
+     * Data-base da compra no crédito, no CADASTRO: a `data_compra` informada pelo usuário
+     * (permite lançar retroativo — o motor gera todas as parcelas, inclusive as já
+     * vencidas) ou hoje quando omitida. Na EDIÇÃO, o chamador passa a data original como
+     * override em {@see self::paraDominio()} para preservar o ciclo do cartão.
+     */
+    private function dataCompraDoCredito(): CarbonImmutable
+    {
+        return $this->filled('data_compra')
+            ? CarbonImmutable::parse((string) $this->input('data_compra'), RelativeDate::TIMEZONE)
+            : CarbonImmutable::now(RelativeDate::TIMEZONE);
+    }
+
+    /**
      * Regra de valor monetário pt-BR: precisa ser interpretável e maior que zero.
      */
     private function valorMonetario(): \Closure
@@ -182,9 +200,10 @@ class RegistrarGastoRequest extends FormRequest
     /**
      * Traduz a entrada validada para o DTO do domínio.
      *
-     * No crédito a data-base é "hoje" no cadastro; na EDIÇÃO, `$dataCompraCredito`
-     * preserva a data de compra original (senão os vencimentos seriam recalculados
-     * a partir de hoje). Fora de cartão, a data-base é sempre o vencimento informado.
+     * No crédito a data-base é a `data_compra` informada (compra retroativa) ou hoje
+     * quando omitida; na EDIÇÃO, `$dataCompraCredito` preserva a data de compra original
+     * (senão os vencimentos seriam recalculados a partir de hoje) e tem precedência.
+     * Fora de cartão, a data-base é sempre o vencimento informado.
      */
     public function paraDominio(?CarbonImmutable $dataCompraCredito = null): DadosGastoManual
     {
@@ -192,7 +211,7 @@ class RegistrarGastoRequest extends FormRequest
         $ehCredito = $forma === PaymentMethod::CREDITO;
 
         $dataCompra = $ehCredito
-            ? ($dataCompraCredito ?? CarbonImmutable::now(RelativeDate::TIMEZONE))
+            ? ($dataCompraCredito ?? $this->dataCompraDoCredito())
             : CarbonImmutable::parse((string) $this->input('vencimento'), RelativeDate::TIMEZONE);
 
         return new DadosGastoManual(

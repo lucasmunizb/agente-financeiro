@@ -107,6 +107,23 @@ it('pede esclarecimento quando a data não é compreendida', function () {
     expect($r->esclarecimentos)->toContain('data');
 });
 
+it('preserva data explícita PASSADA junto do parcelamento (lançamento retroativo via IA/Telegram)', function () {
+    $user = User::factory()->create();
+
+    // "gastei 1200 em 3x no dia 10/01" registrado só em julho: a normalização NÃO força
+    // a data para hoje — a data retroativa e as parcelas fluem intactas ao domínio, que
+    // então gera todas as parcelas (inclusive as já vencidas). Fecha o caminho Telegram.
+    $r = normalizar(
+        gastoExtraidoFake(['dataTexto' => '10/01/2026', 'parcelas' => 3]),
+        $user->id,
+        '2026-07-10',
+    );
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->dados->dataCompra->toDateString())->toBe('2026-01-10')
+        ->and($r->dados->parcelas)->toBe(3);
+});
+
 /* -------- forma de pagamento -------- */
 
 it('resolve a forma de pagamento para o id da tabela de referência', function () {

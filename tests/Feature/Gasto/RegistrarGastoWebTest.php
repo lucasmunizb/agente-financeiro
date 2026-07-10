@@ -134,6 +134,77 @@ it('grava um gasto no crédito parcelado usando o vencimento do cartão', functi
         ->toBe(['2026-07-05', '2026-08-05', '2026-09-05']);
 });
 
+it('grava um gasto no crédito com data de compra RETROATIVA — gera todas as parcelas (as passadas nascem vencidas)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create(['dia_fechamento' => 28, 'dia_vencimento' => 5]);
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-10', 'America/Sao_Paulo'));
+
+    // Compra parcelada lançada meses depois: o usuário informa a DATA REAL da compra
+    // (15/01). O motor deve gerar todas as N parcelas a partir do ciclo do cartão,
+    // inclusive as já vencidas (doc 03 §4.1) — nada é pulado.
+    $resp = $this->actingAs($user)->postJson('/gastos', [
+        'descricao' => 'Geladeira (comprada em janeiro)',
+        'valor' => '1.200,00',
+        'forma' => 'credito',
+        'card_id' => $card->id,
+        'data_compra' => '2026-01-15',
+        'parcelas' => 3,
+    ]);
+
+    $resp->assertOk()->assertJsonPath('ok', true);
+
+    $tx = Transaction::with('installments')->first();
+    expect($tx->data_compra->toDateString())->toBe('2026-01-15')
+        ->and($tx->installments)->toHaveCount(3);
+
+    // Ciclo do cartão a partir de 15/01: fecha dia 28 ⇒ fatura de janeiro; vence
+    // dia 5 (< fechamento) ⇒ mês seguinte (05/02); depois +1 mês por parcela.
+    expect($tx->installments->sortBy('numero')->pluck('vencimento')->map->toDateString()->all())
+        ->toBe(['2026-02-05', '2026-03-05', '2026-04-05']);
+
+    // Todas vencem antes de hoje (10/07) ⇒ todas nascem VENCIDO (não pula as passadas).
+    expect($tx->installments->pluck('status_id')->unique()->values()->all())
+        ->toBe([StatusPagamento::idFor(StatusPagamento::VENCIDO)]);
+});
+
+it('a prévia do crédito honra a data de compra retroativa (calcula vencido, sem persistir)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create(['dia_fechamento' => 28, 'dia_vencimento' => 5]);
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-10', 'America/Sao_Paulo'));
+
+    $this->actingAs($user)->postJson('/gastos/previa', [
+        'descricao' => 'Geladeira',
+        'valor' => '1.200,00',
+        'forma' => 'credito',
+        'card_id' => $card->id,
+        'data_compra' => '2026-01-15',
+        'parcelas' => 3,
+    ])->assertOk()
+        ->assertJsonCount(3, 'parcelas')
+        ->assertJsonPath('parcelas.0.label', '1/3')
+        ->assertJsonPath('parcelas.0.vencimento', '05/02/2026')
+        ->assertJsonPath('parcelas.0.status', StatusPagamento::VENCIDO)
+        ->assertJsonPath('parcelas.2.vencimento', '05/04/2026');
+
+    expect(Transaction::count())->toBe(0);
+});
+
+it('sem data_compra, o crédito assume hoje (comportamento padrão preservado)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create(['dia_fechamento' => 28, 'dia_vencimento' => 5]);
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo'));
+
+    $this->actingAs($user)->postJson('/gastos', [
+        'descricao' => 'Compra hoje',
+        'valor' => '300,00',
+        'forma' => 'credito',
+        'card_id' => $card->id,
+        'parcelas' => 1,
+    ])->assertOk();
+
+    expect(Transaction::first()->data_compra->toDateString())->toBe('2026-06-10');
+});
+
 it('grava um gasto FORA DE CARTÃO parcelado (pix em 3x), com vencimentos mensais', function () {
     $user = User::factory()->create();
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-01', 'America/Sao_Paulo'));
