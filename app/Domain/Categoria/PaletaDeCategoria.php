@@ -28,6 +28,7 @@ final class PaletaDeCategoria
 
     /** @var list<string> Ícones de linha oferecidos no seletor (nomes do componente x-icon). */
     public const ICONES = [
+        // Base (genéricos + contas fixas)
         'tag',
         'utensils',
         'shopping-cart',
@@ -40,6 +41,32 @@ final class PaletaDeCategoria
         'zap',
         'calendar',
         'sparkles',
+        // Tipos de despesa comuns em gestão financeira pessoal
+        'plane',          // viagem
+        'heart-pulse',    // saúde
+        'pill',           // farmácia
+        'graduation-cap', // educação
+        'shirt',          // vestuário
+        'dumbbell',       // academia
+        'gamepad-2',      // jogos / lazer
+        'film',           // cinema / streaming
+        'music',          // música / assinaturas
+        'coffee',         // café / lanches
+        'gift',           // presentes
+        'baby',           // filhos
+        'paw-print',      // pet
+        'fuel',           // combustível
+        'bus',            // transporte público
+        'wrench',         // manutenção
+        'smartphone',     // celular / telefonia
+        'piggy-bank',     // poupança
+        'trending-up',    // investimentos
+        'landmark',       // banco / impostos
+        'briefcase',      // trabalho
+        'scissors',       // beleza / salão
+        'wine',           // bebidas / bar
+        'cake',           // festas / aniversário
+        'umbrella',       // seguro
     ];
 
     /**
