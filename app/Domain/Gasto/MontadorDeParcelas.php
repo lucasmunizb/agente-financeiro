@@ -43,7 +43,9 @@ final class MontadorDeParcelas
     private function primeiroVencimento(DadosGastoManual $dados): CarbonImmutable
     {
         if ($dados->cardId !== null) {
-            $card = Card::findOrFail($dados->cardId);
+            // Escopo por usuário (pentest 2026-07 L10, defesa em profundidade): não depender
+            // só da validação a montante — o cartão tem de ser do próprio dono do gasto.
+            $card = Card::where('user_id', $dados->userId)->findOrFail($dados->cardId);
 
             return CalculadoraDeVencimento::cartao($dados->dataCompra, $card->dia_fechamento, $card->dia_vencimento);
         }

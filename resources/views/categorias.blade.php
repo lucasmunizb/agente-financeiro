@@ -39,8 +39,7 @@
                 @foreach ($categorias as $cat)
                     @php $abrirEste = $bagEditar->isNotEmpty() && $editandoId === $cat['opaqueId']; @endphp
                     <li class="notebook-card flex items-center gap-4 rounded-card p-5">
-                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-control"
-                            style="background-color: {{ $cat['cor'] ?? 'var(--color-surface-container)' }}">
+                        <span @class(['flex h-11 w-11 shrink-0 items-center justify-center rounded-control', \App\Domain\Categoria\PaletaDeCategoria::classe($cat['cor'] ?? null, 'swatch-empty')])>
                             <x-icon :name="$cat['icone']" @class([
                                 'h-5 w-5',
                                 'text-white' => $cat['cor'],

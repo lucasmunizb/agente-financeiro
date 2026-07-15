@@ -4,6 +4,7 @@ use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,11 +19,20 @@ return Application::configure(basePath: dirname(__DIR__))
         // vem de env porque o IP do serviço proxy na overlay network é dinâmico.
         $middleware->trustProxies(
             at: array_filter(explode(',', (string) env('TRUSTED_PROXIES', ''))),
-            headers: Illuminate\Http\Request::HEADER_X_FORWARDED_FOR
-                | Illuminate\Http\Request::HEADER_X_FORWARDED_HOST
-                | Illuminate\Http\Request::HEADER_X_FORWARDED_PORT
-                | Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO,
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO,
         );
+
+        // Host header fixado ao APP_URL em produção (pentest 2026-07 L11): impede que um
+        // proxy mal configurado (X-Forwarded-Host confiado acima) influencie o Host. Só é
+        // enforçado fora de local/testes (padrão do TrustHosts), então não trava o dev.
+        $middleware->trustHosts(at: static function (): array {
+            $host = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+            return is_string($host) && $host !== '' ? [$host] : [];
+        });
 
         // Webhook do Telegram não tem sessão/CSRF (validado pelo segredo).
         $middleware->validateCsrfTokens(except: ['telegram/webhook']);

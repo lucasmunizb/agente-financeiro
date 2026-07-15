@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Domain\Conta\ExcluirConta;
 use App\Models\AuditLog;
+use App\Models\ChatMessage;
+use App\Models\Income;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -60,6 +63,23 @@ it('anonimiza a PII do titular na exclusão (nome, e-mail, telefone — auditori
     expect($link->telefone)->toBeNull()
         ->and($link->telegram_user_id)->toBeNull()
         ->and($link->status)->toBe(\App\Models\TelegramLink::REVOGADO);
+});
+
+it('apaga a conversa de chat e redige as descrições livres do titular (pentest M3)', function () {
+    $user = User::factory()->create();
+    ChatMessage::factory()->for($user)->create(['body' => 'meu CPF é 123.456.789-00']);
+    $tx = Transaction::factory()->for($user)->create(['descricao' => 'almoço com o Dr. João']);
+    $income = Income::factory()->for($user)->create(['descricao' => 'salário empresa X']);
+
+    (new ExcluirConta)->excluir($user->id);
+
+    // Texto livre do titular não sobrevive ao esquecimento.
+    expect(ChatMessage::where('user_id', $user->id)->count())->toBe(0)
+        ->and($tx->fresh()->descricao)->toBe('[removido]')
+        ->and($income->fresh()->descricao)->toBe('[removido]');
+
+    // Integridade: a linha financeira permanece (valor preservado).
+    expect(Transaction::withTrashed()->find($tx->id))->not->toBeNull();
 });
 
 it('bloqueia o login de um usuário excluído', function () {

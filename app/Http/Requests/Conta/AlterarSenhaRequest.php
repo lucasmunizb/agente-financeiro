@@ -28,7 +28,9 @@ class AlterarSenhaRequest extends FormRequest
     {
         return [
             'senha_atual' => ['required', 'current_password'],
-            'senha' => ['required', 'confirmed', Password::min(8)],
+            // uncompromised(): recusa senhas já vazadas (HIBP k-anonymity). Falha aberta se a
+            // API estiver inacessível (pentest 2026-07 L2).
+            'senha' => ['required', 'confirmed', Password::min(8)->uncompromised()],
         ];
     }
 

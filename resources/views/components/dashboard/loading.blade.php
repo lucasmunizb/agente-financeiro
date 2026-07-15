@@ -15,7 +15,7 @@
         </div>
         <div class="flex items-end justify-between gap-1 pt-4">
             @for ($i = 0; $i < 24; $i++)
-                <div class="skeleton w-[2px] rounded-full" style="height: {{ [12, 20, 12, 24, 12, 20][$i % 6] }}px"></div>
+                <div class="skeleton w-[2px] rounded-full {{ ['h-3', 'h-5', 'h-3', 'h-6', 'h-3', 'h-5'][$i % 6] }}"></div>
             @endfor
         </div>
     </div>

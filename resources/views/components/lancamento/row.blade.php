@@ -40,8 +40,7 @@
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             @if ($categoria)
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-surface-container px-2.5 py-0.5 font-label-sm text-label-sm text-on-surface-variant">
-                    <span class="h-2 w-2 shrink-0 rounded-full"
-                        style="background-color: {{ $categoria['cor'] ?? '#6B6F66' }}"></span>
+                    <span @class(['h-2 w-2 shrink-0 rounded-full', \App\Domain\Categoria\PaletaDeCategoria::classe($categoria['cor'] ?? null)])></span>
                     {{ $categoria['nome'] }}
                 </span>
             @endif

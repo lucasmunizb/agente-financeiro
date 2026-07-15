@@ -87,7 +87,13 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [ ] Testes adversariais de prompt (determinísticos): guard sob injeção, tools ignoram `user_id` injetado, classificação defensiva, saída sem trace, sem escrita sem confirmação.
 - [ ] Hardening: bloco "Segurança" no `instructions()` de todos os agentes; delimitar texto não confiável.
 - [ ] Conformidade LGPD (consentimento, minimização, retenção, exclusão lógica, transparência de IA).
+- [ ] **Enumeração de contas no registro (pentest L1/2026-07 — deferido).** Hoje `/criar-conta` revela "e-mail já cadastrado" (oráculo de existência) e tem diferença de timing; mitigado por `throttle:auth`. **Correção real exige fluxo de verificação por e-mail** (aceitar sempre + avisar o dono por e-mail; resposta neutra ao cliente) — depende de infra de e-mail transacional, ausente no MVP. Decidir com o usuário quando houver e-mail. Ver `docs/pentest-2026-07-14.md` (achado L1).
 - [ ] **(Etapa separada)** Mensagens de recusa do bot, aviso de transparência de IA e fluxo de consentimento.
+
+> **Pentest 2026-07 aplicado** (`docs/pentest-2026-07-14.md`): 14 de 15 achados corrigidos com
+> testes de regressão (M1 re-auth na exclusão, M2 guard anti-alucinação, M3 esquecimento do texto
+> livre, L2–L12 + L6 CSP `style-src` sem `unsafe-inline`). Resta só L1 (enumeração no registro),
+> acima. Sem achados Crítico/Alto; IDOR/SQLi/mass-assignment/webhook/upload limpos.
 
 ## Bloco 9 — Faturas materializadas 🟠 (pendente — proposta a validar)
 

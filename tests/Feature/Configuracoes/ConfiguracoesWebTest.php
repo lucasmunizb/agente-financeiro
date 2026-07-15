@@ -27,19 +27,47 @@ it('mostra o perfil do usuário autenticado', function () {
         ->assertSee('lucas@exemplo.com');
 });
 
-it('atualiza o perfil (nome, e-mail, fuso)', function () {
-    $user = User::factory()->create(['name' => 'Lucas', 'email' => 'lucas@exemplo.com']);
+it('atualiza o perfil (nome, e-mail, fuso) com a senha atual', function () {
+    $user = User::factory()->create([
+        'name' => 'Lucas', 'email' => 'lucas@exemplo.com', 'password' => Hash::make('password'),
+    ]);
 
     $this->actingAs($user)->put(route('configuracoes.perfil'), [
         'name' => 'Lucas Braga',
         'email' => 'novo@exemplo.com',
         'timezone' => 'America/Bahia',
+        'senha_atual' => 'password',
     ])->assertRedirect(route('configuracoes'));
 
     $user->refresh();
     expect($user->name)->toBe('Lucas Braga')
         ->and($user->email)->toBe('novo@exemplo.com')
         ->and($user->timezone)->toBe('America/Bahia');
+});
+
+it('atualiza nome/fuso SEM senha quando o e-mail não muda', function () {
+    $user = User::factory()->create(['name' => 'Lucas', 'email' => 'lucas@exemplo.com']);
+
+    $this->actingAs($user)->put(route('configuracoes.perfil'), [
+        'name' => 'Lucas Braga',
+        'email' => 'lucas@exemplo.com', // igual — não exige senha
+        'timezone' => 'America/Bahia',
+    ])->assertRedirect(route('configuracoes'));
+
+    expect($user->fresh()->name)->toBe('Lucas Braga');
+});
+
+it('recusa a troca de e-mail sem a senha atual (pentest L3)', function () {
+    $user = User::factory()->create(['email' => 'lucas@exemplo.com']);
+
+    $this->actingAs($user)->from(route('configuracoes'))
+        ->put(route('configuracoes.perfil'), [
+            'name' => 'Lucas',
+            'email' => 'outro@exemplo.com',
+            'timezone' => 'America/Sao_Paulo',
+        ])->assertSessionHasErrors('senha_atual', errorBag: 'perfil');
+
+    expect($user->fresh()->email)->toBe('lucas@exemplo.com');
 });
 
 it('rejeita fuso horário inválido', function () {
@@ -111,12 +139,27 @@ it('exige digitar EXCLUIR para apagar a conta', function () {
     $this->assertAuthenticated();
 });
 
-it('exclui a conta com a confirmação correta e encerra a sessão', function () {
-    $user = User::factory()->create();
+it('recusa a exclusão sem a senha atual correta (pentest M1)', function () {
+    $user = User::factory()->create(['password' => Hash::make('password')]);
+
+    $this->actingAs($user)->from(route('configuracoes'))
+        ->delete(route('configuracoes.excluir'), [
+            'confirmacao' => 'EXCLUIR',
+            'senha_atual' => 'errada',
+        ])->assertSessionHasErrors('senha_atual', errorBag: 'excluir');
+
+    expect(User::find($user->id))->not->toBeNull();
+    $this->assertAuthenticated();
+});
+
+it('exclui a conta com a confirmação e a senha atual, encerrando a sessão', function () {
+    $user = User::factory()->create(['password' => Hash::make('password')]);
 
     $this->actingAs($user)
-        ->delete(route('configuracoes.excluir'), ['confirmacao' => 'EXCLUIR'])
-        ->assertRedirect(route('login'));
+        ->delete(route('configuracoes.excluir'), [
+            'confirmacao' => 'EXCLUIR',
+            'senha_atual' => 'password',
+        ])->assertRedirect(route('login'));
 
     expect(User::find($user->id))->toBeNull()
         ->and(User::withTrashed()->find($user->id))->not->toBeNull();

@@ -56,7 +56,11 @@ Route::middleware(['auth', ExigeConsentimentoLgpd::class])->group(function () {
     // saber se a tela ficou desatualizada por uma confirmação vinda de outro canal
     // (ex.: o chat do Telegram) e então recarregam. Devolve só um hash opaco do
     // estado do usuário (regra 4 — nenhum número calculado sai por aqui).
-    Route::get('/atualizacoes', [AtualizacoesController::class, 'assinatura'])->name('atualizacoes');
+    // throttle (pentest 2026-07 L5): o polling é chamado em loop por cada aba aberta e
+    // faz query de estado; sem teto, um usuário autenticado martela a rota sem limite.
+    Route::get('/atualizacoes', [AtualizacoesController::class, 'assinatura'])
+        ->middleware('throttle:60,1')
+        ->name('atualizacoes');
 
     // Lançamentos — lista/extrato (FE §7.6). Borda fina sobre o domínio determinístico
     // (ConsultarLancamentos): lista as parcelas do mês agrupadas por dia, com filtros e o

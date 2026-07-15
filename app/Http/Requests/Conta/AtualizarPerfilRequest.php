@@ -33,8 +33,20 @@ class AtualizarPerfilRequest extends FormRequest
                 'required', 'string', 'email', 'max:255',
                 Rule::unique('users', 'email')->ignore($this->user()->id),
             ],
+            // Trocar o e-mail (identificador de login) exige reautenticação: sem a senha
+            // atual, uma sessão sequestrada faria account takeover (pentest 2026-07 L3).
+            // Só é obrigatória quando o e-mail muda; edições de nome/fuso não pedem senha.
+            'senha_atual' => ['nullable', Rule::requiredIf(fn (): bool => $this->emailMudou()), 'current_password'],
             'timezone' => ['required', 'timezone:all'],
         ];
+    }
+
+    /** O e-mail enviado difere do atual do usuário (comparação normalizada). */
+    private function emailMudou(): bool
+    {
+        $novo = mb_strtolower(trim((string) $this->input('email')));
+
+        return $novo !== mb_strtolower((string) $this->user()->email);
     }
 
     /**
@@ -44,6 +56,8 @@ class AtualizarPerfilRequest extends FormRequest
     {
         return [
             'email.unique' => 'Este e-mail já está em uso.',
+            'senha_atual.required' => 'Confirme sua senha atual para trocar o e-mail.',
+            'senha_atual.current_password' => 'A senha atual está incorreta.',
             'timezone.timezone' => 'Selecione um fuso horário válido.',
         ];
     }

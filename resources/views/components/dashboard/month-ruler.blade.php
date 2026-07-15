@@ -43,7 +43,7 @@
     <div class="relative px-2 pb-2 pt-6">
         {{-- Faixa do "disponível" ao longo do mês (vem calculada do backend). --}}
         <div class="absolute left-2 right-2 top-8 h-1 overflow-hidden rounded-full bg-surface-container">
-            <div class="h-full rounded-full bg-primary-container/25" style="width: {{ (int) $availablePct }}%"></div>
+            <x-ui.bar :pct="$availablePct" class="h-full rounded-full bg-primary-container/25" />
         </div>
 
         <div class="relative flex justify-between">

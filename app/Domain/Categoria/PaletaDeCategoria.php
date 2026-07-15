@@ -70,6 +70,19 @@ final class PaletaDeCategoria
     ];
 
     /**
+     * Classe CSS da amostra de cor (CSP: cor por classe, sem style inline — pentest 2026-07
+     * L6). Cada cor da paleta tem `.swatch-{hex}` no app.css; valor fora da paleta cai no
+     * fallback informado. Como o Form Request só aceita cores da paleta, o hit é sempre certo.
+     */
+    public static function classe(?string $cor, string $fallback = 'swatch-6b6f66'): string
+    {
+        $hex = strtolower(ltrim((string) $cor, '#'));
+        $conhecidas = array_map(static fn (string $c): string => strtolower(ltrim($c, '#')), self::CORES);
+
+        return in_array($hex, $conhecidas, true) ? 'swatch-'.$hex : $fallback;
+    }
+
+    /**
      * Mapeia um ícone gravado para um nome válido do componente x-icon, com fallback em "tag".
      * Cobre ícones legados (ex.: "food"/"health" das categorias sugeridas antigas) sem quebrar a
      * tela quando o valor salvo não está mais na paleta.

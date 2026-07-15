@@ -20,3 +20,9 @@ Schedule::command('ai:expurgar-conversas')->dailyAt('03:30')
 Schedule::command('recorrencia:materializar')->dailyAt('06:00')
     ->onOneServer()
     ->withoutOverlapping();
+
+// Expurgo de jobs falhos (pentest 2026-07 L4). O payload serializado na fila `database`
+// carrega a mensagem crua do usuário (PII) em claro; sem prune, `failed_jobs` a retém
+// indefinidamente — fora do expurgo de 60 dias, do export e da exclusão de conta.
+Schedule::command('queue:prune-failed', ['--hours' => 48])->dailyAt('04:00')
+    ->onOneServer();

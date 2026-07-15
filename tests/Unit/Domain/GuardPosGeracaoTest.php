@@ -289,6 +289,118 @@ it('não trata "depois de junho" como data', function () {
     expect($resultado->aprovado)->toBeTrue();
 });
 
+/* -------- Inteiro sem símbolo em contexto monetário — lacuna M2 (pentest 2026-07) -------- */
+
+it('bloqueia inteiro com separador de milhar sem R$ ("disponível é 1.500")', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Seu disponível do mês é 1.500.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('aprova "1.500" quando 150000 centavos está no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Seu disponível do mês é 1.500.',
+        payload(valoresEmCentavos: [150000]),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('bloqueia inteiro seco após termo monetário ("2500 para gastar")', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Você tem 2500 para gastar este mês.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('aprova "2500 para gastar" quando 250000 está no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Você tem 2500 para gastar este mês.',
+        payload(valoresEmCentavos: [250000]),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('bloqueia decimal à americana ("saldo é 1500.00") divergente', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Seu saldo é 1500.00 neste mês.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('não trata inteiro com milhar seguido de contador como dinheiro ("1.500 pontos")', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Você acumulou 1.500 pontos e comprou em 3 parcelas.',
+        payload(),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('não trata inteiro pequeno perto de termo monetário como dinheiro ("gastou 3 vezes")', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Você gastou 3 vezes no mercado.',
+        payload(),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('bloqueia valor por extenso com "bilhão" divergente (L9)', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'A dívida chegou a dois bilhões de reais.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+/* -------- Datas ISO e ordinal — lacuna L9 -------- */
+
+it('bloqueia data ISO "aaaa-mm-dd" ausente do payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'A fatura vence em 2026-08-15.',
+        payload(datasIso: ['2026-07-10']),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('aprova data ISO presente no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'A fatura vence em 2026-07-10.',
+        payload(datasIso: ['2026-07-10']),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('bloqueia dia ordinal "1º de julho" ausente do payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'A conta vence em 1º de julho.',
+        payload(datasIso: ['2026-07-10']),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('aprova "1º de julho" presente no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'A conta vence em 1º de julho.',
+        payload(datasIso: ['2026-07-01']),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
 it('bloqueia quando valor e data divergem ao mesmo tempo', function () {
     $resultado = (new GuardPosGeracao)->validar(
         'Você gastou R$ 1,00 e vence em 01/01/2030.',

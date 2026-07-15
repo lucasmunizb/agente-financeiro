@@ -60,7 +60,7 @@
             @foreach ($cores as $c)
                 <label class="cursor-pointer">
                     <input type="radio" name="cor" value="{{ $c }}" class="peer sr-only" @checked($corSel === $c) aria-label="Cor {{ $c }}">
-                    <span class="block h-8 w-8 rounded-full ring-2 ring-transparent ring-offset-2 ring-offset-superficie transition peer-checked:ring-tinta peer-focus-visible:ring-primary" style="background-color: {{ $c }}"></span>
+                    <span @class(['block h-8 w-8 rounded-full ring-2 ring-transparent ring-offset-2 ring-offset-superficie transition peer-checked:ring-tinta peer-focus-visible:ring-primary', \App\Domain\Categoria\PaletaDeCategoria::classe($c)])></span>
                 </label>
             @endforeach
         </div>

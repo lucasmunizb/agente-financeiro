@@ -53,7 +53,8 @@ final class NumeroPorExtenso
         $temNumero = false;
 
         foreach ($palavras as $palavra) {
-            if ($palavra === 'e') {
+            // "e"/"de" são conectivos ("mil E quinhentos", "dois bilhões DE reais").
+            if ($palavra === 'e' || $palavra === 'de') {
                 continue;
             }
 
@@ -69,6 +70,10 @@ final class NumeroPorExtenso
                 $atual = 0;
             } elseif (in_array($palavra, ['milhao', 'milhoes'], strict: true)) {
                 $atual = ($atual === 0 ? 1 : $atual) * 1_000_000;
+                $total += $atual;
+                $atual = 0;
+            } elseif (in_array($palavra, ['bilhao', 'bilhoes'], strict: true)) {
+                $atual = ($atual === 0 ? 1 : $atual) * 1_000_000_000;
                 $total += $atual;
                 $atual = 0;
             } else {

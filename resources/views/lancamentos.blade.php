@@ -144,8 +144,7 @@
             {{-- Primeiro uso: convite calmo à ação. Decoração de pauta (rule-safe, via
                  token) evoca o caderno sem imagem externa (regra 6/LGPD). --}}
             <div class="relative flex flex-col items-center gap-4 overflow-hidden rounded-card border border-linha bg-surface-container-lowest px-6 py-20 text-center">
-                <div class="pointer-events-none absolute inset-0 opacity-[0.06]"
-                    style="background-image: repeating-linear-gradient(0deg, var(--color-linha) 0, var(--color-linha) 1px, transparent 1px, transparent 40px); background-position: 0 40px;"></div>
+                <div class="ledger-grid pointer-events-none absolute inset-0 opacity-[0.06]"></div>
                 <span class="relative flex h-24 w-24 items-center justify-center rounded-full bg-surface-container text-outline">
                     <x-icon name="receipt" class="h-11 w-11" />
                 </span>

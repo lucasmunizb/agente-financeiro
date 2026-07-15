@@ -546,6 +546,60 @@ dialog.modal-dialog::backdrop {
     transform: translateX(24px);
 }
 
+/* =====================================================================
+   Cor por CLASSE, não por style inline (CSP: style-src sem 'unsafe-inline'
+   — pentest 2026-07 L6). Amostras de categoria da paleta fixa
+   (PaletaDeCategoria::CORES) + fallbacks. Ver PaletaDeCategoria::classe().
+   ===================================================================== */
+.swatch-1f6e5a {
+    background-color: #1f6e5a;
+}
+.swatch-2e8b72 {
+    background-color: #2e8b72;
+}
+.swatch-005543 {
+    background-color: #005543;
+}
+.swatch-c9852a {
+    background-color: #c9852a;
+}
+.swatch-875300 {
+    background-color: #875300;
+}
+.swatch-b4452f {
+    background-color: #b4452f;
+}
+.swatch-8a2714 {
+    background-color: #8a2714;
+}
+.swatch-6b6f66 {
+    background-color: #6b6f66;
+}
+/* Categoria sem cor definida — neutro do "caderno". */
+.swatch-empty {
+    background-color: var(--color-surface-container);
+}
+
+/* Atrasos de entrada das seções do dashboard (antes: style="animation-delay"). */
+.animate-enter--delay-1 {
+    animation-delay: 0.1s;
+}
+.animate-enter--delay-2 {
+    animation-delay: 0.2s;
+}
+
+/* Pauta horizontal do extrato — o "caderno" (antes: style="background-image"). */
+.ledger-grid {
+    background-image: repeating-linear-gradient(
+        0deg,
+        var(--color-linha) 0,
+        var(--color-linha) 1px,
+        transparent 1px,
+        transparent 40px
+    );
+    background-position: 0 40px;
+}
+
 /* Respeita quem pede menos movimento. */
 @media (prefers-reduced-motion: reduce) {
     .shake-horizontal {

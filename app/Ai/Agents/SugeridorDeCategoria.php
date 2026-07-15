@@ -6,6 +6,10 @@ namespace App\Ai\Agents;
 
 use App\Ai\Concerns\UsaFailoverDeProvedores;
 use App\Ai\Concerns\UsaRaciocinioBaixoNaGroq;
+use App\Domain\Categoria\SugerirCategoriaComIa;
+use App\Domain\IA\Custo\LogDeUsoDeIA;
+use App\Domain\IA\Custo\TipoDeUsoIA;
+use App\Domain\IA\Guard\TextoParaPrompt;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Ai\Attributes\UseCheapestModel;
@@ -14,6 +18,7 @@ use Laravel\Ai\Contracts\Conversational;
 use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Contracts\HasTools;
+use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Promptable;
 use Laravel\Ai\Responses\StructuredAgentResponse;
@@ -24,7 +29,7 @@ use Stringable;
  * categorias do usuário, escolher UMA — a que melhor combina — ou nenhuma. A IA nunca calcula
  * dinheiro (regra 4); aqui só interpreta texto. É fallback do lookup determinístico (doc 08):
  * só roda quando aliases/keywords não classificaram. A resolução do nome de volta ao id e o
- * guard anti-alucinação são camada NOSSA ({@see \App\Domain\Categoria\SugerirCategoriaComIa}).
+ * guard anti-alucinação são camada NOSSA ({@see SugerirCategoriaComIa}).
  *
  * As opções são injetadas por chamada ({@see sugerir()}) e viram tanto a instrução quanto o
  * `enum` do schema — o modelo é obrigado a devolver o nome EXATO de uma categoria da lista, ou
@@ -72,7 +77,7 @@ class SugeridorDeCategoria implements Agent, Conversational, HasProviderOptions,
         $resposta = $this->prompt($descricao);
 
         // Custo visível para TODOS os agentes, não só a consulta (auditoria P3-1).
-        \App\Domain\IA\Custo\LogDeUsoDeIA::registrar($resposta, \App\Domain\IA\Custo\TipoDeUsoIA::MENSAGEM, inicio: $inicio);
+        LogDeUsoDeIA::registrar($resposta, TipoDeUsoIA::MENSAGEM, inicio: $inicio);
 
         $escolha = $resposta->toArray()['categoria'] ?? null;
         $escolha = is_string($escolha) ? trim($escolha) : null;
@@ -82,7 +87,13 @@ class SugeridorDeCategoria implements Agent, Conversational, HasProviderOptions,
 
     public function instructions(): Stringable|string
     {
-        $lista = implode("\n", array_map(fn (string $nome) => "- {$nome}", $this->opcoes));
+        // Sanitiza cada nome antes de interpolar no system prompt (pentest 2026-07 L8):
+        // um nome de categoria com "\n"/controle fabricaria linhas de instrução (injeção
+        // de 2ª ordem). Do lado certo da barreira dados/instrução, como no resto do domínio.
+        $lista = implode("\n", array_map(
+            fn (string $nome) => '- '.TextoParaPrompt::sanitizar($nome),
+            $this->opcoes,
+        ));
 
         return <<<TXT
         Você classifica um gasto em UMA categoria, escolhendo da lista abaixo, em português do Brasil.
@@ -106,7 +117,7 @@ class SugeridorDeCategoria implements Agent, Conversational, HasProviderOptions,
     }
 
     /**
-     * @return \Laravel\Ai\Contracts\Tool[]
+     * @return Tool[]
      */
     public function tools(): iterable
     {

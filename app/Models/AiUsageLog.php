@@ -29,7 +29,11 @@ class AiUsageLog extends Model
     /** Append-only: o Eloquent não gerencia updated_at. */
     public const UPDATED_AT = null;
 
-    protected $guarded = [];
+    /** Somente métricas de custo/uso (pentest 2026-07 L12); nunca conteúdo de mensagem. */
+    protected $fillable = [
+        'user_id', 'provider', 'model', 'tokens_entrada', 'tokens_saida',
+        'custo_estimado_cents', 'latencia_ms', 'tipo',
+    ];
 
     protected $casts = [
         'tokens_entrada' => 'integer',

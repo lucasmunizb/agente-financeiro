@@ -40,7 +40,7 @@
                 <div class="flex items-center gap-3">
                     <div class="h-2 flex-1 overflow-hidden rounded-full bg-surface-container" role="progressbar"
                         aria-valuenow="{{ $percentual }}" aria-valuemin="0" aria-valuemax="100" aria-label="Consumo do orçamento">
-                        <div class="h-full rounded-full {{ $estourou ? 'bg-error' : 'bg-cedula' }}" style="width: {{ $barra }}%"></div>
+                        <x-ui.bar :pct="$barra" class="h-full rounded-full {{ $estourou ? 'bg-error' : 'bg-cedula' }}" />
                     </div>
                     <span class="w-12 shrink-0 text-right font-value-label text-value-label {{ $estourou ? 'text-error' : 'text-on-surface-variant' }}">{{ $percentual }}%</span>
                 </div>
@@ -101,7 +101,7 @@
                         <li class="flex items-center justify-between gap-4 px-4 py-3">
                             <span class="inline-flex items-center gap-2 font-body-sm text-body-sm text-on-surface">
                                 @if ($linha['cor'])
-                                    <span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ $linha['cor'] }}"></span>
+                                    <span @class(['h-2.5 w-2.5 rounded-full', \App\Domain\Categoria\PaletaDeCategoria::classe($linha['cor'])])></span>
                                 @endif
                                 {{ $linha['nome'] }}
                             </span>

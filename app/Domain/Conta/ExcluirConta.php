@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Domain\Conta;
 
 use App\Models\AuditLog;
+use App\Models\ChatMessage;
+use App\Models\Income;
+use App\Models\Recurrence;
 use App\Models\TelegramLink;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -19,9 +23,18 @@ use Illuminate\Support\Str;
  * permanecem (auditoria/integridade), mas sem elo com uma pessoa identificável. A
  * trilha de auditoria é PRESERVADA e registra apenas o fato — sem reexpor PII.
  * O encerramento da sessão é responsabilidade da borda.
+ *
+ * Erasure do texto livre (pentest 2026-07 M3): como o soft delete é um UPDATE, as FKs
+ * cascade NÃO disparam — o conteúdo em claro sobreviveria até o expurgo de 60 dias. Por
+ * isso apagamos aqui as mensagens de chat do titular e redigimos as descrições livres
+ * (transações/receitas/recorrências), onde ele pode ter digitado dados pessoais. Valores
+ * e datas ficam (integridade); só o texto identificável sai.
  */
 final class ExcluirConta
 {
+    /** Placeholder das descrições livres após o esquecimento (coluna é NOT NULL). */
+    private const REDIGIDO = '[removido]';
+
     public function excluir(int $userId): void
     {
         DB::transaction(function () use ($userId): void {
@@ -55,6 +68,14 @@ final class ExcluirConta
                 'telegram_user_id' => null,
                 'token_hash' => null,
             ]);
+
+            // Texto livre do titular: conversa do chat apagada; descrições redigidas.
+            // withTrashed(): linhas já soft-deletadas (receitas/lançamentos excluídos)
+            // também guardam PII e precisam ser redigidas.
+            ChatMessage::where('user_id', $user->id)->delete();
+            Transaction::withTrashed()->where('user_id', $user->id)->update(['descricao' => self::REDIGIDO]);
+            Income::withTrashed()->where('user_id', $user->id)->update(['descricao' => self::REDIGIDO]);
+            Recurrence::withTrashed()->where('user_id', $user->id)->update(['descricao' => self::REDIGIDO]);
 
             $user->delete(); // soft delete (SoftDeletes)
         });

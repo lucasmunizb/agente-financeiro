@@ -41,8 +41,34 @@ final class GuardPosGeracao
     /** Data numérica: "dd/mm" ou "dd/mm/aaaa". */
     private const DATA = '/\b\d{2}\/\d{2}(?:\/\d{4})?\b/';
 
-    /** Data por extenso: "5 de junho", "cinco de junho de 2026", "vinte e cinco de dezembro". */
-    private const DATA_EXTENSO = '/\b(\d{1,2}|\p{L}+(?:\s+e\s+\p{L}+)?)\s+de\s+(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b(?:\s+de\s+(\d{4}))?/iu';
+    /** Data ISO: "aaaa-mm-dd" (pentest 2026-07 L9). */
+    private const DATA_ISO = '/\b(\d{4})-(\d{2})-(\d{2})\b/';
+
+    /**
+     * Data por extenso: "5 de junho", "1º de julho", "cinco de junho de 2026",
+     * "vinte e cinco de dezembro". O marcador ordinal (º/°/ª) é tolerado no dia (L9).
+     */
+    private const DATA_EXTENSO = '/\b(\d{1,2}(?:[º°ª])?|\p{L}+(?:\s+e\s+\p{L}+)?)\s+de\s+(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b(?:\s+de\s+(\d{4}))?/iu';
+
+    /**
+     * Inteiro com separador de milhar SEM centavos ("1.500", "12.000"): formato de dinheiro
+     * (pentest 2026-07 M2). Ignora o que já vem com "R$" (coberto por VALOR) e o que é
+     * seguido de contador não-monetário ("1.500 pontos"). Lookahead evita casar o miolo de
+     * "1.234,56" (deixa para VALOR).
+     */
+    private const VALOR_MILHAR_INTEIRO = '/(?<!R\$)(?<!R\$ )-?\d{1,3}(?:\.\d{3})+(?!\d)(?!,\d)(?!\s+(?:'.self::CONTADOR.')\b)/iu';
+
+    /** Decimal à americana ("1500.00"): dinheiro só acima do limiar (evita "versão 2.0"). */
+    private const VALOR_DECIMAL_PONTO = '/(?<!R\$)(?<!R\$ )-?\d+\.\d{2}(?!\d)/u';
+
+    /** Termos que marcam contexto monetário (para validar inteiros "secos" perto deles). */
+    private const MONETARIO = 'dispon[ií]vel|saldo|sobrou|sobra|sobram|total|totais|fatura|faturas|gastar|gastou|gastei|gasto|gastos|custou|custa|custam|custo|receber|recebeu|recebi|receita|receitas|limite|or[çc]amento|pagar|paguei|pagou|pago|deve|d[ií]vida|d[ií]vidas|economizei|economizou|economia';
+
+    /** Unidades de contagem (não são dinheiro): "3 parcelas", "5 dias", "1.500 pontos". */
+    private const CONTADOR = 'parcelas?|dias?|meses|m[eê]s|semanas?|anos?|vezes|vez|itens|item|horas?|minutos?|pontos?|x';
+
+    /** Piso para tratar um inteiro seco/decimal-ponto como dinheiro: R$ 100,00. */
+    private const LIMIAR_CONTEXTO_CENTS = 10000;
 
     /** @var array<string, int> meses normalizados (sem acento) → número */
     private const MESES = [
@@ -140,7 +166,76 @@ final class GuardPosGeracao
             $citados[] = [trim($token), Money::fromHuman($token)->cents()];
         }
 
+        // 5) Inteiro com separador de milhar ("1.500"): dinheiro por formato (M2).
+        preg_match_all(self::VALOR_MILHAR_INTEIRO, $texto, $matches);
+        foreach ($matches[0] as $token) {
+            if (($cents = $this->centsDeToken($token)) !== null) {
+                $citados[] = [trim($token), $cents];
+            }
+        }
+
+        // 6) Decimal à americana ("1500.00") acima do limiar de dinheiro (M2/L9).
+        preg_match_all(self::VALOR_DECIMAL_PONTO, $texto, $matches);
+        foreach ($matches[0] as $token) {
+            $cents = $this->centsDeToken($token);
+            if ($cents !== null && abs($cents) >= self::LIMIAR_CONTEXTO_CENTS) {
+                $citados[] = [trim($token), $cents];
+            }
+        }
+
+        // 7) Inteiro "seco" perto de termo monetário ("disponível é 1500", "2500 para gastar")
+        //    — a lacuna central da barreira 4 (M2). Só ≥ R$100 e fora de contador.
+        foreach ($this->valoresPorContexto($texto) as $par) {
+            $citados[] = $par;
+        }
+
         return $citados;
+    }
+
+    /**
+     * Inteiros "secos" (sem R$, sem vírgula decimal) que aparecem junto a um termo monetário,
+     * em qualquer ordem — a única pista determinística de que "1500" ali é dinheiro. Exige
+     * valor ≥ R$100 e recusa quando o número é seguido de um contador ("2500 dias").
+     *
+     * @return list<array{string, int}>
+     */
+    private function valoresPorContexto(string $texto): array
+    {
+        // (?![-/]\d): não capturar um número que é parte de uma DATA ("2026-07-10", "10/07"),
+        // mesmo perto de um termo monetário ("a fatura vence em 2026-07-10").
+        $regexes = [
+            // termo → número: "disponível é 1500", "gastou 2500 no mês". O número é capturado
+            // por inteiro (quantificador possessivo *+, sem recuo) para o (?![-/]\d) barrar a
+            // data por completo em vez de casar um prefixo ("2026" de "2026-07-10").
+            '/\b(?:'.self::MONETARIO.')\b(?:\s+\p{L}+){0,3}?\s+(-?\d[\d.,]*+)(?![-\/]\d)(?!\s+(?:'.self::CONTADOR.')\b)/iu',
+            // número → termo: "2500 para gastar", "1500 de fatura".
+            '/(-?\d[\d.,]*+)(?![-\/]\d)(?!\s+(?:'.self::CONTADOR.')\b)(?:\s+\p{L}+){0,3}?\s+(?:'.self::MONETARIO.')\b/iu',
+        ];
+
+        $citados = [];
+        foreach ($regexes as $regex) {
+            preg_match_all($regex, $texto, $matches, PREG_SET_ORDER);
+            foreach ($matches as $m) {
+                $token = $m[1];
+                $cents = $this->centsDeToken($token);
+
+                if ($cents !== null && abs($cents) >= self::LIMIAR_CONTEXTO_CENTS) {
+                    $citados[] = [trim($token), $cents];
+                }
+            }
+        }
+
+        return $citados;
+    }
+
+    /** Centavos de um token humano; null quando o trecho não tem número parseável. */
+    private function centsDeToken(string $token): ?int
+    {
+        try {
+            return Money::fromHuman($token)->cents();
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
     }
 
     /**
@@ -158,9 +253,16 @@ final class GuardPosGeracao
             $datas[] = [trim($token), $dia, $mes, $ano];
         }
 
+        // Data ISO "aaaa-mm-dd" (L9).
+        preg_match_all(self::DATA_ISO, $texto, $matches, PREG_SET_ORDER);
+        foreach ($matches as $m) {
+            $datas[] = [trim($m[0]), (int) $m[3], (int) $m[2], (int) $m[1]];
+        }
+
         preg_match_all(self::DATA_EXTENSO, $texto, $matches, PREG_SET_ORDER);
         foreach ($matches as $m) {
-            $dia = $this->parseNumero($m[1]);
+            // Remove o marcador ordinal ("1º" → "1") antes de interpretar o dia (L9).
+            $dia = $this->parseNumero(preg_replace('/[º°ª]/u', '', $m[1]) ?? $m[1]);
 
             if ($dia === null || $dia < 1 || $dia > 31) {
                 continue; // "depois de junho" — não é uma data

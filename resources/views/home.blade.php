@@ -44,7 +44,7 @@
             :next-url="route('home', ['mes' => $vm['mesSeguinte']])" />
 
         {{-- Cards de resumo (bento). Valores em mono, alinhados à direita. --}}
-        <div class="grid animate-enter grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4" style="animation-delay: 0.1s">
+        <div class="grid animate-enter animate-enter--delay-1 grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
             <x-dashboard.summary-card label="Disponível do mês" :value="$vm['disponivel']"
                 :tone="$vm['disponivelPositivo'] ? 'primary' : 'default'" />
 
@@ -82,7 +82,7 @@
              no mês atual e também em mês FUTURO quando há contas/recorrências previstas
              (spec 10b) — os valores já vêm mesclados e conferidos do backend (regra 4). --}}
         @php $mostrarContas = $vm['ehMesAtual'] || ($vm['ehFuturo'] && count($vm['proximasContas']) > 0); @endphp
-        <div class="grid animate-enter grid-cols-1 gap-gutter lg:grid-cols-3" style="animation-delay: 0.2s">
+        <div class="grid animate-enter animate-enter--delay-2 grid-cols-1 gap-gutter lg:grid-cols-3">
             {{-- Donut "gastos por categoria" (mensal — aparece em qualquer competência). Ocupa
                  a largura toda quando o quadro de contas some (mês histórico sem previstas). --}}
             <div class="notebook-card flex flex-col items-center rounded-card p-8 {{ $mostrarContas ? 'lg:col-span-1' : 'lg:col-span-3' }}">

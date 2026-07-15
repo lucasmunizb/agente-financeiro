@@ -24,7 +24,9 @@ class RegisterRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'confirmed', Password::min(8)],
+            // uncompromised(): recusa senhas já vazadas (HIBP k-anonymity, nativo). Falha
+            // aberta se a API estiver inacessível — não trava o cadastro (pentest 2026-07 L2).
+            'password' => ['required', 'string', 'confirmed', Password::min(8)->uncompromised()],
             'terms' => ['accepted'],
         ];
     }

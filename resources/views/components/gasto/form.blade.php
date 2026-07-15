@@ -264,7 +264,7 @@
                                     'border border-linha bg-surface-container text-on-surface-variant hover:bg-surface-container-high' => !$catAtiva,
                                 ])>
                                 @if ($cat->cor)
-                                    <span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ $cat->cor }}"></span>
+                                    <span @class(['h-2.5 w-2.5 rounded-full', \App\Domain\Categoria\PaletaDeCategoria::classe($cat->cor)])></span>
                                 @endif
                                 <x-icon :name="$iconeCategoria($cat->icone)" class="h-5 w-5" />
                                 <span>{{ $cat->nome }}</span>
