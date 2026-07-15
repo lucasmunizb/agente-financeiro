@@ -201,7 +201,7 @@ estrito por `userId`, devolvendo um `Resultado…` com `payload(): PayloadDeResp
     `tests/Feature/Domain/ConsultarGastosTest.php`, `ConsultarDisponivelDoMesTest.php`,
     `ConsultarProximasContasTest.php`, `ConsultarFaturaCartaoTest.php`.
 - **Adiado para:** **frontend** (apresentação no bot/web, item "(Etapa separada)" do
-  Bloco 5 em `docs/TODO.md`); registro de uso de importação/resumo → [[spec-07-importacao-pdf]].
+  Bloco 5 em `docs/TODO.md`); registro de uso de importação/resumo → [[spec-11-importacao-pdf]].
 - **Decisões de regra tomadas:**
   - O **guard é determinístico** e parseia o texto pt-BR de volta a centavos; **contagens
     não-monetárias** (sem "R$"/vírgula decimal) são ignoradas de propósito.

@@ -13,7 +13,7 @@
 | **Bloco · Fase** | Bloco 1 · F1 |
 | **Status** | ✅ Concluído |
 | **Depende de** | [[spec-00-fundacoes-devops]] |
-| **Habilita** | [[spec-02-cadastro-manual-receitas]] · [[spec-04-ia-interpretacao]] · [[spec-05-chat-financeiro]] · [[spec-06-dashboard]] · [[spec-07-importacao-pdf]] |
+| **Habilita** | [[spec-02-cadastro-manual-receitas]] · [[spec-04-ia-interpretacao]] · [[spec-05-chat-financeiro]] · [[spec-06-dashboard]] · [[spec-11-importacao-pdf]] |
 | **Fonte de verdade** | seção 4 do escopo · [`docs/03-regras-financeiras.md`](../03-regras-financeiras.md) · [`docs/04-modelo-dados.md`](../04-modelo-dados.md) |
 | **Regras críticas** | 2 (test-first) · 4 (IA nunca calcula) · 5 (centavos BIGINT, fuso SP) |
 

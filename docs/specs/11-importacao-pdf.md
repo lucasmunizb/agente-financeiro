@@ -1,4 +1,4 @@
-# Spec 07 — Importação de PDF (Itaú) — última etapa do MVP
+# Spec 11 — Importação de PDF (Itaú) — 1ª etapa do pós-MVP
 
 > **Como usar este spec.** É o **ponto de partida** da etapa: leia, confirme os
 > critérios e implemente **test-first** (regra inviolável 2), **backend antes do
@@ -11,20 +11,26 @@
 > **Spec prospectivo.** Nada aqui está implementado ainda. Os contratos de §6 e o plano
 > de §7 são **proposta** test-first; ao implementar, confirme as assinaturas e atualize
 > §10.
+>
+> **Fora do MVP (decisão de escopo).** A importação de fatura em PDF foi **removida do MVP
+> e promovida à 1ª etapa do pós-MVP** (alto valor / alto risco). Ver
+> [`ROADMAP-POS-MVP.md`](../ROADMAP-POS-MVP.md) (ordem 1). O pipeline efêmero base já está
+> pronto e testado; o que resta (regra de extração do `ParserItau` + telas) é executado na
+> primeira evolução após o fechamento do MVP.
 
 | Campo | Valor |
 |---|---|
-| **Bloco · Fase** | Bloco 7 · F9 |
+| **Bloco · Fase** | Pós-MVP · 1ª etapa |
 | **Status** | 🟡 Pipeline pronto e testado — **falta só a regra de extração** do `ParserItau` (deliberadamente adiada para depois do frontend) |
 | **Depende de** | [[spec-01-dominio-financeiro]] · [[spec-03-telegram]] |
-| **Habilita** | — (encerra o MVP) |
+| **Habilita** | — (1ª evolução após o MVP; abre caminho para OCR avançado) |
 | **Fonte de verdade** | seção 8 do escopo · [`docs/07-importacao-pdf.md`](../07-importacao-pdf.md) · [`docs/04-modelo-dados.md`](../04-modelo-dados.md) |
 | **Regras críticas** | **4** (IA não calcula) · **5** (centavos) · **6** (PDF/texto/sensível nunca persistidos) · **7** (confirmar antes de gravar) |
 
 ---
 
 ## 1. Objetivo
-Permitir que o usuário envie a **fatura de cartão em PDF** (Itaú no MVP) e receba uma
+Permitir que o usuário envie a **fatura de cartão em PDF** (Itaú, banco inicial) e receba uma
 **pré-importação revisável** dos lançamentos extraídos — para confirmar (total ou
 parcialmente) ou cancelar — sem que o **PDF ou o texto extraído** sejam jamais
 persistidos e sem reter **nenhum dado sensível**.
@@ -45,7 +51,7 @@ persistidos e sem reter **nenhum dado sensível**.
   - Registro de **erros de parsing** em `pdf_parse_errors` para evoluir o parser.
 - **Não inclui (outro spec / frontend / pós-MVP):**
   - **Tela web de revisão em lote** e **resumo/confirmação no bot** → frontend (§8).
-  - Outros bancos além de Itaú (o pipeline nasce **extensível**, mas só Itaú no MVP).
+  - Outros bancos além de Itaú (o pipeline nasce **extensível**, mas só Itaú nesta 1ª etapa).
   - **Juros, IOF, multas, encargos, compra internacional/moeda** → pós-MVP.
   - Vetorização/RAG da fatura → **fora do escopo** (conflita com a não retenção).
 

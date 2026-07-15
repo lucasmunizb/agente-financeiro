@@ -4,6 +4,10 @@
 
 Funcionalidade de **alto valor e alto risco**. O PDF chega por Telegram ou web. Banco inicial suportado: **Itaú**, com **pipeline genérico extensível** para outros bancos.
 
+> **Escopo:** esta funcionalidade foi **removida do MVP** e é a **1ª etapa do pós-MVP**
+> (ver [`ROADMAP-POS-MVP.md`](ROADMAP-POS-MVP.md), ordem 1, e o spec [`specs/11-importacao-pdf.md`](specs/11-importacao-pdf.md)).
+> Este documento continua a **fonte de verdade** da regra de importação para quando ela for implementada.
+
 Princípio inegociável: **o PDF e o texto extraído NUNCA são persistidos** — o processamento é efêmero e descartado ao final. Nenhum dado sensível é armazenado.
 
 ---

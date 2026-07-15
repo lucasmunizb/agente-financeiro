@@ -13,7 +13,7 @@
 | **Bloco · Fase** | Bloco 0 · F0 |
 | **Status** | ✅ Concluído |
 | **Depende de** | — |
-| **Habilita** | [[spec-01]] · [[spec-02]] · [[spec-03]] · [[spec-04]] · [[spec-05]] · [[spec-06]] · [[spec-07]] |
+| **Habilita** | [[spec-01]] · [[spec-02]] · [[spec-03]] · [[spec-04]] · [[spec-05]] · [[spec-06]] · [[spec-11]] |
 | **Fonte de verdade** | seção 12 do escopo · [`docs/11-devops.md`](../11-devops.md) · [`docs/01-decisoes-estruturais.md`](../01-decisoes-estruturais.md) |
 | **Regras críticas** | 9 (tudo em contêiner) · 10 (produção com Secrets, sem `.env`) |
 

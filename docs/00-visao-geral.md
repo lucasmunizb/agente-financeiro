@@ -44,10 +44,10 @@ finas. Isso prepara WhatsApp e outros canais futuros sem tocar na regra.
 **Entra no MVP:** autenticação básica e usuário individual; cadastro manual de gastos;
 Telegram com confirmação; categorias básicas; cartões; parcelamento; status de
 pagamento; receitas; orçamento mensal geral + alerta; dashboard simples; consulta por IA
-sobre dados estruturados; importação de PDF (Itaú) com revisão; prevenção de
-duplicidade; auditoria de origem.
+sobre dados estruturados; prevenção de duplicidade; auditoria de origem.
 
-**Fica para depois (pós-MVP):** WhatsApp; OCR avançado; áudio; imagem de comprovante;
+**Fica para depois (pós-MVP):** **importação de PDF (Itaú) com revisão** (1ª etapa);
+WhatsApp; OCR avançado; áudio; imagem de comprovante;
 multiusuário/família; recomendações financeiras; orçamento por categoria; exportação;
 conciliação bancária; metas; subcategorias; RAG documental.
 

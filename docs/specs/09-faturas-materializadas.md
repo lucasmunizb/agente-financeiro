@@ -15,7 +15,7 @@
 | **Bloco · Fase** | A definir (pós-MVP incremental sobre o domínio F1) |
 | **Status** | 🟠 Pendente (proposta a validar — não iniciar) |
 | **Depende de** | [[spec-01-dominio-financeiro]] (parcelas, vencimento, disponível) · [[spec-02-cadastro-manual-receitas]] (CRUD de gasto) |
-| **Habilita** | [[spec-06-dashboard]] (agregação por fatura) · [[spec-07-importacao-pdf]] (casar importação com fatura) |
+| **Habilita** | [[spec-06-dashboard]] (agregação por fatura) · [[spec-11-importacao-pdf]] (casar importação com fatura) |
 | **Fonte de verdade** | seção 4 do escopo · [`docs/03-regras-financeiras.md`](../03-regras-financeiras.md) (§4.1, §4.3, §4.5) · [`docs/04-modelo-dados.md`](../04-modelo-dados.md) (`invoices`) |
 | **Regras críticas** | 2 (test-first) · 4 (IA nunca calcula) · 5 (centavos BIGINT, fuso SP) · 7 (confirmar antes de gravar) |
 
@@ -39,7 +39,7 @@ da fatura fechada"), **status da fatura** e o **snapshot do valor fechado/import
   - Mudar a **fórmula** do disponível do mês — continua determinística (regra 4, §4.5);
     a fatura materializada deve **refletir** a mesma soma, nunca recalculá-la.
   - Telas web / mensagens do bot sobre fatura → frontend, etapa separada (regra 3).
-  - Importação de PDF em si → [[spec-07-importacao-pdf]] (mas passa a **casar** com a fatura).
+  - Importação de PDF em si → [[spec-11-importacao-pdf]] (mas passa a **casar** com a fatura).
 
 ## 3. Cenários de aceite (Given-When-Then) — RASCUNHO (depende de §4b)
 

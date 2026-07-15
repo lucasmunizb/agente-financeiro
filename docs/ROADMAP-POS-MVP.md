@@ -8,15 +8,16 @@ A arquitetura já nasce preparada para multiusuário, canais desacoplados e moed
 
 | Ordem | Evolução | Observação |
 | --- | --- | --- |
-| 1 | **OCR avançado** | Primeira alteração pós-MVP (faturas escaneadas/imagens). |
-| 2 | **WhatsApp** | Após OCR; reutiliza o domínio (canal desacoplado). |
-| 3 | **Comandos por áudio** | Após WhatsApp. |
-| 4 | **Relatórios comparativos por mês/ano + exportação** | Após áudio. |
-| 5 | **Orçamento por categoria, metas, subcategorias** | Refinamento financeiro. |
-| 6 | **Multiusuário/família e permissões** | Arquitetura já preparada. |
-| 7 | **Moeda estrangeira / IOF / encargos** | Modelo já preparado para isso (campo de moeda existente). |
-| 8 | **Recomendações financeiras / anomalias** | **Apenas alertas; nunca aconselhamento** (no MVP só existem alertas operacionais). |
-| 9 | **App mobile nativo (+ RAG documental se necessário)** | Última etapa, só se houver necessidade comprovada. |
+| 1 | **Importação de PDF (Itaú)** | **Removida do MVP** (alto valor / alto risco) e promovida à 1ª etapa pós-MVP. Pipeline efêmero já pronto e testado; resta a regra de extração do `ParserItau` + telas de upload/revisão. Spec: [`11-importacao-pdf.md`](specs/11-importacao-pdf.md). |
+| 2 | **OCR avançado** | Após a importação de PDF (faturas escaneadas/imagens). |
+| 3 | **WhatsApp** | Após OCR; reutiliza o domínio (canal desacoplado). |
+| 4 | **Comandos por áudio** | Após WhatsApp. |
+| 5 | **Relatórios comparativos por mês/ano + exportação** | Após áudio. |
+| 6 | **Orçamento por categoria, metas, subcategorias** | Refinamento financeiro. |
+| 7 | **Multiusuário/família e permissões** | Arquitetura já preparada. |
+| 8 | **Moeda estrangeira / IOF / encargos** | Modelo já preparado para isso (campo de moeda existente). |
+| 9 | **Recomendações financeiras / anomalias** | **Apenas alertas; nunca aconselhamento** (no MVP só existem alertas operacionais). |
+| 10 | **App mobile nativo (+ RAG documental se necessário)** | Última etapa, só se houver necessidade comprovada. |
 
 ## Veredito sobre RAG
 

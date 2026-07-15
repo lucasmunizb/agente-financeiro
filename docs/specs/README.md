@@ -22,8 +22,8 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 ## Mapa das etapas
 
 > Numeração alinhada aos **Blocos** do [`ROADMAP-MVP.md`](../ROADMAP-MVP.md) e
-> [`TODO.md`](../TODO.md). A **Importação de PDF** foi deliberadamente movida para o
-> **fim** (alto valor / alto risco).
+> [`TODO.md`](../TODO.md). A **Importação de PDF** foi **removida do MVP** (alto valor / alto
+> risco) e é a **1ª etapa do pós-MVP** — spec **11**, abaixo.
 
 | # | Spec | Status | Depende de | Doc de referência |
 |---|---|---|---|---|
@@ -37,10 +37,10 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 | 05 | [Chat financeiro (tools + guard)](05-chat-financeiro.md) | ✅ | 01, 03, 04 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
 | 06 | [Dashboard (agregações do mês)](06-dashboard.md) | ✅ | 02, 03 | [`05-arquitetura.md`](../05-arquitetura.md) |
 | **FE** | [**Frontend (Stitch) — todas as telas**](FE-frontend-stitch.md) | ⬜ | 02–06 | [`05-arquitetura.md`](../05-arquitetura.md) · [`06-telegram.md`](../06-telegram.md) |
-| 07 | [Importação de PDF (Itaú) — última feature](07-importacao-pdf.md) | 🟡 | 01 | [`07-importacao-pdf.md`](../07-importacao-pdf.md) |
 | 08 | [Segurança e LGPD — portão de fechamento](08-seguranca-lgpd.md) | ⬜ | todas | [`09-nfr-seguranca-lgpd.md`](../09-nfr-seguranca-lgpd.md) |
 | 09 | [Faturas materializadas (ciclo de fatura)](09-faturas-materializadas.md) | 🟠 | 01, 02 | [`04-modelo-dados.md`](../04-modelo-dados.md) (`invoices`) |
 | 10 | [Recorrência mensal (assinaturas/contas fixas)](10-recorrencia-mensal.md) | ✅ | 02, 04b | [`03-regras-financeiras.md`](../03-regras-financeiras.md) §4.6 · [`04-modelo-dados.md`](../04-modelo-dados.md) (`recurrences`) |
+| 11 | [Importação de PDF (Itaú) — **1ª etapa do pós-MVP**](11-importacao-pdf.md) | 🟡 | 01 | [`07-importacao-pdf.md`](../07-importacao-pdf.md) |
 
 **Legenda:** ✅ concluído · 🟡 em andamento · ⬜ planejado · 🟠 pendente (proposta a validar — não iniciar).
 
@@ -48,10 +48,14 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 > derivada). Antes de escrever testes/feature é preciso fechar as **Questões em aberto (§4b)**
 > do próprio spec.
 
+> **Spec 11 (Importação de PDF)** está **fora do MVP** — é a **1ª etapa do pós-MVP** (ordem 1
+> em [`ROADMAP-POS-MVP.md`](../ROADMAP-POS-MVP.md)). O número 11 é apenas o id do spec; a
+> ordem de execução vem do roadmap pós-MVP, não da numeração.
+
 > A **fase FE** consolida **todo o frontend** adiado das etapas anteriores (regra 3) em um
 > único spec orientado ao **Stitch** — um prompt por tela + design system comum. Roda
-> **depois** do backend das features (00–06) e **antes** da importação de PDF (07); as telas
-> da 07 ficam no mini-TODO da FE marcadas para gerar **após** o backend da 07.
+> **depois** do backend das features (00–06). As telas de importação de PDF **não** fazem
+> parte do MVP: acompanham a **spec 11** (pós-MVP), geradas após o backend dela.
 
 > O **spec 08** é **transversal**: não é uma feature, e sim o **portão de fechamento** —
 > code review de segurança, pen test e testes adversariais de prompt. Roda **depois** das

@@ -15,7 +15,7 @@
 
 | Campo | Valor |
 |---|---|
-| **Bloco · Fase** | Bloco 8 · Fechamento (após F9) |
+| **Bloco · Fase** | Bloco 8 · Fechamento (após as features F1–F8 e a fase FE; último passo do MVP) |
 | **Status** | ⬜ Planejado |
 | **Depende de** | [[spec-03-telegram]] · [[spec-04-ia-interpretacao]] · [[spec-05-chat-financeiro]] · [[spec-00-fundacoes-devops]] (e todas as demais, por ser transversal) |
 | **Habilita** | Fechamento do MVP |

@@ -268,7 +268,7 @@ Borda HTTP:
 - **Adiado para:**
   - **Editar/cancelar via texto livre:** dependem de um extrator de IA para "qual lançamento"
     (não entregue no [[spec-04-ia-interpretacao]]); por ora caem no fallback "não entendi".
-  - **Importar (PDF)** → [[spec-07-importacao-pdf]].
+  - **Importar (PDF)** → [[spec-11-importacao-pdf]].
   - **Frontend:** mensagens formatadas do bot (curtas, sem botões) do processamento de
     comandos; a porta de saída `RespostaAoUsuario` segue inerte (`RespostaInerte`) até a
     redação/envio dos Blocos 4/5.

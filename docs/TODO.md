@@ -12,8 +12,8 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 
 > **Todo o frontend** (telas web + mensagens do bot) está **consolidado** na fase **FE**:
 > [`docs/specs/FE-frontend-stitch.md`](specs/FE-frontend-stitch.md) — um prompt de Stitch por
-> tela + design system. Executada após o backend das features e **antes** da importação de PDF
-> (Bloco 7). Os itens **(Etapa separada)** abaixo apontam para lá.
+> tela + design system. Executada após o backend das features. Os itens **(Etapa separada)**
+> abaixo apontam para lá.
 
 ## Bloco 0 — Fundações e DevOps ✅
 
@@ -73,16 +73,9 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [ ] Job de expurgo de mensagens (60 dias).
 - [ ] **(Etapa separada)** Telas e gráficos do dashboard.
 
-## Bloco 7 — Importação de PDF (última etapa do MVP)
-
-> **Reordenado:** a importação de fatura (alto valor, alto risco) foi deliberadamente
-> movida para o fim do MVP. Todas as demais etapas de backend são entregues antes dela.
-
-- [ ] Testes + implementação: recepção, validação de nome, bloqueio de PDF com senha.
-- [ ] Testes + implementação: extração de texto + OCR fallback (Tesseract) — efêmero.
-- [ ] Testes + implementação: parser Itaú, pré-importação, duplicidade, descarte de PDF/texto.
-- [ ] Testes + implementação: `pdf_parse_errors` para evolução do parser.
-- [ ] **(Etapa separada)** Tela web de revisão em lote + resumo no bot.
+> **Importação de PDF removida do MVP.** A importação de fatura (alto valor, alto risco) saiu
+> do MVP e virou a **1ª etapa do pós-MVP** — ver **Pós-MVP · Importação de PDF** no fim deste
+> arquivo e [`ROADMAP-POS-MVP.md`](ROADMAP-POS-MVP.md) (ordem 1).
 
 ## Bloco 8 — Segurança e LGPD (portão de fechamento)
 
@@ -107,3 +100,18 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 - [ ] Testes + implementação: tabela `invoices` + vínculo parcela↔fatura + find-or-create.
 - [ ] Testes + implementação: pagamento da fatura (boleto §4.5) sem regredir o disponível do mês.
 - [ ] **(Etapa separada)** Tela/mensagem de fatura e destaque de divergência importada.
+
+---
+
+## Pós-MVP · Importação de PDF (1ª etapa) — ex-Bloco 7
+
+> Spec: [`docs/specs/11-importacao-pdf.md`](specs/11-importacao-pdf.md).
+> **Removida do MVP** (alto valor, alto risco): é a **1ª evolução após o fechamento do MVP**
+> ([`ROADMAP-POS-MVP.md`](ROADMAP-POS-MVP.md), ordem 1). O pipeline efêmero base já está pronto
+> e testado; falta a regra de extração do `ParserItau` + as telas.
+
+- [ ] Testes + implementação: recepção, validação de nome, bloqueio de PDF com senha.
+- [ ] Testes + implementação: extração de texto + OCR fallback (Tesseract) — efêmero.
+- [ ] Testes + implementação: parser Itaú, pré-importação, duplicidade, descarte de PDF/texto.
+- [ ] Testes + implementação: `pdf_parse_errors` para evolução do parser.
+- [ ] **(Etapa separada)** Tela web de revisão em lote + resumo no bot.
