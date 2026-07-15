@@ -6,6 +6,7 @@ namespace App\Domain\FaturaCartao;
 
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\IA\Guard\PayloadDeResposta;
+use App\Domain\IA\Guard\TextoParaPrompt;
 use App\Domain\Shared\Money;
 use Carbon\CarbonImmutable;
 
@@ -54,9 +55,11 @@ final class ResultadoConsultaFaturaCartao
     public function paraPrompt(): string
     {
         $competencia = $this->trace->filtros['competencia'] ?? '';
+        // Texto do usuário sanitizado antes do prompt (injeção de 2ª ordem, P2-5).
+        $descricaoCartao = TextoParaPrompt::sanitizar($this->cartaoDescricao);
         $cartao = $this->cartaoFinal4 !== null
-            ? "{$this->cartaoDescricao} (final {$this->cartaoFinal4})"
-            : $this->cartaoDescricao;
+            ? "{$descricaoCartao} (final {$this->cartaoFinal4})"
+            : $descricaoCartao;
 
         $linhas = [
             "fatura_cartao: {$cartao} — {$competencia}",
@@ -64,9 +67,10 @@ final class ResultadoConsultaFaturaCartao
         ];
 
         foreach ($this->itens as $item) {
+            $descricao = TextoParaPrompt::sanitizar($item['descricao']);
             $vencimento = CarbonImmutable::parse($item['vencimento'])->format('d/m/Y');
             $parcela = $item['total'] > 1 ? " ({$item['numero']}/{$item['total']})" : '';
-            $linhas[] = "- {$item['descricao']}{$parcela} (vence {$vencimento}): ".Money::fromCents($item['cents'])->formatBRL();
+            $linhas[] = "- {$descricao}{$parcela} (vence {$vencimento}): ".Money::fromCents($item['cents'])->formatBRL();
         }
 
         $linhas[] = $this->trace->resumo();

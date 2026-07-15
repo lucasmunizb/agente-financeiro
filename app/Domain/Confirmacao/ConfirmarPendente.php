@@ -43,7 +43,8 @@ final class ConfirmarPendente
             $pendente->update([
                 'status' => PendingConfirmation::STATUS_CONFIRMADO,
                 'transaction_id' => $transaction->id,
-                'resolvido_em' => $agora,
+                // timestamptz: converter a UTC antes de gravar, senão o instante corrompe.
+                'resolvido_em' => $agora->setTimezone('UTC'),
             ]);
 
             AuditLog::create([

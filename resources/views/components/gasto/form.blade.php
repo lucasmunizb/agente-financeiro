@@ -72,7 +72,9 @@
     @endif
 
     {{-- ============================ PAINEL 1: FORM ============================ --}}
-    <form id="rg-form" data-rg-panel="form" novalidate
+    {{-- action/method reais (P2-7): sem JS, o submit faz POST à prévia (calcula sem
+         gravar — regra 7 preservada) em vez de um GET com _token na query string. --}}
+    <form id="rg-form" data-rg-panel="form" novalidate action="{{ $previaUrl }}" method="POST"
         @class(['flex min-h-0 flex-1 flex-col', 'pointer-events-none opacity-60' => $bloqueado])
         @if ($bloqueado) aria-disabled="true" @endif>
         @csrf
@@ -82,8 +84,9 @@
         <div class="min-h-0 flex-1 space-y-6 overflow-y-auto px-gutter py-6">
             <p class="font-label-sm text-label-sm text-outline">* obrigatório</p>
 
-            {{-- Erro geral (validações fora dos campos inline) --}}
-            <p data-rg-error="geral" hidden
+            {{-- Erro geral (validações fora dos campos inline). role=alert: leitor de
+                 tela anuncia o erro quando ele aparece (P2-8). --}}
+            <p data-rg-error="geral" id="rg-error-geral" role="alert" hidden
                 class="flex items-center gap-1.5 rounded-control border border-argila/30 bg-argila/5 px-3 py-2 font-label-sm text-label-sm text-argila">
                 <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
             </p>
@@ -94,7 +97,7 @@
                 <input id="rg-descricao" name="descricao" type="text" placeholder="Ex.: mercado do mês" maxlength="255"
                     value="{{ $valDescricao }}"
                     class="input-field h-12 w-full rounded-lg px-4 font-body-md text-body-md text-on-surface" />
-                <p data-rg-error="descricao" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
+                <p data-rg-error="descricao" id="rg-error-descricao" role="alert" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
                     <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
                 </p>
             </div>
@@ -108,7 +111,7 @@
                         value="{{ $valValor }}"
                         class="input-field h-12 w-full rounded-lg px-4 text-right font-value-label text-value-label text-on-surface" />
                 </div>
-                <p data-rg-error="valor" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
+                <p data-rg-error="valor" id="rg-error-valor" role="alert" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
                     <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
                 </p>
             </div>
@@ -236,7 +239,7 @@
                                 <label for="rg-dia_recorrencia" class="font-body-sm text-body-sm text-on-surface-variant">Dia</label>
                                 <input id="rg-dia_recorrencia" name="dia_recorrencia" type="number" inputmode="numeric" min="1" max="31" placeholder="5"
                                     class="input-field h-12 w-full rounded-lg px-4 font-value-label text-value-label text-on-surface" />
-                                <p data-rg-error="dia_recorrencia" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
+                                <p data-rg-error="dia_recorrencia" id="rg-error-dia_recorrencia" role="alert" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
                                     <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
                                 </p>
                             </div>
@@ -269,7 +272,7 @@
                         @endforeach
                     </div>
                 @endif
-                <p data-rg-error="categoria_id" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
+                <p data-rg-error="categoria_id" id="rg-error-categoria_id" role="alert" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
                     <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
                 </p>
             </div>

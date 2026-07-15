@@ -66,8 +66,13 @@ class SugeridorDeCategoria implements Agent, Conversational, HasProviderOptions,
             return null;
         }
 
+        $inicio = microtime(true);
+
         /** @var StructuredAgentResponse $resposta */
         $resposta = $this->prompt($descricao);
+
+        // Custo visível para TODOS os agentes, não só a consulta (auditoria P3-1).
+        \App\Domain\IA\Custo\LogDeUsoDeIA::registrar($resposta, \App\Domain\IA\Custo\TipoDeUsoIA::MENSAGEM, inicio: $inicio);
 
         $escolha = $resposta->toArray()['categoria'] ?? null;
         $escolha = is_string($escolha) ? trim($escolha) : null;

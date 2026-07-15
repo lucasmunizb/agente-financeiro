@@ -24,7 +24,8 @@ final class ConsultarPendentes
             ->where('user_id', $userId)
             ->where('status', PendingConfirmation::STATUS_PENDENTE)
             ->where(function ($q) use ($agora) {
-                $q->whereNull('expira_em')->orWhere('expira_em', '>', $agora);
+                // timestamptz: comparar em UTC — o binding serializa a hora local sem offset.
+                $q->whereNull('expira_em')->orWhere('expira_em', '>', $agora->setTimezone('UTC'));
             })
             ->orderBy('created_at')
             ->orderBy('id')

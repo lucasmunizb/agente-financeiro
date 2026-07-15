@@ -58,6 +58,19 @@ it('store: usuário autenticado envia mensagem e recebe a resposta do assistente
     expect(ChatMessage::query()->where('user_id', $user->id)->count())->toBe(2);
 });
 
+it('store: aplica rate limit por usuário na rota de IA (auditoria P1-2)', function () {
+    config()->set('ai.limites.web_por_minuto', 2);
+    $user = User::factory()->create();
+
+    foreach (range(1, 2) as $i) {
+        Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'consultar']]);
+        Ai::fakeAgent(AssistenteDeConsulta::class, ['Tudo certo.']);
+        $this->actingAs($user)->postJson(route('chat.store'), ['mensagem' => 'oi'])->assertOk();
+    }
+
+    $this->actingAs($user)->postJson(route('chat.store'), ['mensagem' => 'oi'])->assertStatus(429);
+});
+
 it('store: registrar um gasto pelo chat devolve a prévia e deixa pendente (regra 7)', function () {
     $user = User::factory()->create();
     Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'registrar']]);

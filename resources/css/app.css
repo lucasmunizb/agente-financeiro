@@ -31,7 +31,7 @@
     --color-superficie: #fbfbf8; /* cartões (off-white) */
     --color-cedula: #1f6e5a; /* ação primária */
     --color-cedula-clara: #2e8b72; /* hover primária */
-    --color-ocre: #c9852a; /* a vencer */
+    --color-ocre: #8f5a10; /* a vencer — escurecido p/ contraste AA em texto pequeno (P2-9; era #c9852a ≈2.8:1) */
     --color-argila: #b4452f; /* em atraso / erro */
     --color-linha: #dde0d7; /* divisores e bordas */
     --color-nevoa: #6b6f66;
@@ -43,7 +43,7 @@
     --color-on-primary-container: #a2edd4;
     --color-on-surface: #1d1c18;
     --color-on-surface-variant: #3f4945;
-    --color-outline: #6f7975;
+    --color-outline: #5b6560; /* escurecido p/ contraste AA em texto 12px (P2-9; era #6f7975 ≈4.0:1) */
     --color-outline-variant: #bec9c3;
     --color-surface-container-low: #f8f3ec;
     --color-surface-container: #f2ede6;

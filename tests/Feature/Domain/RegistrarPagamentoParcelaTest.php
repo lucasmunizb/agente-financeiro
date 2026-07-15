@@ -42,6 +42,21 @@ function gastoPixParcelado(User $user, CarbonImmutable $hoje): Transaction
     ), $hoje);
 }
 
+it('recusa pagar parcela de lançamento cancelado (auditoria P2-2)', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
+    $tx = gastoPixParcelado($user, $hoje);
+    (new \App\Domain\Gasto\CancelarGastoManual)->confirmar($tx->id, $user->id);
+    $parcela = $tx->installments()->where('numero', 1)->first();
+
+    // Pagar uma parcela cancelada a devolveria ao Disponível/Consumo (dinheiro 2×).
+    expect(fn () => (new RegistrarPagamentoParcela)->confirmar($parcela->id, $user->id, $hoje))
+        ->toThrow(PagamentoNaoPermitidoException::class);
+
+    expect($parcela->fresh()->status_id)
+        ->toBe(StatusPagamento::idFor(StatusPagamento::CANCELADO));
+});
+
 it('marca a parcela alvo como paga e grava a data de pagamento', function () {
     $user = User::factory()->create();
     $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');

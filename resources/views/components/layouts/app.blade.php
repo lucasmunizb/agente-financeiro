@@ -3,7 +3,7 @@
     'heading' => null,
     'subheading' => null,
     'active' => null, // chave do item de navegação ativo
-    'notificacoes' => null, // coleção pronta do backend; null → usa o demo do componente
+    'notificacoes' => [], // coleção pronta do backend; vazio → estado "Tudo em dia" (nunca demo — P1-4)
     'wide' => false, // canvas largo, alinhado à esquerda (dashboard/listas); padrão é a coluna estreita centrada
 ])
 
@@ -49,6 +49,13 @@
 </head>
 
 <body class="min-h-screen overflow-x-clip text-on-surface">
+    {{-- Skip link (P3-6): primeiro tab-stop pula direto ao conteúdo — sem ele são
+         ~15 paradas de teclado (nav inteira) antes do conteúdo em toda página. --}}
+    <a href="#conteudo"
+        class="sr-only z-[60] rounded-lg bg-primary px-4 py-2 font-body-sm text-body-sm font-semibold text-on-primary focus:not-sr-only focus:fixed focus:left-4 focus:top-4">
+        Ir para o conteúdo
+    </a>
+
     <div class="paper-texture" aria-hidden="true"></div>
 
     {{-- Backdrop do drawer (só mobile, quando aberto) --}}
@@ -142,7 +149,7 @@
 
         {{-- Canvas principal. Estreito e centrado por padrão (telas de card único);
              largo e alinhado à esquerda no modo `wide` (dashboard, extratos). --}}
-        <main class="flex-1 bg-surface-container-low">
+        <main id="conteudo" tabindex="-1" class="flex-1 bg-surface-container-low">
             <div @class([
                 'mx-auto w-full px-container-padding-mobile md:px-container-padding-desktop py-section-gap',
                 'flex max-w-4xl flex-col items-center' => !$wide,
@@ -175,34 +182,8 @@
          Só a URL; a referência é a 1ª leitura do poller (pages/atualizacoes.js). --}}
     <div data-poll-atualizacoes data-url="{{ route('atualizacoes') }}" hidden></div>
 
-    {{-- Drawer do menu (mobile): abre/fecha o aside. JS mínimo, sem framework. --}}
-    <script>
-        (function () {
-            const aside = document.getElementById('app-sidebar');
-            const backdrop = document.getElementById('sidebar-backdrop');
-            const openBtn = document.getElementById('sidebar-open');
-            const closeBtn = document.getElementById('sidebar-close');
-            if (!aside) return;
-
-            function setOpen(open) {
-                aside.classList.toggle('-translate-x-full', !open);
-                backdrop.hidden = !open;
-                document.body.classList.toggle('overflow-hidden', open);
-                openBtn?.setAttribute('aria-expanded', String(open));
-            }
-
-            openBtn?.addEventListener('click', () => setOpen(true));
-            closeBtn?.addEventListener('click', () => setOpen(false));
-            backdrop?.addEventListener('click', () => setOpen(false));
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') setOpen(false);
-            });
-            // Fecha ao navegar (mobile); no desktop o aside fica sempre visível.
-            aside.querySelectorAll('a[href]:not([aria-disabled])').forEach((a) =>
-                a.addEventListener('click', () => setOpen(false))
-            );
-        })();
-    </script>
+    {{-- Drawer do menu: resources/js/shell/sidebar.js (via app.js) — script inline
+         aqui era bloqueado pela CSP estrita de produção (P3-13). --}}
 
     @stack('scripts')
 </body>

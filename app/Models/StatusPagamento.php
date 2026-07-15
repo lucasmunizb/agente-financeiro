@@ -19,6 +19,19 @@ class StatusPagamento extends Model
     public const PENDENTE_REVISAO = 'pendente_revisao';
     public const AGENDADO = 'agendado';
 
+    /**
+     * Status que NÃO são cobrança efetiva (doc 03 §4.4) — visão única usada pelas
+     * consultas do motor (gastos, disponível, fatura, próximas contas). Centralizado
+     * aqui para as 6 consultas não divergirem entre si (auditoria P3-2).
+     *
+     * @var list<string>
+     */
+    public const EXCLUIDOS = [
+        self::PENDENTE_REVISAO,
+        self::CANCELADO,
+        self::ESTORNADO,
+    ];
+
     /** @var array<string, string> Código => descrição (doc 03 §4.4). */
     public const CODIGOS = [
         self::ABERTO => 'Em aberto, ainda não pago',
@@ -39,10 +52,15 @@ class StatusPagamento extends Model
     protected $fillable = ['codigo', 'descricao'];
 
     /**
-     * Resolve o id do status pelo seu código.
+     * Resolve o id do status pelo seu código. Memoizado por request via once():
+     * é tabela de referência imutável — sem isso, uma compra em 12× dispara 12
+     * consultas idênticas (auditoria P3-2). Nos testes o framework limpa o cache
+     * do once() entre casos (os ids mudam a cada RefreshDatabase).
      */
     public static function idFor(string $codigo): ?int
     {
-        return static::where('codigo', $codigo)->value('id');
+        $ids = once(fn (): array => static::query()->pluck('id', 'codigo')->all());
+
+        return $ids[$codigo] ?? null;
     }
 }

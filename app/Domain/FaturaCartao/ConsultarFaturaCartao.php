@@ -6,6 +6,7 @@ namespace App\Domain\FaturaCartao;
 
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\Shared\PeriodoMensal;
+use App\Domain\Shared\SqlLike;
 use App\Models\Card;
 use App\Models\Installment;
 use App\Models\StatusPagamento;
@@ -27,12 +28,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class ConsultarFaturaCartao
 {
-    /** @var list<string> Status que não são cobrança efetiva (§4.4). */
-    private const STATUS_EXCLUIDOS = [
-        StatusPagamento::PENDENTE_REVISAO,
-        StatusPagamento::CANCELADO,
-        StatusPagamento::ESTORNADO,
-    ];
 
     public function para(int $userId, string $cartao, string $competencia): ResultadoConsultaFaturaCartao
     {
@@ -70,7 +65,7 @@ final class ConsultarFaturaCartao
         $p = PeriodoMensal::fromString($competencia);
 
         $excluidos = StatusPagamento::query()
-            ->whereIn('codigo', self::STATUS_EXCLUIDOS)
+            ->whereIn('codigo', StatusPagamento::EXCLUIDOS)
             ->pluck('id')
             ->all();
 
@@ -124,7 +119,8 @@ final class ConsultarFaturaCartao
         return Card::query()
             ->where('user_id', $userId)
             ->where(fn (Builder $q) => $q
-                ->where('descricao', 'ilike', $cartao)
+                // Escapa curingas: texto da IA não vira padrão LIKE (auditoria P3-3).
+                ->where('descricao', 'ilike', SqlLike::escapar($cartao))
                 ->orWhere('final_4', $cartao))
             ->first();
     }

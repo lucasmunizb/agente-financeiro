@@ -65,12 +65,5 @@ if (alvoPoll) {
     setInterval(verificar, 3000);
 }
 
-// Confirmação antes de ação destrutiva (regra 7): cancela o envio do form se o
-// usuário desistir; caso contrário deixa o POST seguir para o backend.
-document.querySelectorAll('[data-confirm]').forEach((btn) => {
-    btn.addEventListener('click', (event) => {
-        if (!window.confirm(btn.dataset.confirm)) {
-            event.preventDefault();
-        }
-    });
-});
+// A confirmação do "Desconectar" é server-rendered via <details> (regra 7 na
+// borda, sem depender de JS) — nenhum window.confirm aqui (auditoria P3-5).

@@ -1,4 +1,8 @@
-@props(['monthLabel' => 'Junho de 2026'])
+@props([
+    'monthLabel' => 'Junho de 2026',
+    'prevUrl' => null, // navegação por competência (mês anterior); null desabilita
+    'nextUrl' => null, // navegação por competência (mês seguinte); null desabilita
+])
 
 {{-- Estado VAZIO do dashboard (spec FE §7.5) — primeiro mês, nada registrado.
      Texto-guia que convida à ação (nunca um "nada aqui" seco). A régua aparece
@@ -8,14 +12,25 @@
     <section>
         <div class="mb-4 flex items-center justify-between">
             <h2 class="font-headline-md text-headline-md text-on-surface">{{ $monthLabel }}</h2>
+            {{-- Navegação real por competência (P2-15) — mesmo padrão do month-ruler. --}}
             <div class="flex items-center gap-2 text-on-surface-variant">
-                <button type="button" aria-label="Mês anterior" class="rounded-full p-1 transition-colors hover:text-primary">
+                <a @if ($prevUrl) href="{{ $prevUrl }}" @else aria-disabled="true" tabindex="-1" @endif aria-label="Mês anterior"
+                    @class([
+                        'rounded-full p-1 transition-colors',
+                        'hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary' => $prevUrl,
+                        'pointer-events-none text-outline-variant opacity-50' => ! $prevUrl,
+                    ])>
                     <x-icon name="chevron-left" class="h-5 w-5" />
-                </button>
+                </a>
                 <span class="font-label-sm text-label-sm uppercase tracking-wider">Hoje</span>
-                <button type="button" aria-label="Próximo mês" class="rounded-full p-1 transition-colors hover:text-primary">
+                <a @if ($nextUrl) href="{{ $nextUrl }}" @else aria-disabled="true" tabindex="-1" @endif aria-label="Próximo mês"
+                    @class([
+                        'rounded-full p-1 transition-colors',
+                        'hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary' => $nextUrl,
+                        'pointer-events-none text-outline-variant opacity-50' => ! $nextUrl,
+                    ])>
                     <x-icon name="chevron-right" class="h-5 w-5" />
-                </button>
+                </a>
             </div>
         </div>
         <div class="relative overflow-hidden rounded-card border border-linha bg-surface-container-lowest p-6">

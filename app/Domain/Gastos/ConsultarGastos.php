@@ -10,6 +10,7 @@ use App\Domain\Orcamento\ConsumoMensal;
 use App\Domain\Recorrencia\ProjetarRecorrencias;
 use App\Domain\Recorrencia\ProjetarRecorrenciasPendentes;
 use App\Domain\Shared\PeriodoMensal;
+use App\Domain\Shared\SqlLike;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
@@ -29,12 +30,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class ConsultarGastos
 {
-    /** @var list<string> Status que não entram no cálculo por padrão (§4.4), espelha {@see ConsumoDoMes}. */
-    private const STATUS_EXCLUIDOS = [
-        StatusPagamento::PENDENTE_REVISAO,
-        StatusPagamento::CANCELADO,
-        StatusPagamento::ESTORNADO,
-    ];
 
     public function __construct(
         private readonly ProjetarRecorrencias $projetarRecorrencias = new ProjetarRecorrencias,
@@ -196,7 +191,7 @@ final class ConsultarGastos
         }
 
         $excluidos = StatusPagamento::query()
-            ->whereIn('codigo', self::STATUS_EXCLUIDOS)
+            ->whereIn('codigo', StatusPagamento::EXCLUIDOS)
             ->pluck('id')
             ->all();
 
@@ -211,7 +206,8 @@ final class ConsultarGastos
     {
         return (int) (Category::query()
             ->where('user_id', $userId)
-            ->where('nome', 'ilike', $categoria)
+            // Escapa curingas: texto da IA não vira padrão LIKE (auditoria P3-3).
+            ->where('nome', 'ilike', SqlLike::escapar($categoria))
             ->value('id') ?? -1);
     }
 
@@ -224,7 +220,8 @@ final class ConsultarGastos
         return (int) (Card::query()
             ->where('user_id', $userId)
             ->where(fn (Builder $q) => $q
-                ->where('descricao', 'ilike', $cartao)
+                // Escapa curingas: texto da IA não vira padrão LIKE (auditoria P3-3).
+                ->where('descricao', 'ilike', SqlLike::escapar($cartao))
                 ->orWhere('final_4', $cartao))
             ->value('id') ?? -1);
     }

@@ -3,7 +3,6 @@
 use App\Ai\Agents\AssistenteDeConsulta;
 use App\Ai\Agents\ClassificadorDeIntencao;
 use App\Ai\Agents\ExtratorDeGasto;
-use App\Ai\Agents\RedatorDeResposta;
 use App\Ai\Agents\SugeridorDeCategoria;
 use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Attributes\UseCheapestModel;
@@ -40,12 +39,6 @@ it('extrai campos do gasto no modelo mais barato', function () {
     expect(usaModeloMaisBarato(ExtratorDeGasto::class))->toBeTrue();
 });
 
-it('redige a resposta no modelo mais barato — formatar um payload já calculado é mecânico', function () {
-    // Sem roteamento de tools: apenas formata números que o motor já calculou (regra 4).
-    // Não há retry de guard a temer aqui, então o modelo mais barato é sempre o certo.
-    expect(usaModeloMaisBarato(RedatorDeResposta::class))->toBeTrue();
-});
-
 it('pede reasoning_effort baixo à Groq no classificador, e nada a outros provedores', function () {
     $agente = app(ClassificadorDeIntencao::class);
 
@@ -55,13 +48,6 @@ it('pede reasoning_effort baixo à Groq no classificador, e nada a outros proved
 
 it('pede reasoning_effort baixo à Groq no extrator, e nada a outros provedores', function () {
     $agente = app(ExtratorDeGasto::class);
-
-    expect($agente->providerOptions(Lab::Groq))->toBe(['reasoning_effort' => 'low'])
-        ->and($agente->providerOptions(Lab::Gemini))->toBe([]);
-});
-
-it('pede reasoning_effort baixo à Groq no redator, e nada a outros provedores', function () {
-    $agente = app(RedatorDeResposta::class);
 
     expect($agente->providerOptions(Lab::Groq))->toBe(['reasoning_effort' => 'low'])
         ->and($agente->providerOptions(Lab::Gemini))->toBe([]);
@@ -81,7 +67,6 @@ it('pede reasoning_effort baixo à Groq no sugeridor de categoria, e nada a outr
 it('não usa #[MaxTokens] nos agentes de raciocínio — o teto truncaria o structured output (Groq 400)', function () {
     expect(temMaxTokens(ClassificadorDeIntencao::class))->toBeFalse()
         ->and(temMaxTokens(ExtratorDeGasto::class))->toBeFalse()
-        ->and(temMaxTokens(RedatorDeResposta::class))->toBeFalse()
         ->and(temMaxTokens(SugeridorDeCategoria::class))->toBeFalse()
         ->and(temMaxTokens(AssistenteDeConsulta::class))->toBeFalse();
 });

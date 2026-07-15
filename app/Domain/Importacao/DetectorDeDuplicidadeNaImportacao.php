@@ -26,7 +26,7 @@ final class DetectorDeDuplicidadeNaImportacao
      */
     public function marcar(int $userId, array $lancamentos): array
     {
-        $existentes = $this->chavesExistentes($userId);
+        $existentes = $this->chavesExistentes($userId, $lancamentos);
 
         return array_map(
             fn (LancamentoExtraido $l) => DetectorDeDuplicidade::ehDuplicado(
@@ -39,21 +39,33 @@ final class DetectorDeDuplicidadeNaImportacao
 
     /**
      * Chaves de duplicidade dos lançamentos já salvos do usuário (nº de parcelas =
-     * total de installments, nunca a parcela vigente).
+     * total de installments, nunca a parcela vigente). Pré-filtrado em SQL pelos
+     * valores/datas do lote (componentes exatos da chave) — carregar TODO o histórico
+     * em memória cresce sem limite (auditoria P2-4).
      *
+     * @param  array<int, LancamentoExtraido>  $lancamentos
      * @return array<int, ChaveDeDuplicidade>
      */
-    private function chavesExistentes(int $userId): array
+    private function chavesExistentes(int $userId, array $lancamentos): array
     {
+        if ($lancamentos === []) {
+            return [];
+        }
+
+        $valores = array_values(array_unique(array_map(fn (LancamentoExtraido $l) => $l->valorCents, $lancamentos)));
+        $datas = array_values(array_unique(array_map(fn (LancamentoExtraido $l) => $l->data->toDateString(), $lancamentos)));
+
         return Transaction::query()
             ->where('user_id', $userId)
-            ->with('installments')
+            ->whereIn('valor_total_cents', $valores)
+            ->whereIn('data_compra', $datas)
+            ->withCount('installments')
             ->get()
             ->map(fn (Transaction $tx) => ChaveDeDuplicidade::de(
                 $tx->valor_total_cents,
                 $tx->descricao,
                 CarbonImmutable::parse($tx->data_compra->toDateString(), RelativeDate::TIMEZONE),
-                $tx->installments->count(),
+                $tx->installments_count,
             ))
             ->all();
     }

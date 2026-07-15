@@ -13,8 +13,9 @@ services:
     image: financeiro-app:dev
     restart: unless-stopped
     env_file: .env
+    # Vinculado ao loopback (P3-14): a porta de dev não fica exposta na rede local.
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     volumes:
       - .:/app
     depends_on:
@@ -62,13 +63,17 @@ services:
       - .:/app
     # Vite dev server (HMR) quando rodar `make vite`; ignorado no build.
     ports:
-      - "${VITE_PORT:-5173}:5173"
+      - "127.0.0.1:${VITE_PORT:-5173}:5173"
 
   # Túnel HTTPS público (Cloudflare Quick Tunnel) para expor o webhook do
   # Telegram em DEV — sem instalar nada no host (regra 9). Fica no profile
   # `tools`: não sobe com `make up` sozinho; é orquestrado por `make webhook-up`
   # (quando há TELEGRAM_BOT_TOKEN) e derrubado por `make down`/`webhook-down`.
   # Aponta direto para o app na rede do compose; a URL pública sai nos logs.
+  #
+  # ⚠ P3-14: o túnel expõe o APP INTEIRO (com APP_DEBUG=true) numa URL pública
+  # aleatória. Use só enquanto testa o bot e derrube depois (`make webhook-down`);
+  # nunca divulgue a URL. O webhook em si é protegido pelo segredo (403 sem ele).
   cloudflared:
     image: cloudflare/cloudflared:latest
     profiles: ["tools"]
@@ -85,8 +90,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-financeiro}
       POSTGRES_USER: ${POSTGRES_USER:-financeiro}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+    # Vinculado ao loopback (P3-14): o Postgres de dev (senha fraca) não fica
+    # acessível a outras máquinas da rede.
     ports:
-      - "${DB_PORT_HOST:-5432}:5432"
+      - "127.0.0.1:${DB_PORT_HOST:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

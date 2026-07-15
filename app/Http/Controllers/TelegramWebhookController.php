@@ -9,6 +9,7 @@ use App\Domain\Telegram\DedupeDeUpdate;
 use App\Domain\Telegram\RoteadorDeMensagem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Webhook do Telegram (doc 06 §3). Adaptador fino: NÃO contém regra de negócio.
@@ -46,6 +47,14 @@ final class TelegramWebhookController extends Controller
         }
 
         $telegramUserId = (int) $from;
+
+        // Rate limit por remetente (auditoria P1-2): cada mensagem pode disparar IA;
+        // o teto protege as cotas dos provedores contra flood/loop. Estouro descarta
+        // EM SILÊNCIO com 200 — um 429 faria o Telegram reentregar o update em loop.
+        if ($this->estourouLimite($telegramUserId)) {
+            return $this->ok();
+        }
+
         $update = $request->all();
 
         if ($user = $auth->resolver($telegramUserId)) {
@@ -60,5 +69,24 @@ final class TelegramWebhookController extends Controller
     private function ok(): Response
     {
         return new Response('', Response::HTTP_OK);
+    }
+
+    /** Janelas de minuto e dia por remetente (config ai.limites). */
+    private function estourouLimite(int $telegramUserId): bool
+    {
+        $janelas = [
+            ["telegram-ia:{$telegramUserId}:minuto", (int) config('ai.limites.telegram_por_minuto', 15), 60],
+            ["telegram-ia:{$telegramUserId}:dia", (int) config('ai.limites.telegram_por_dia', 300), 86400],
+        ];
+
+        foreach ($janelas as [$chave, $limite, $segundos]) {
+            if (RateLimiter::tooManyAttempts($chave, $limite)) {
+                return true;
+            }
+
+            RateLimiter::hit($chave, $segundos);
+        }
+
+        return false;
     }
 }

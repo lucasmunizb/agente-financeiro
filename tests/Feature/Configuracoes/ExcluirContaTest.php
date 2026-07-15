@@ -39,6 +39,29 @@ it('faz soft delete do usuário e preserva a auditoria sem PII em claro', functi
         ->and($serial)->not->toContain('Lucas');
 });
 
+it('anonimiza a PII do titular na exclusão (nome, e-mail, telefone — auditoria P2-10)', function () {
+    $user = User::factory()->create(['name' => 'Lucas', 'email' => 'lucas@exemplo.com']);
+    \App\Models\TelegramLink::create([
+        'user_id' => $user->id,
+        'telegram_user_id' => 999002,
+        'telefone' => '+5511988887777',
+        'status' => \App\Models\TelegramLink::ATIVO,
+        'vinculado_em' => now(),
+    ]);
+
+    (new ExcluirConta)->excluir($user->id);
+
+    // Esquecimento de verdade: identificadores do titular não ficam retidos em claro.
+    $anon = User::withTrashed()->find($user->id);
+    expect($anon->name)->toBeNull()
+        ->and($anon->email)->not->toBe('lucas@exemplo.com');
+
+    $link = \App\Models\TelegramLink::where('user_id', $user->id)->first();
+    expect($link->telefone)->toBeNull()
+        ->and($link->telegram_user_id)->toBeNull()
+        ->and($link->status)->toBe(\App\Models\TelegramLink::REVOGADO);
+});
+
 it('bloqueia o login de um usuário excluído', function () {
     $user = User::factory()->create([
         'email' => 'sai@exemplo.com',

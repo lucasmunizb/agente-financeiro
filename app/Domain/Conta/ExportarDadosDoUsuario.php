@@ -51,6 +51,11 @@ final class ExportarDadosDoUsuario
                 ->get(['id', 'mes', 'limite_cents', 'categoria_id'])->toArray(),
             'recorrencias' => Recurrence::where('user_id', $userId)
                 ->get(['id', 'descricao', 'valor_cents', 'payment_method_id', 'categoria_id', 'periodicidade', 'dia', 'status', 'proxima_em'])->toArray(),
+            // Histórico do chat também é dado do titular (portabilidade completa,
+            // auditoria P2-10) — o expurgo de 60 dias limita a janela retida.
+            'chat' => \App\Models\ChatMessage::where('user_id', $userId)
+                ->orderBy('created_at')
+                ->get(['id', 'role', 'body', 'aprovado', 'tem_anexo', 'created_at'])->toArray(),
             'telegram' => $this->telegram($userId),
             'transparencia_ia' => 'A IA classifica seus gastos, extrai dados de faturas e redige as respostas. '
                 .'A IA nunca calcula dinheiro — os números vêm do seu banco de dados.',

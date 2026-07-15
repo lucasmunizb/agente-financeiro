@@ -1,4 +1,2 @@
-import axios from 'axios';
-window.axios = axios;
-
-window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+// Todo request do app usa fetch nativo (ver pages/*.js) — sem cliente HTTP
+// empacotado (auditoria P3-4: axios eram 45KB de peso morto em toda página).

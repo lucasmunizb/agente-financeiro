@@ -25,13 +25,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class ConsultarProximasContas
 {
-    /** @var list<string> Status que NÃO são conta a pagar (liquidado + §4.4). */
-    private const STATUS_EXCLUIDOS = [
-        StatusPagamento::PAGO,
-        StatusPagamento::PENDENTE_REVISAO,
-        StatusPagamento::CANCELADO,
-        StatusPagamento::ESTORNADO,
-    ];
+    /** @var list<string> Status que NÃO são conta a pagar: liquidado + os excluídos comuns (§4.4). */
+    private const STATUS_PROPRIOS_EXCLUIDOS = [StatusPagamento::PAGO];
 
     public function para(int $userId, CarbonImmutable $hoje, int $janelaDias): ResultadoConsultaProximasContas
     {
@@ -39,7 +34,7 @@ final class ConsultarProximasContas
         $ate = $de->addDays($janelaDias);
 
         $excluidos = StatusPagamento::query()
-            ->whereIn('codigo', self::STATUS_EXCLUIDOS)
+            ->whereIn('codigo', [...self::STATUS_PROPRIOS_EXCLUIDOS, ...StatusPagamento::EXCLUIDOS])
             ->pluck('id')
             ->all();
 

@@ -16,4 +16,9 @@ final class EdicaoBloqueadaException extends RuntimeException
     {
         return new self('Não é possível editar: há parcela já paga.');
     }
+
+    public static function cancelado(): self
+    {
+        return new self('Não é possível editar um lançamento cancelado.');
+    }
 }

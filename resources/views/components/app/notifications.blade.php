@@ -5,30 +5,15 @@
     // A UI só apresenta: valores (R$, datas) chegam formatados; nada é
     // calculado aqui (regras 4 e 5).
     //
-    // Notificações são pós-MVP (docs/specs/06-dashboard.md). Enquanto o backend
-    // não existe, usamos o conjunto de demonstração abaixo — o mesmo conteúdo das
-    // telas do Stitch ("Painel de Notificações — Aberto"). Passe :notificacoes="[]"
-    // para ver o estado vazio ("Tudo em dia"); ligue à fonte real quando houver.
-    'notificacoes' => null,
+    // Notificações são pós-MVP (docs/specs/06-dashboard.md). Sem fonte real,
+    // o padrão é o estado VAZIO ("Tudo em dia") — nunca dados de demonstração:
+    // valores financeiros inventados no header quebrariam a confiança do
+    // usuário (auditoria P1-4). Ligue à fonte real quando houver.
+    'notificacoes' => [],
 ])
 
 @php
-    $demo = [
-        ['icone' => 'receipt', 'tom' => 'ocre', 'titulo' => 'Conta vence hoje',
-            'descricao' => 'Energia elétrica — R$ 245,00', 'quando' => '09:42', 'lida' => false],
-        ['icone' => 'send', 'tom' => 'primary', 'titulo' => 'Telegram conectado',
-            'descricao' => 'Alertas em tempo real ativados.', 'quando' => 'Ontem', 'lida' => false],
-        ['icone' => 'flag', 'tom' => 'cedula', 'titulo' => 'Lembrete de meta',
-            'descricao' => 'Você atingiu 80% da meta de economia.', 'quando' => '14/out', 'lida' => false],
-        ['icone' => 'credit-card', 'tom' => 'neutro', 'titulo' => 'Fatura fechada',
-            'descricao' => 'Cartão final 4432.', 'quando' => '12/out', 'lida' => true],
-        ['icone' => 'bar-chart', 'tom' => 'neutro', 'titulo' => 'Relatório disponível',
-            'descricao' => 'Mensal: setembro de 2025.', 'quando' => '10/out', 'lida' => true],
-        ['icone' => 'tag', 'tom' => 'neutro', 'titulo' => 'Gasto registrado',
-            'descricao' => 'Uber — R$ 42,90.', 'quando' => '08/out', 'lida' => true],
-    ];
-
-    $itens = collect($notificacoes ?? $demo);
+    $itens = collect($notificacoes ?? []);
     $naoVistas = $itens->reject(fn ($n) => $n['lida'] ?? false)->values();
     $vistas = $itens->filter(fn ($n) => $n['lida'] ?? false)->values();
     $qtdNaoVistas = $naoVistas->count();
@@ -160,91 +145,6 @@
     </div>
 </div>
 
-@push('scripts')
-    <script>
-        (function () {
-            const trigger = document.getElementById('notif-trigger');
-            const panel = document.getElementById('notif-panel');
-            if (!trigger || !panel) return;
-
-            let closeTimer = null;
-
-            function open() {
-                clearTimeout(closeTimer);
-                panel.hidden = false;
-                // força reflow antes de animar para a transição valer.
-                void panel.offsetWidth;
-                panel.classList.remove('scale-95', 'opacity-0');
-                panel.classList.add('scale-100', 'opacity-100');
-                trigger.setAttribute('aria-expanded', 'true');
-            }
-
-            function close() {
-                panel.classList.add('scale-95', 'opacity-0');
-                panel.classList.remove('scale-100', 'opacity-100');
-                trigger.setAttribute('aria-expanded', 'false');
-                closeTimer = setTimeout(() => {
-                    if (trigger.getAttribute('aria-expanded') === 'false') panel.hidden = true;
-                }, 160);
-            }
-
-            function isOpen() {
-                return trigger.getAttribute('aria-expanded') === 'true';
-            }
-
-            trigger.addEventListener('click', (e) => {
-                e.stopPropagation();
-                isOpen() ? close() : open();
-            });
-
-            // Fecha ao clicar fora ou com Esc.
-            document.addEventListener('click', (e) => {
-                if (isOpen() && !panel.contains(e.target) && !trigger.contains(e.target)) close();
-            });
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && isOpen()) {
-                    close();
-                    trigger.focus();
-                }
-            });
-
-            // Marcação de leitura — afago visual (sem backend de notificações no
-            // MVP; nada é persistido). Tira o realce/ponto e ressincroniza o selo.
-            const markAll = document.getElementById('notif-mark-all');
-
-            function marcarLida(item) {
-                const dot = item.querySelector('.notif-dot');
-                if (!dot) return; // já lida
-                item.classList.remove('bg-cedula/5');
-                item.classList.add('hover:bg-surface-container');
-                dot.remove();
-            }
-
-            function sincronizarBadge() {
-                const restantes = panel.querySelectorAll('.notif-dot').length;
-                const badge = document.getElementById('notif-badge');
-                if (restantes === 0) {
-                    badge?.remove();
-                    markAll?.remove();
-                } else if (badge) {
-                    badge.textContent = restantes > 9 ? '9+' : restantes;
-                }
-            }
-
-            // Clique numa notificação não lida → marca só aquela.
-            panel.querySelectorAll('[data-notif-item]').forEach((item) => {
-                item.addEventListener('click', () => {
-                    marcarLida(item);
-                    sincronizarBadge();
-                });
-            });
-
-            // "Marcar todas como lidas".
-            markAll?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                panel.querySelectorAll('[data-notif-item]').forEach(marcarLida);
-                sincronizarBadge();
-            });
-        })();
-    </script>
-@endpush
+{{-- O comportamento (abrir/fechar/marcar lida) vive em resources/js/shell/notifications.js
+     (importado pelo app.js): script inline aqui era bloqueado pela CSP estrita de
+     produção — script-src 'self', sem 'unsafe-inline' (P3-13). --}}

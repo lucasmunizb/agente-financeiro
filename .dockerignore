@@ -12,3 +12,9 @@ scratchpad
 *.docx
 storage/app/faturas
 storage/logs/*.log
+# Nunca levar caches resolvidos de dev para a imagem (config:cache embutiria
+# segredos — regra 10) nem artefatos de teste.
+bootstrap/cache/*.php
+storage/framework
+tests
+phpunit.xml

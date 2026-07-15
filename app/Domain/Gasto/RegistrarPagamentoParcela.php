@@ -35,6 +35,14 @@ final class RegistrarPagamentoParcela
             throw PagamentoNaoPermitidoException::ehCartao();
         }
 
+        // Cancelado (transação ou a própria parcela) não vira "pago" (auditoria P2-2):
+        // o valor reentraria no Disponível/Consumo já tendo sido cancelado.
+        $cancelado = StatusPagamento::idFor(StatusPagamento::CANCELADO);
+
+        if ($parcela->transaction->status_id === $cancelado || $parcela->status_id === $cancelado) {
+            throw PagamentoNaoPermitidoException::cancelado();
+        }
+
         $pago = StatusPagamento::idFor(StatusPagamento::PAGO);
         $antes = ['status_id' => $parcela->status_id, 'data_pagamento' => $parcela->data_pagamento?->toDateString()];
 

@@ -3,42 +3,95 @@
 # /run/secrets/<nome>, lidos pelo entrypoint (padrão *_FILE).
 #
 # Uso (exemplo):
-#   printf '%s' "$APP_KEY"        | docker secret create app_key -
-#   printf '%s' "$DB_PASSWORD"    | docker secret create db_password -
-#   printf '%s' "$ANTHROPIC_KEY"  | docker secret create anthropic_api_key -
-#   printf '%s' "$TELEGRAM_TOKEN" | docker secret create telegram_bot_token -
+#   printf '%s' "$APP_KEY"          | docker secret create app_key -
+#   printf '%s' "$DB_PASSWORD"      | docker secret create db_password -
+#   printf '%s' "$ANTHROPIC_KEY"    | docker secret create anthropic_api_key -
+#   printf '%s' "$TELEGRAM_TOKEN"   | docker secret create telegram_bot_token -
+#   printf '%s' "$WEBHOOK_SECRET"   | docker secret create telegram_webhook_secret -
 #   docker build -f docker/Dockerfile --target prod -t financeiro-app:prod .
 #   docker stack deploy -c docker-stack.yml financeiro
 #
+# Antes do deploy: trocar "seu-dominio.example" pelo domínio real (proxy + APP_URL).
 # Variáveis NÃO sensíveis ficam aqui; segredos NUNCA vão para imagem/log/git.
 # =====================================================================
 
+# Ambiente comum de app/worker/migrate (âncora YAML — Swarm aceita extensões x-*).
+x-app-environment: &app-environment
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_TIMEZONE: America/Sao_Paulo
+  APP_URL: https://seu-dominio.example
+  # Logs para stderr: visíveis em `docker service logs`, sem arquivo sem rotação.
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: warning
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_DATABASE: financeiro
+  DB_USERNAME: financeiro
+  QUEUE_CONNECTION: database
+  # Rede overlay do Swarm (o serviço proxy tem IP dinâmico nessa faixa).
+  TRUSTED_PROXIES: 10.0.0.0/8
+  AI_PROVIDER: anthropic
+  # Segredos resolvidos pelo entrypoint a partir de /run/secrets:
+  APP_KEY_FILE: /run/secrets/app_key
+  DB_PASSWORD_FILE: /run/secrets/db_password
+  ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+  TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
+  TELEGRAM_WEBHOOK_SECRET_FILE: /run/secrets/telegram_webhook_secret
+
+x-app-secrets: &app-secrets
+  - app_key
+  - db_password
+  - anthropic_api_key
+  - telegram_bot_token
+  - telegram_webhook_secret
+
 services:
+  # Borda TLS: Caddy com HTTPS automático (Let's Encrypt). O app NÃO publica
+  # porta — só o proxy fala com a internet. Necessário porque o cookie de
+  # sessão é Secure e o webhook do Telegram exige HTTPS.
+  proxy:
+    image: caddy:2-alpine
+    command: caddy reverse-proxy --from seu-dominio.example --to app:8000
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # Migrations como job de deploy: roda 1× até concluir a cada `stack deploy`
+  # (cria sessions/cache/jobs no primeiro deploy — sem isso o app sobe em 500).
+  # replicated-job com 1 réplica = sem corrida; `--force` porque APP_ENV=production.
+  migrate:
+    image: financeiro-app:prod
+    command: php artisan migrate --force
+    environment:
+      <<: *app-environment
+    secrets: *app-secrets
+    deploy:
+      mode: replicated-job
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
   app:
     image: financeiro-app:prod
     environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
-      APP_TIMEZONE: America/Sao_Paulo
-      APP_URL: https://seu-dominio.example
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_DATABASE: financeiro
-      DB_USERNAME: financeiro
-      QUEUE_CONNECTION: database
-      AI_PROVIDER: anthropic
-      # Segredos resolvidos pelo entrypoint a partir de /run/secrets:
-      APP_KEY_FILE: /run/secrets/app_key
-      DB_PASSWORD_FILE: /run/secrets/db_password
-      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
-      TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
-    secrets:
-      - app_key
-      - db_password
-      - anthropic_api_key
-      - telegram_bot_token
-    ports:
-      - "8000:8000"
+      <<: *app-environment
+    secrets: *app-secrets
+    # Healthcheck de verdade: /up sobe o framework (detecta APP_KEY/DB quebrados),
+    # em vez do endpoint administrativo do FrankenPHP.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/up"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       - postgres
     deploy:
@@ -52,31 +105,16 @@ services:
     image: financeiro-app:prod
     command: sh -c "php artisan schedule:work & exec php artisan queue:work --tries=3 --timeout=120 --sleep=2"
     environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
-      APP_TIMEZONE: America/Sao_Paulo
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_DATABASE: financeiro
-      DB_USERNAME: financeiro
-      QUEUE_CONNECTION: database
-      AI_PROVIDER: anthropic
-      APP_KEY_FILE: /run/secrets/app_key
-      DB_PASSWORD_FILE: /run/secrets/db_password
-      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
-      TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
-    secrets:
-      - app_key
-      - db_password
-      - anthropic_api_key
-      - telegram_bot_token
+      <<: *app-environment
+    secrets: *app-secrets
     # O worker não serve HTTP; desliga o healthcheck herdado da imagem.
     healthcheck:
       disable: true
     depends_on:
       - postgres
     deploy:
-      # Worker escala independente do app.
+      # Worker escala independente do app. schedule:work replicado é seguro:
+      # as tarefas agendadas usam onOneServer() (lock em cache_locks).
       replicas: 2
       restart_policy:
         condition: on-failure
@@ -105,6 +143,10 @@ secrets:
     external: true
   telegram_bot_token:
     external: true
+  telegram_webhook_secret:
+    external: true
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

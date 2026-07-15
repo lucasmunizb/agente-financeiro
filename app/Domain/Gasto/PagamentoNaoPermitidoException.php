@@ -17,4 +17,9 @@ final class PagamentoNaoPermitidoException extends RuntimeException
     {
         return new self('Lançamento em cartão é quitado pela fatura — não é possível marcar a parcela como paga aqui.');
     }
+
+    public static function cancelado(): self
+    {
+        return new self('Lançamento cancelado não pode ter parcela marcada como paga.');
+    }
 }

@@ -228,18 +228,9 @@
         </article>
     </div>
 
-    {{-- Cortesia de latência: habilita "Excluir definitivamente" só quando "EXCLUIR" é digitado.
-         O guard REAL é server-side (ExcluirContaRequest); isto é só UX (regra 7). --}}
-    <script>
-        (function () {
-            const root = document.querySelector('[data-excluir-conta]');
-            if (!root) return;
-            const input = root.querySelector('[data-excluir-input]');
-            const submit = root.querySelector('[data-excluir-submit]');
-            if (!input || !submit) return;
-            const sync = () => { submit.disabled = input.value !== 'EXCLUIR'; };
-            input.addEventListener('input', sync);
-            sync();
-        })();
-    </script>
+    {{-- Cortesia de latência do "Excluir definitivamente": resources/js/pages/configuracoes.js
+         (script inline era bloqueado pela CSP estrita de produção — P3-13). --}}
+    @push('scripts')
+        @vite('resources/js/pages/configuracoes.js')
+    @endpush
 </x-layouts.app>

@@ -45,8 +45,13 @@ class ClassificadorDeIntencao implements Agent, Conversational, HasProviderOptio
      */
     public function classificar(string $texto): Intencao
     {
+        $inicio = microtime(true);
+
         /** @var StructuredAgentResponse $resposta */
         $resposta = $this->prompt($texto);
+
+        // Custo visível para TODOS os agentes, não só a consulta (auditoria P3-1).
+        \App\Domain\IA\Custo\LogDeUsoDeIA::registrar($resposta, \App\Domain\IA\Custo\TipoDeUsoIA::MENSAGEM, inicio: $inicio);
 
         $dados = $resposta->toArray();
 

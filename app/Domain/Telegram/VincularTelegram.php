@@ -109,10 +109,11 @@ final class VincularTelegram
     /** Ativa o pendente: captura identidade, consome o token e garante um ativo por conta. */
     private function ativar(TelegramLink $link, int $telegramUserId, string $telefone, CarbonImmutable $agora): void
     {
-        // Apenas um vínculo ativo por conta.
+        // Apenas um vínculo ativo por conta. O revogado perde o telefone — sem
+        // finalidade para retê-lo (LGPD — minimização, P2-10).
         TelegramLink::where('user_id', $link->user_id)
             ->where('status', TelegramLink::ATIVO)
-            ->update(['status' => TelegramLink::REVOGADO]);
+            ->update(['status' => TelegramLink::REVOGADO, 'telefone' => null]);
 
         $link->update([
             'telegram_user_id' => $telegramUserId,

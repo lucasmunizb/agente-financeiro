@@ -132,6 +132,35 @@ it('despacha como não vinculado quando o telegram_user_id não tem vínculo ati
         ->and($espiao->autenticadoComoUserId)->toBeNull();
 });
 
+/* -------- rate limit (auditoria P1-2) -------- */
+
+it('descarta em silêncio (200, sem rotear) updates acima do limite por remetente', function () {
+    config()->set('ai.limites.telegram_por_minuto', 3);
+    $espiao = espiaoRoteador();
+
+    foreach (range(1, 3) as $i) {
+        postWebhook(update($i, fromId: 777))->assertOk();
+    }
+    expect($espiao->chamadas)->toBe(3);
+
+    // Sempre 200 para o Telegram (senão há reentrega em loop) — mas não roteia.
+    postWebhook(update(4, fromId: 777))->assertOk();
+    expect($espiao->chamadas)->toBe(3);
+});
+
+it('o rate limit é por remetente: outro usuário não é afetado', function () {
+    config()->set('ai.limites.telegram_por_minuto', 2);
+    $espiao = espiaoRoteador();
+
+    foreach (range(1, 3) as $i) {
+        postWebhook(update($i, fromId: 777));
+    }
+
+    postWebhook(update(100, fromId: 888))->assertOk();
+
+    expect($espiao->naoVinculadoTelegramId)->toBe(888);
+});
+
 /* -------- robustez -------- */
 
 it('responde 200 e não roteia quando o update não traz mensagem/remetente', function () {

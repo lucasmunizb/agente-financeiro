@@ -84,7 +84,9 @@ final class ConsultarLancamentos
                 }
 
                 if ($busca !== null) {
-                    $q->where('descricao', 'ilike', '%'.$busca.'%');
+                    // Escapa curingas do texto do usuário (auditoria P3-3); os "%"
+                    // externos (busca parcial) são intencionais.
+                    $q->where('descricao', 'ilike', '%'.\App\Domain\Shared\SqlLike::escapar($busca).'%');
                 }
             })
             ->with(['transaction.categoria', 'transaction.card', 'transaction.paymentMethod', 'status'])

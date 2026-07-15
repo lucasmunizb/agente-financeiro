@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Ai\Agents\AssistenteDeConsulta;
 use App\Ai\Agents\ClassificadorDeIntencao;
 use App\Ai\Agents\ExtratorDeGasto;
-use App\Ai\Agents\RedatorDeResposta;
 use App\Domain\IA\Consulta\ColetorDeConsultas;
 use App\Listeners\LogarFailoverDeIA;
 use App\Models\User;
@@ -37,8 +36,7 @@ it('todos os agentes expõem a lista de failover da config em provider()', funct
     $esperado = config('ai.failover');
 
     expect((new ClassificadorDeIntencao)->provider())->toBe($esperado)
-        ->and((new ExtratorDeGasto)->provider())->toBe($esperado)
-        ->and((new RedatorDeResposta)->provider())->toBe($esperado);
+        ->and((new ExtratorDeGasto)->provider())->toBe($esperado);
 
     $assistente = new AssistenteDeConsulta(User::factory()->make(['id' => 1]), new ColetorDeConsultas);
     expect($assistente->provider())->toBe($esperado);
@@ -50,8 +48,7 @@ it('todos os agentes expõem um timeout curto (da config) para failover rápido'
     $esperado = 7;
 
     expect((new ClassificadorDeIntencao)->timeout())->toBe($esperado)
-        ->and((new ExtratorDeGasto)->timeout())->toBe($esperado)
-        ->and((new RedatorDeResposta)->timeout())->toBe($esperado);
+        ->and((new ExtratorDeGasto)->timeout())->toBe($esperado);
 
     $assistente = new AssistenteDeConsulta(User::factory()->make(['id' => 1]), new ColetorDeConsultas);
     expect($assistente->timeout())->toBe($esperado);

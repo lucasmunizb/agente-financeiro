@@ -28,6 +28,10 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
+            // Consentimento LGPD dado por padrão: o app inteiro exige aceite
+            // (middleware ExigeConsentimentoLgpd); testes do fluxo de onboarding
+            // sobrescrevem com null explicitamente.
+            'aceite_lgpd_em' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];

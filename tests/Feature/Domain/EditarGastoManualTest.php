@@ -140,6 +140,22 @@ it('bloqueia edição quando há parcela já paga', function () {
     (new EditarGastoManual)->confirmar($tx->id, dadosEdit($user, ['valorTotalCents' => 45000]), $hoje);
 })->throws(EdicaoBloqueadaException::class);
 
+it('bloqueia edição de lançamento cancelado (parcelas-zumbi, auditoria P2-2)', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
+    $tx = gastoExistente($user, $hoje);
+    (new \App\Domain\Gasto\CancelarGastoManual)->confirmar($tx->id, $user->id);
+
+    // Regenerar as parcelas de um cancelado as recriaria "abertas" — o gasto
+    // voltaria a contar no Disponível/Consumo com a transação cancelada.
+    expect(fn () => (new EditarGastoManual)->confirmar($tx->id, dadosEdit($user), $hoje))
+        ->toThrow(EdicaoBloqueadaException::class);
+
+    expect(Installment::where('transaction_id', $tx->id)
+        ->where('status_id', StatusPagamento::idFor(StatusPagamento::CANCELADO))
+        ->count())->toBe(3); // parcelas seguem canceladas
+});
+
 it('não edita transaction de outro usuário', function () {
     $user = User::factory()->create();
     $outro = User::factory()->create();

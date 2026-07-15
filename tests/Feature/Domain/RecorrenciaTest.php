@@ -164,6 +164,25 @@ it('é idempotente: rodar de novo no mesmo dia não enfileira outra ocorrência 
         ->and(PendingConfirmation::where('user_id', $user->id)->count())->toBe(1);
 });
 
+it('não materializa 2× quando uma execução concorrente já avançou o ponteiro (corrida)', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-07-09 06:00', 'America/Sao_Paulo');
+    $rec = (new RegistrarRecorrencia)->registrar(dadosRecorrencia($user, ['dia' => 9]), $hoje);
+
+    // Worker B leu a recorrência ANTES de A materializar (leitura defasada).
+    $stale = Recurrence::findOrFail($rec->id);
+
+    (new MaterializarRecorrencias)->paraTodos($hoje); // worker A materializa
+
+    // Worker B processa a leitura defasada: o re-check sob lock deve descartá-la —
+    // sem confirmação duplicada e sem avançar o ponteiro de novo (mês pulado).
+    $materializou = (new MaterializarRecorrencias)->materializarUma($stale, $hoje->startOfDay());
+
+    expect($materializou)->toBeFalse()
+        ->and(PendingConfirmation::where('user_id', $user->id)->count())->toBe(1)
+        ->and($rec->fresh()->proxima_em->format('Y-m-d'))->toBe('2026-08-09');
+});
+
 it('não materializa recorrência com ocorrência no futuro (C10)', function () {
     $user = User::factory()->create();
     $hoje = CarbonImmutable::parse('2026-07-09 06:00', 'America/Sao_Paulo');
@@ -247,6 +266,51 @@ it('sincroniza o molde da recorrência ao propagar "este e os próximos" e recal
         ->and($rec->proxima_em->format('Y-m-d'))->toBe('2026-08-15') // novo dia, mesmo mês
         ->and(AuditLog::where('entidade', 'recurrence')->where('entidade_id', $rec->id)
             ->where('acao', AuditLog::ACAO_EDITAR)->exists())->toBeTrue();
+});
+
+it('não rebaixa o dia 31 do molde ao sincronizar uma ocorrência clampada (fev → 28)', function () {
+    // Regra é "todo dia 31"; fevereiro materializou clampado no dia 28. Editar SÓ o valor
+    // dessa ocorrência ("este e os próximos") não pode reescrever o molde para dia 28.
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create([
+        'descricao' => 'Aluguel', 'valor_cents' => 150000,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'categoria_id' => null, 'dia' => 31, 'proxima_em' => '2026-03-31',
+        'status' => Recurrence::STATUS_ATIVO,
+    ]);
+    $novos = new DadosGastoManual(
+        userId: $user->id, descricao: 'Aluguel', valorTotalCents: 160000,
+        dataCompra: CarbonImmutable::parse('2026-02-28', 'America/Sao_Paulo'), // clamp de fev
+        paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
+    );
+
+    (new SincronizarRecorrencia)->sincronizar($rec, $novos);
+
+    $rec->refresh();
+    expect($rec->valor_cents)->toBe(160000)
+        ->and($rec->dia)->toBe(31) // o molde continua "todo dia 31"
+        ->and($rec->proxima_em->format('Y-m-d'))->toBe('2026-03-31');
+});
+
+it('muda o dia do molde quando a edição escolheu de fato outro dia', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create([
+        'descricao' => 'Aluguel', 'valor_cents' => 150000,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'categoria_id' => null, 'dia' => 31, 'proxima_em' => '2026-03-31',
+        'status' => Recurrence::STATUS_ATIVO,
+    ]);
+    $novos = new DadosGastoManual(
+        userId: $user->id, descricao: 'Aluguel', valorTotalCents: 150000,
+        dataCompra: CarbonImmutable::parse('2026-02-10', 'America/Sao_Paulo'), // dia 10 de verdade
+        paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
+    );
+
+    (new SincronizarRecorrencia)->sincronizar($rec, $novos);
+
+    $rec->refresh();
+    expect($rec->dia)->toBe(10)
+        ->and($rec->proxima_em->format('Y-m-d'))->toBe('2026-03-10');
 });
 
 it('não sincroniza recorrência cancelada (não há futuro a alterar)', function () {

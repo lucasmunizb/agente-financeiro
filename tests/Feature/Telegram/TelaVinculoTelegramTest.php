@@ -56,6 +56,24 @@ it('gerar novo código revoga o anterior e emite outro token', function () {
         ->and(TelegramLink::where('token_hash', hash('sha256', $anterior->token))->where('status', TelegramLink::PENDENTE)->exists())->toBeFalse();
 });
 
+it('desconectar revoga o vínculo e apaga o telefone (minimização — auditoria P2-10)', function () {
+    $user = User::factory()->create();
+    TelegramLink::create([
+        'user_id' => $user->id,
+        'telegram_user_id' => 999001,
+        'telefone' => '+5511999998888',
+        'status' => TelegramLink::ATIVO,
+        'vinculado_em' => now(),
+    ]);
+
+    $this->actingAs($user)->post('/telegram/desconectar');
+
+    $link = TelegramLink::where('user_id', $user->id)->first();
+    expect($link->status)->toBe(TelegramLink::REVOGADO)
+        // Revogado não tem finalidade para reter o telefone (LGPD — minimização).
+        ->and($link->telefone)->toBeNull();
+});
+
 it('mostra o estado vinculado com o telefone mascarado e a opção de desconectar', function () {
     $user = User::factory()->create();
     TelegramLink::create([

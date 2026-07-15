@@ -75,9 +75,10 @@ class TelegramLinkController extends Controller
 
     public function desconectar(Request $request): RedirectResponse
     {
+        // Revogado não tem finalidade para reter o telefone (LGPD — minimização, P2-10).
         TelegramLink::where('user_id', $request->user()->id)
             ->where('status', TelegramLink::ATIVO)
-            ->update(['status' => TelegramLink::REVOGADO]);
+            ->update(['status' => TelegramLink::REVOGADO, 'telefone' => null]);
 
         return redirect()->route('telegram');
     }
@@ -99,7 +100,8 @@ class TelegramLinkController extends Controller
             $valido = TelegramLink::where('user_id', $userId)
                 ->where('status', TelegramLink::PENDENTE)
                 ->where('token_hash', hash('sha256', $token))
-                ->where('token_expira_em', '>', CarbonImmutable::now(RelativeDate::TIMEZONE))
+                // timestamptz: comparar em UTC — o binding serializa a hora local sem offset.
+                ->where('token_expira_em', '>', CarbonImmutable::now('UTC'))
                 ->exists();
 
             if ($valido) {

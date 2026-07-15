@@ -6,6 +6,7 @@ namespace App\Domain\Gastos;
 
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\IA\Guard\PayloadDeResposta;
+use App\Domain\IA\Guard\TextoParaPrompt;
 use App\Domain\Shared\Money;
 use Carbon\CarbonInterface;
 
@@ -67,16 +68,19 @@ final class ResultadoConsultaGastos
         ];
 
         foreach ($this->porCategoria as $linha) {
-            $linhas[] = "- {$linha['nome']}: ".Money::fromCents($linha['cents'])->formatBRL();
+            // Texto do usuário sanitizado antes do prompt (injeção de 2ª ordem, P2-5).
+            $nome = TextoParaPrompt::sanitizar($linha['nome']);
+            $linhas[] = "- {$nome}: ".Money::fromCents($linha['cents'])->formatBRL();
         }
 
         if ($this->itens !== []) {
             $linhas[] = 'lancamentos:';
             foreach ($this->itens as $item) {
+                $descricao = TextoParaPrompt::sanitizar($item['descricao']);
                 $valor = Money::fromCents($item['cents'])->formatBRL();
                 $data = $item['vencimento']->format('d/m/Y');
                 $parcela = $item['parcela'] !== null ? " (parcela {$item['parcela']})" : '';
-                $linhas[] = "- {$item['descricao']}{$parcela}: {$valor} em {$data}";
+                $linhas[] = "- {$descricao}{$parcela}: {$valor} em {$data}";
             }
         }
 

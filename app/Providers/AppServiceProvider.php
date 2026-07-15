@@ -30,8 +30,11 @@ use App\Listeners\CancelarRecorrenciaAoRejeitar;
 use App\Listeners\LogarFailoverDeIA;
 use App\Listeners\PenalizarProvedorNaRotacao;
 use App\Models\ChatMessage;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -106,6 +109,26 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Rate limit das rotas de IA (auditoria P1-2): cada mensagem pode disparar
+        // chamadas a provedor; o teto por usuário protege as cotas/custo. O webhook do
+        // Telegram tem o seu próprio controle (descarte silencioso com 200 — ver
+        // TelegramWebhookController), porque 429 causaria reentrega em loop.
+        RateLimiter::for('ia-web', function (Request $request) {
+            $chave = (string) ($request->user()?->id ?? $request->ip());
+
+            return [
+                Limit::perMinute((int) config('ai.limites.web_por_minuto', 15))->by('ia-web:m:'.$chave),
+                Limit::perDay((int) config('ai.limites.web_por_dia', 300))->by('ia-web:d:'.$chave),
+            ];
+        });
+
+        // Limite por IP nas rotas de autenticação (auditoria P3-7/P3-8): o throttle do
+        // LoginRequest é por (email, IP) — fraco contra password spraying (1 tentativa
+        // em N contas) e não cobre o registro (enumeração de e-mail).
+        RateLimiter::for('auth', function (Request $request) {
+            return Limit::perMinute(10)->by('auth:'.$request->ip());
+        });
+
         // Registra a indisponibilidade de provedor de IA (failover nativo da SDK).
         Event::listen(AgentFailedOver::class, LogarFailoverDeIA::class);
 

@@ -41,8 +41,9 @@
         </p>
     </div>
 
-    {{-- 3. Histórico (área rolável — ocupa a maior parte da altura). --}}
-    <div id="chat-history" class="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
+    {{-- 3. Histórico (área rolável — ocupa a maior parte da altura). aria-live:
+         leitor de tela anuncia a resposta do assistente quando ela chega (P3-6). --}}
+    <div id="chat-history" aria-live="polite" class="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
         {{-- Estado vazio: some assim que existir a primeira mensagem (JS o esconde). --}}
         <div id="chat-empty" @class(['flex flex-1 flex-col items-center justify-center gap-3 text-center', 'hidden' => $mensagens->isNotEmpty()])>
             <span class="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container text-outline">

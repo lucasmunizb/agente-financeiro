@@ -18,19 +18,13 @@ use App\Models\StatusPagamento;
  */
 final class ConsumoDoMes
 {
-    /** @var list<string> Status que não entram no cálculo (§4.4). */
-    private const STATUS_EXCLUIDOS = [
-        StatusPagamento::PENDENTE_REVISAO,
-        StatusPagamento::CANCELADO,
-        StatusPagamento::ESTORNADO,
-    ];
 
     public function para(int $userId, string $mes): ConsumoMensal
     {
         $periodo = PeriodoMensal::fromString($mes);
 
         $excluidos = StatusPagamento::query()
-            ->whereIn('codigo', self::STATUS_EXCLUIDOS)
+            ->whereIn('codigo', StatusPagamento::EXCLUIDOS)
             ->pluck('id')
             ->all();
 

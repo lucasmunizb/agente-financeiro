@@ -53,17 +53,28 @@
                 </li>
             </ul>
 
-            {{-- Ação destrutiva: desvincular. Confirma antes de gravar (regra 7);
-                 o POST revoga o vínculo ativo no backend. --}}
+            {{-- Ação destrutiva: desvincular. Confirmação em dois passos SEM depender de
+                 JS (regra 7 na borda — auditoria P3-5): o <details> revela o aviso e só
+                 então o POST real fica disponível. --}}
             <div class="mt-10 w-full border-t border-linha pt-6">
-                <form method="POST" action="{{ route('telegram.desconectar') }}">
-                    @csrf
-                    <button type="submit" data-confirm="Desconectar o Telegram? Você deixará de registrar gastos pelo chat."
-                        class="flex w-full items-center justify-center gap-2 rounded-lg border border-argila py-3 px-4 font-body-md text-body-md font-semibold text-argila transition-colors hover:bg-argila/10 active:scale-[0.98]">
+                <details class="group">
+                    <summary class="flex w-full cursor-pointer list-none items-center justify-center gap-2 rounded-lg border border-argila py-3 px-4 font-body-md text-body-md font-semibold text-argila transition-colors hover:bg-argila/10 active:scale-[0.98] [&::-webkit-details-marker]:hidden">
                         <x-icon name="unlink" class="h-5 w-5" />
                         Desconectar Telegram
-                    </button>
-                </form>
+                    </summary>
+                    <div class="mt-4 space-y-4 rounded-lg border border-argila/30 bg-argila/5 p-4 text-left">
+                        <p class="font-body-sm text-body-sm text-on-surface-variant">
+                            Desconectar o Telegram? Você deixará de registrar gastos pelo chat.
+                        </p>
+                        <form method="POST" action="{{ route('telegram.desconectar') }}">
+                            @csrf
+                            <button type="submit"
+                                class="flex w-full items-center justify-center gap-2 rounded-lg bg-argila py-3 px-4 font-body-md text-body-md font-semibold text-white transition-colors hover:bg-argila/90 active:scale-[0.98]">
+                                Sim, desconectar
+                            </button>
+                        </form>
+                    </div>
+                </details>
             </div>
         </section>
     @else

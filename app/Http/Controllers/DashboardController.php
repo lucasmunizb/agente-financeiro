@@ -72,6 +72,10 @@ class DashboardController extends Controller
             $dados['vm'] = $this->viewModel($userId, $ancora, $hoje, $ehMesAtual, $resumoDoMes);
         } else {
             $dados['mesLabel'] = $this->rotuloMes($ancora);
+            // Navegação por competência também no estado vazio (auditoria P2-15):
+            // as setas eram botões mortos.
+            $dados['mesAnterior'] = $ancora->subMonthNoOverflow()->format('Y-m');
+            $dados['mesSeguinte'] = $ancora->addMonthNoOverflow()->format('Y-m');
         }
 
         return view('home', $dados);

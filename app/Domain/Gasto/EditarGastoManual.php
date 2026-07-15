@@ -89,6 +89,14 @@ final class EditarGastoManual
 
     private function garantirEditavel(Transaction $transaction): void
     {
+        // Cancelado não se edita (auditoria P2-2): regenerar as parcelas as recriaria
+        // "abertas" e o gasto voltaria a contar no Disponível com a transação cancelada.
+        $cancelado = StatusPagamento::idFor(StatusPagamento::CANCELADO);
+
+        if ($transaction->status_id === $cancelado) {
+            throw EdicaoBloqueadaException::cancelado();
+        }
+
         $finalizadas = StatusPagamento::query()
             ->whereIn('codigo', self::FINALIZADAS)
             ->pluck('id')

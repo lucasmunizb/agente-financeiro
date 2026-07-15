@@ -41,6 +41,26 @@ it('exporta os dados estruturados do próprio usuário e audita', function () {
         ->exists())->toBeTrue();
 });
 
+it('inclui o histórico de chat do titular (portabilidade completa — auditoria P2-10)', function () {
+    $user = User::factory()->create();
+    \App\Models\ChatMessage::factory()->for($user)->create(['body' => 'quanto gastei em junho?']);
+
+    $export = (new ExportarDadosDoUsuario)->exportar($user->id);
+
+    expect($export)->toHaveKey('chat')
+        ->and(json_encode($export, JSON_UNESCAPED_UNICODE))->toContain('quanto gastei em junho?');
+});
+
+it('nunca inclui chat de outro usuário', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+    \App\Models\ChatMessage::factory()->for($outro)->create(['body' => 'mensagem alheia sigilosa']);
+
+    $json = json_encode((new ExportarDadosDoUsuario)->exportar($user->id), JSON_UNESCAPED_UNICODE);
+
+    expect($json)->not->toContain('mensagem alheia sigilosa');
+});
+
 it('nunca inclui dados de outro usuário', function () {
     $user = User::factory()->create();
     $outro = User::factory()->create(['email' => 'terceiro@exemplo.com']);

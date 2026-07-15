@@ -54,8 +54,10 @@ final class Money
             // Vírgula = decimal; pontos são separadores de milhar.
             $clean = str_replace('.', '', $clean);
             $clean = str_replace(',', '.', $clean);
-        } else {
-            // Sem vírgula: ponto é tratado como milhar (pt-BR canônico).
+        } elseif (! preg_match('/^\d+\.\d{1,2}$/', $clean)) {
+            // Sem vírgula: ponto é milhar ("1.500") — EXCETO um único ponto com
+            // 1–2 casas no fim ("10.50" digitado à americana), que é decimal;
+            // sem isso "10.50" viraria R$ 1.050,00 (erro de 100×).
             $clean = str_replace('.', '', $clean);
         }
 

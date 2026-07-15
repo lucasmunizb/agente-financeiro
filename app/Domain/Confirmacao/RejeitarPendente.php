@@ -35,7 +35,8 @@ final class RejeitarPendente
 
             $pendente->update([
                 'status' => PendingConfirmation::STATUS_REJEITADO,
-                'resolvido_em' => $agora,
+                // timestamptz: converter a UTC antes de gravar, senão o instante corrompe.
+                'resolvido_em' => $agora->setTimezone('UTC'),
             ]);
 
             AuditLog::create([

@@ -32,7 +32,8 @@ final class EnfileirarConfirmacao
             'tipo' => PendingConfirmation::TIPO_GASTO,
             'payload' => PayloadDoGasto::paraArray($dados),
             'status' => PendingConfirmation::STATUS_PENDENTE,
-            'expira_em' => $expiraEm,
+            // timestamptz: converter a UTC antes de gravar, senão o instante corrompe.
+            'expira_em' => $expiraEm?->setTimezone('UTC'),
             'recurrence_id' => $dados->recurrenceId,
         ]);
     }

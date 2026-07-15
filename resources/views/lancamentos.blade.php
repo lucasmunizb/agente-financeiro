@@ -60,7 +60,7 @@
                 </label>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <select name="categoria" onchange="this.form.submit()"
+                    <select name="categoria"
                         class="h-11 rounded-control border border-linha bg-superficie px-3 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
                         {{-- value criptografado (token opaco): o id real NUNCA vai na query
                              (README §"Identificadores nas URLs"). @selected compara o id já
@@ -71,7 +71,7 @@
                         @endforeach
                     </select>
 
-                    <select name="forma" onchange="this.form.submit()"
+                    <select name="forma"
                         class="h-11 rounded-control border border-linha bg-superficie px-3 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
                         <option value="">Forma</option>
                         @foreach ($formas as $tipo => $label)
@@ -80,7 +80,7 @@
                     </select>
 
                     @if ($cartoes->isNotEmpty())
-                        <select name="cartao" onchange="this.form.submit()"
+                        <select name="cartao"
                             class="h-11 rounded-control border border-linha bg-superficie px-3 font-body-sm text-body-sm text-on-surface-variant outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary">
                             <option value="">Cartão</option>
                             @foreach ($cartoes as $cartao)

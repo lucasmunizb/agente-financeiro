@@ -37,7 +37,18 @@ final class SincronizarRecorrencia
         }
 
         return DB::transaction(function () use ($rec, $novos): bool {
-            $dia = $novos->dataCompra->day;
+            // O dia do molde só muda quando o usuário escolheu DE FATO outro dia. Se o dia
+            // da ocorrência editada é exatamente o clamp do dia do molde naquele mês (regra
+            // "dia 31" materializada em 28/fev), a data não foi alterada pelo usuário — o
+            // molde continua "todo dia 31" (auditoria P2-1).
+            $diaClampadoDoMolde = OcorrenciaMensal::aPartirDe(
+                $rec->dia,
+                $novos->dataCompra->startOfMonth(),
+            )->day;
+
+            $dia = $novos->dataCompra->day === $diaClampadoDoMolde
+                ? $rec->dia
+                : $novos->dataCompra->day;
 
             $antes = [
                 'descricao' => $rec->descricao,

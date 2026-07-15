@@ -15,6 +15,7 @@ export default defineConfig({
                 'resources/js/pages/registrar-gasto.js',
                 'resources/js/pages/categorias.js',
                 'resources/js/pages/chat.js',
+                'resources/js/pages/configuracoes.js',
             ],
             refresh: true,
         }),

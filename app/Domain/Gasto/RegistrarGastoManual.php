@@ -132,15 +132,20 @@ final class RegistrarGastoManual
             $dados->parcelas,
         );
 
+        // Pré-filtra em SQL por valor+data (componentes exatos da chave): carregar TODO o
+        // histórico em memória a cada prévia cresce sem limite (auditoria P2-4). A descrição
+        // normalizada e o nº de parcelas seguem comparados via ChaveDeDuplicidade.
         $existentes = Transaction::query()
             ->where('user_id', $dados->userId)
-            ->with('installments')
+            ->where('valor_total_cents', $dados->valorTotalCents)
+            ->whereDate('data_compra', $dados->dataCompra->toDateString())
+            ->withCount('installments')
             ->get()
             ->map(fn (Transaction $tx) => ChaveDeDuplicidade::de(
                 $tx->valor_total_cents,
                 $tx->descricao,
                 CarbonImmutable::parse($tx->data_compra->toDateString(), RelativeDate::TIMEZONE),
-                $tx->installments->count(),
+                $tx->installments_count,
             ))
             ->all();
 

@@ -24,12 +24,6 @@ use App\Models\StatusPagamento;
  */
 final class ConsultarDisponivelDoMes
 {
-    /** @var list<string> Status que não entram no cálculo (§4.4), espelha {@see ConsumoDoMes}. */
-    private const STATUS_EXCLUIDOS = [
-        StatusPagamento::PENDENTE_REVISAO,
-        StatusPagamento::CANCELADO,
-        StatusPagamento::ESTORNADO,
-    ];
 
     public function __construct(
         private readonly ReceitasDoMes $receitas,
@@ -80,7 +74,7 @@ final class ConsultarDisponivelDoMes
     private function contarParcelas(int $userId, PeriodoMensal $periodo): int
     {
         $excluidos = StatusPagamento::query()
-            ->whereIn('codigo', self::STATUS_EXCLUIDOS)
+            ->whereIn('codigo', StatusPagamento::EXCLUIDOS)
             ->pluck('id')
             ->all();
 

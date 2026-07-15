@@ -46,6 +46,23 @@ it('completa um único dígito decimal (vírgula) corretamente', function () {
     expect(Money::fromHuman('35,5')->cents())->toBe(3550);
 });
 
+it('interpreta "10.50" (ponto com 2 casas, sem vírgula) como decimal — 1050 centavos', function () {
+    // "gastei 10.50 no uber" não pode virar R$ 1.050,00 (erro de 100×, auditoria P2-3).
+    expect(Money::fromHuman('10.50')->cents())->toBe(1050);
+});
+
+it('interpreta "10.5" (ponto com 1 casa) como decimal — 1050 centavos', function () {
+    expect(Money::fromHuman('10.5')->cents())->toBe(1050);
+});
+
+it('mantém "1.500" (ponto com 3 casas) como milhar — 150000 centavos', function () {
+    expect(Money::fromHuman('1.500')->cents())->toBe(150000);
+});
+
+it('mantém "1.500.000" como milhar composto', function () {
+    expect(Money::fromHuman('1.500.000')->cents())->toBe(150000000);
+});
+
 it('rejeita texto sem nenhum número', function () {
     Money::fromHuman('sem valor');
 })->throws(InvalidArgumentException::class);

@@ -168,12 +168,21 @@ function initGastoForm(root) {
     });
 
     /* ---- Erros ----------------------------------------------------------- */
+    // Acessibilidade (P2-8): os <p data-rg-error> têm role="alert" no Blade (anunciados
+    // ao aparecer); aqui ligamos aria-invalid + aria-describedby no input correspondente.
     function limparErros() {
         root.querySelectorAll('[data-rg-error]').forEach((el) => (el.hidden = true));
         root.querySelectorAll('.border-argila').forEach((el) => el.classList.remove('border-argila', 'focus:border-argila'));
+        root.querySelectorAll('[aria-invalid="true"]').forEach((el) => {
+            el.removeAttribute('aria-invalid');
+            el.removeAttribute('aria-describedby');
+        });
     }
     function esconderErro(campo) {
         root.querySelector(`[data-rg-error="${campo}"]`)?.setAttribute('hidden', '');
+        const input = root.querySelector(`#rg-${campo}`);
+        input?.removeAttribute('aria-invalid');
+        input?.removeAttribute('aria-describedby');
     }
     function mostrarErros(errors) {
         const geral = [];
@@ -186,7 +195,12 @@ function initGastoForm(root) {
                     el.hidden = false;
                 }
                 // Realça o input do campo, quando ele existe (categoria é chips, sem input — no-op).
-                root.querySelector(`#rg-${campo}`)?.classList.add('border-argila', 'focus:border-argila');
+                const input = root.querySelector(`#rg-${campo}`);
+                if (input) {
+                    input.classList.add('border-argila', 'focus:border-argila');
+                    input.setAttribute('aria-invalid', 'true');
+                    if (el?.id) input.setAttribute('aria-describedby', el.id);
+                }
             } else {
                 geral.push(msg);
             }
@@ -343,26 +357,62 @@ if (modal) {
     const card = modal.querySelector('[role="dialog"]');
     let ultimoFoco = null;
 
+    // Fundo inerte enquanto o modal está aberto (P2-6): Tab/leitor de tela não
+    // escapam para o conteúdo por trás. `inert` em todos os irmãos do modal.
+    function alternarFundoInerte(ativo) {
+        [...document.body.children].forEach((el) => {
+            if (el === modal || el.contains(modal)) return;
+            if (ativo) el.setAttribute('inert', '');
+            else el.removeAttribute('inert');
+        });
+    }
+
     function abrir() {
         ultimoFoco = document.activeElement;
         modal.hidden = false;
         document.body.classList.add('overflow-hidden', 'modal-aberto');
+        alternarFundoInerte(true);
         api?.mostrarPainel('form');
         modal.querySelector('#rg-descricao')?.focus({ preventScroll: true });
     }
     function fechar() {
+        alternarFundoInerte(false);
         fecharModal(root);
         api?.setSalvandoReview(false);
         if (ultimoFoco instanceof HTMLElement) ultimoFoco.focus({ preventScroll: true });
     }
+
+    // Focus trap (P2-6): reforço para navegadores/ATs sem suporte pleno a inert —
+    // Tab/Shift+Tab circulam apenas entre os focáveis visíveis do diálogo.
+    modal.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab') return;
+        const focaveis = [...card.querySelectorAll(
+            'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        )].filter((el) => el.offsetParent !== null);
+        if (focaveis.length === 0) return;
+        const primeiro = focaveis[0];
+        const ultimo = focaveis[focaveis.length - 1];
+        if (e.shiftKey && document.activeElement === primeiro) {
+            e.preventDefault();
+            ultimo.focus();
+        } else if (!e.shiftKey && document.activeElement === ultimo) {
+            e.preventDefault();
+            primeiro.focus();
+        }
+    });
 
     document.querySelectorAll('[data-rg-open]').forEach((b) => b.addEventListener('click', abrir));
     modal.querySelectorAll('[data-rg-close]').forEach((el) => el.addEventListener('click', fechar));
     modal.addEventListener('mousedown', (e) => {
         if (!card.contains(e.target)) fechar();
     });
+    // preventDefault sinaliza aos demais overlays (notificações, chat) que este Esc
+    // já foi consumido — um Esc fecha UMA camada por vez (P3-6).
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !modal.hidden) fechar();
+        if (e.key === 'Escape' && !e.defaultPrevented && !modal.hidden) {
+            e.preventDefault();
+            fechar();
+        }
     });
 
     // Afordância de revisão: ?modal=aberto|erro|salvando

@@ -9,9 +9,14 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Expurgo diário do histórico de conversa com mais de 60 dias (doc 02 §3.6).
-Schedule::command('ai:expurgar-conversas')->dailyAt('03:30');
+// onOneServer: o worker roda replicado no Swarm; o lock (cache_locks) garante 1 execução.
+Schedule::command('ai:expurgar-conversas')->dailyAt('03:30')
+    ->onOneServer()
+    ->withoutOverlapping();
 
 // Materialização diária das recorrências mensais vencíveis: enfileira 1 confirmação por
 // recorrência no seu dia (spec 10, regra 7 — nada grava sozinho). Diário porque cada
 // recorrência tem seu próprio dia-do-mês; o ponteiro `proxima_em` torna a operação idempotente.
-Schedule::command('recorrencia:materializar')->dailyAt('06:00');
+Schedule::command('recorrencia:materializar')->dailyAt('06:00')
+    ->onOneServer()
+    ->withoutOverlapping();

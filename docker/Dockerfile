@@ -48,7 +48,16 @@ CMD ["frankenphp", "run", "-c", "/etc/caddy/Caddyfile"]
 # ---------------------------------------------------------------------
 FROM base AS prod
 
+# Tuning de opcache só em prod (validate_timestamps=0 quebraria o bind-mount de dev).
+COPY docker/php-prod.ini /usr/local/etc/php/conf.d/zz-prod.ini
+
 COPY . /app
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
     && rm -rf /app/.env \
-    && chown -R www-data:www-data /app/storage /app/bootstrap/cache
+    # /data e /config são do Caddy (XDG_* na imagem FrankenPHP); precisam ser
+    # graváveis pelo usuário não-root.
+    && chown -R www-data:www-data /app/storage /app/bootstrap/cache /data /config
+
+# Rootless: RCE via PDF malicioso (poppler/tesseract) não pode virar root no
+# contêiner. Porta 8000 é não-privilegiada, então não precisa de setcap.
+USER www-data

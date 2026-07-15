@@ -19,15 +19,30 @@ use App\Http\Controllers\ReceitaController;
 use App\Http\Controllers\RecorrenciaController;
 use App\Http\Controllers\TelegramLinkController;
 use App\Http\Controllers\TelegramWebhookController;
+use App\Http\Middleware\ExigeConsentimentoLgpd;
 use App\Http\Middleware\VerificaSegredoTelegram;
 use Illuminate\Support\Facades\Route;
 
 // -------------------------------------------------------------------------
-// App (exige login). Todo o app fica atrás de autenticação de sessão: quem
-// não estiver logado é redirecionado automaticamente para /login (padrão do
-// Laravel → route('login')). Novas rotas da aplicação entram neste grupo.
+// Onboarding + logout: exigem login, mas NÃO o consentimento (é aqui que ele
+// é dado; logout precisa funcionar sempre).
 // -------------------------------------------------------------------------
 Route::middleware('auth')->group(function () {
+    // Onboarding + consentimento LGPD. O usuário chega aqui já autenticado
+    // (logo após criar a conta); persistir o aceite (aceite_lgpd_em) é backend.
+    Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
+    Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.consent');
+
+    Route::post('/logout', LogoutController::class)->name('logout');
+});
+
+// -------------------------------------------------------------------------
+// App (exige login E consentimento LGPD — auditoria P1-7). Todo o app fica
+// atrás de autenticação de sessão: quem não estiver logado é redirecionado
+// automaticamente para /login (padrão do Laravel → route('login')); quem não
+// consentiu ainda vai para o onboarding. Novas rotas entram neste grupo.
+// -------------------------------------------------------------------------
+Route::middleware(['auth', ExigeConsentimentoLgpd::class])->group(function () {
     // Dashboard ("Visão Geral") — destino do login. Apresentação com DADOS FAKE
     // (regra 3); a integração com o backend (spec-06) vem depois. O estado da tela
     // (pronto | vazio | carregando) hoje sai da query (?estado=…) só para revisar
@@ -135,12 +150,11 @@ Route::middleware('auth')->group(function () {
     // index devolve o histórico do próprio usuário; store envia a pergunta (ou um PDF,
     // validado por MIME real e descartado — regra 6) e devolve a resposta com fontes.
     Route::get('/chat/mensagens', [ChatController::class, 'index'])->name('chat.index');
-    Route::post('/chat/mensagens', [ChatController::class, 'store'])->name('chat.store');
-
-    // Onboarding + consentimento LGPD. O usuário chega aqui já autenticado
-    // (logo após criar a conta); persistir o aceite (aceite_lgpd_em) é backend.
-    Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
-    Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.consent');
+    // throttle:ia-web (auditoria P1-2): teto por usuário — cada mensagem pode custar
+    // chamadas de IA; sem limite, um loop esgota as cotas dos provedores.
+    Route::post('/chat/mensagens', [ChatController::class, 'store'])
+        ->middleware('throttle:ia-web')
+        ->name('chat.store');
 
     // Vínculo com o Telegram (doc 06 §1). show exibe o código de uso único;
     // gerar emite um novo; desconectar revoga o vínculo ativo. O consumo do
@@ -155,8 +169,6 @@ Route::middleware('auth')->group(function () {
     Route::put('/configuracoes/senha', [ConfiguracoesController::class, 'alterarSenha'])->name('configuracoes.senha');
     Route::get('/configuracoes/exportar', [ConfiguracoesController::class, 'exportar'])->name('configuracoes.exportar');
     Route::delete('/configuracoes/conta', [ConfiguracoesController::class, 'excluirConta'])->name('configuracoes.excluir');
-
-    Route::post('/logout', LogoutController::class)->name('logout');
 });
 
 // -------------------------------------------------------------------------
@@ -167,10 +179,17 @@ Route::middleware('auth')->group(function () {
 // -------------------------------------------------------------------------
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
-    Route::post('/login', [LoginController::class, 'store'])->name('login.attempt');
+    // throttle:auth (P3-8): limite POR IP contra password spraying — complementa o
+    // throttle por (email, IP) do LoginRequest.
+    Route::post('/login', [LoginController::class, 'store'])
+        ->middleware('throttle:auth')
+        ->name('login.attempt');
 
     Route::get('/criar-conta', [RegisterController::class, 'create'])->name('register');
-    Route::post('/criar-conta', [RegisterController::class, 'store'])->name('register.attempt');
+    // throttle:auth (P3-7): dificulta enumeração de contas pela mensagem de e-mail já usado.
+    Route::post('/criar-conta', [RegisterController::class, 'store'])
+        ->middleware('throttle:auth')
+        ->name('register.attempt');
 });
 
 // -------------------------------------------------------------------------

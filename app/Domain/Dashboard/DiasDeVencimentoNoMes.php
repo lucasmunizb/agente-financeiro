@@ -20,12 +20,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class DiasDeVencimentoNoMes
 {
-    /** @var list<string> Status que não geram tick (espelha as demais consultas, §4.4). */
-    private const STATUS_EXCLUIDOS = [
-        StatusPagamento::PENDENTE_REVISAO,
-        StatusPagamento::CANCELADO,
-        StatusPagamento::ESTORNADO,
-    ];
 
     /**
      * @return list<int> dias (1..31) com vencimento, únicos e em ordem crescente
@@ -35,7 +29,7 @@ final class DiasDeVencimentoNoMes
         $periodo = PeriodoMensal::fromString($mes);
 
         $excluidos = StatusPagamento::query()
-            ->whereIn('codigo', self::STATUS_EXCLUIDOS)
+            ->whereIn('codigo', StatusPagamento::EXCLUIDOS)
             ->pluck('id')
             ->all();
 

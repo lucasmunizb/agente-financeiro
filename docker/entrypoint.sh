@@ -30,4 +30,13 @@ if [ -d /app ]; then
 		/app/bootstrap/cache 2>/dev/null || true
 fi
 
+# Produção: cacheia config/rotas/views AGORA, depois de resolver os segredos.
+# Em runtime (não na imagem — regra 10: config:cache no build embutiria segredos;
+# aqui o cache fica só no filesystem efêmero do contêiner).
+if [ "${APP_ENV:-}" = "production" ] && [ -f /app/artisan ]; then
+	php /app/artisan config:cache --quiet || true
+	php /app/artisan route:cache --quiet || true
+	php /app/artisan view:cache --quiet || true
+fi
+
 exec "$@"

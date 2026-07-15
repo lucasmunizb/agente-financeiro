@@ -67,7 +67,7 @@ it('lista só os pendentes do usuário, excluindo resolvidos e expirados', funct
     (new EnfileirarConfirmacao)->enfileirar(dadosPendente($user, 2000, 'Spotify'), PendingConfirmation::ORIGEM_RECORRENCIA);
     PendingConfirmation::factory()->for($user)->confirmado()->create();
     PendingConfirmation::factory()->for($user)->rejeitado()->create();
-    PendingConfirmation::factory()->for($user)->expirado()->create();
+    PendingConfirmation::factory()->for($user)->expirado($agora)->create();
 
     $lista = (new ConsultarPendentes)->para($user->id, $agora);
 
@@ -155,6 +155,56 @@ it('rejeita: marca rejeitado e audita, sem criar lançamento', function () {
         ->and(Transaction::where('user_id', $user->id)->count())->toBe(0)
         ->and(AuditLog::where('entidade', 'pending_confirmation')->where('entidade_id', $pendente->id)
             ->where('acao', AuditLog::ACAO_REJEITAR)->exists())->toBeTrue();
+});
+
+/*
+ * Fuso em timestamptz (auditoria P1-6): datetime construído em America/Sao_Paulo precisa
+ * ser convertido a UTC na GRAVAÇÃO e na COMPARAÇÃO SQL, senão o instante corrompe em 3h
+ * (o cast serializa a hora local sem offset e o Postgres lê como UTC).
+ */
+
+it('preserva o instante de resolvido_em ao confirmar (fuso SP → UTC)', function () {
+    $user = User::factory()->create();
+    $agora = CarbonImmutable::parse('2026-07-09 10:00', 'America/Sao_Paulo');
+    $pendente = (new EnfileirarConfirmacao)->enfileirar(dadosPendente($user), PendingConfirmation::ORIGEM_RECORRENCIA);
+
+    (new ConfirmarPendente)->confirmar($pendente->id, $user->id, $agora);
+
+    expect($pendente->fresh()->resolvido_em->equalTo($agora))->toBeTrue();
+});
+
+it('preserva o instante de resolvido_em ao rejeitar (fuso SP → UTC)', function () {
+    $user = User::factory()->create();
+    $agora = CarbonImmutable::parse('2026-07-09 10:00', 'America/Sao_Paulo');
+    $pendente = (new EnfileirarConfirmacao)->enfileirar(dadosPendente($user), PendingConfirmation::ORIGEM_RECORRENCIA);
+
+    (new RejeitarPendente)->rejeitar($pendente->id, $user->id, $agora);
+
+    expect($pendente->fresh()->resolvido_em->equalTo($agora))->toBeTrue();
+});
+
+it('preserva o instante do TTL gravado no enfileirar (fuso SP → UTC)', function () {
+    $user = User::factory()->create();
+    $expiraEm = CarbonImmutable::parse('2026-07-09 12:00', 'America/Sao_Paulo');
+
+    $pendente = (new EnfileirarConfirmacao)
+        ->enfileirar(dadosPendente($user), PendingConfirmation::ORIGEM_RECORRENCIA, $expiraEm);
+
+    expect($pendente->fresh()->expira_em->equalTo($expiraEm))->toBeTrue();
+});
+
+it('exclui da lista pendente expirado dentro da janela de 3h do fuso', function () {
+    $user = User::factory()->create();
+    // Agora = 10:00 SP (13:00 UTC). TTL venceu às 08:00 SP (11:00 UTC): já expirou.
+    // Comparação ingênua com a hora local ("11:00 > 10:00") listaria o item.
+    $agora = CarbonImmutable::parse('2026-07-09 10:00', 'America/Sao_Paulo');
+    PendingConfirmation::factory()->for($user)->create([
+        'expira_em' => CarbonImmutable::parse('2026-07-09 08:00', 'America/Sao_Paulo')->setTimezone('UTC'),
+    ]);
+
+    $lista = (new ConsultarPendentes)->para($user->id, $agora);
+
+    expect($lista)->toHaveCount(0);
 });
 
 it('não rejeita pendente de outro usuário', function () {

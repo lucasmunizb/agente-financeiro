@@ -6,6 +6,7 @@ namespace App\Domain\ProximasContas;
 
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\IA\Guard\PayloadDeResposta;
+use App\Domain\IA\Guard\TextoParaPrompt;
 use App\Domain\Shared\Money;
 use Carbon\CarbonImmutable;
 
@@ -59,8 +60,10 @@ final class ResultadoConsultaProximasContas
         ];
 
         foreach ($this->contas as $conta) {
+            // Texto do usuário sanitizado antes do prompt (injeção de 2ª ordem, P2-5).
+            $descricao = TextoParaPrompt::sanitizar($conta['descricao']);
             $vencimento = CarbonImmutable::parse($conta['vencimento'])->format('d/m/Y');
-            $linhas[] = "- {$conta['descricao']} (vence {$vencimento}): ".Money::fromCents($conta['cents'])->formatBRL();
+            $linhas[] = "- {$descricao} (vence {$vencimento}): ".Money::fromCents($conta['cents'])->formatBRL();
         }
 
         $linhas[] = $this->trace->resumo();

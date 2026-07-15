@@ -192,6 +192,22 @@ it('lista uma fatura por cartão do usuário, inclusive a de total zero (decisã
         ->and($totais)->toBe([0, 90000]);
 });
 
+it('distingue as faturas de dois cartões com o MESMO final_4 (resolve por id)', function () {
+    $user = User::factory()->create();
+    $nubank = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+    $inter = Card::factory()->for($user)->create(['descricao' => 'Inter', 'final_4' => '1234']);
+
+    resumoParcela($user, 10000, '2026-06-20', $nubank);
+    resumoParcela($user, 25000, '2026-06-20', $inter);
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP());
+
+    $porDescricao = collect($resumo->faturas)->keyBy('cartaoDescricao');
+    expect($resumo->faturas)->toHaveCount(2)
+        ->and($porDescricao->get('Nubank')?->totalCents)->toBe(10000)
+        ->and($porDescricao->get('Inter')?->totalCents)->toBe(25000);
+});
+
 it('ignora cartões excluídos (soft delete) na lista de faturas', function () {
     $user = User::factory()->create();
     Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);

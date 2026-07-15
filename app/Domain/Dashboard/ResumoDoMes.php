@@ -73,13 +73,14 @@ final class ResumoDoMes
         $proximasContas = $this->mesclarPrevistas($proximasContas, $previsao);
         $disponivel = $this->abaterPrevistas($disponivel, $previsao);
 
-        // Uma fatura por cartão ativo do usuário (escopo por user_id). Resolve pelo final_4
-        // — o mais específico — e mantém os de total 0 (decisão §10).
+        // Uma fatura por cartão ativo do usuário (escopo por user_id). Resolve pelo ID do
+        // cartão já em mãos — final_4 não é único (dois cartões podem repetir o final) —
+        // e mantém os de total 0 (decisão §10).
         $faturas = Card::query()
             ->where('user_id', $userId)
             ->orderBy('id')
             ->get()
-            ->map(fn (Card $card) => $this->faturaCartao->para($userId, $card->final_4, $mes))
+            ->map(fn (Card $card) => $this->faturaCartao->paraCartao($userId, $card, $mes))
             ->values()
             ->all();
 

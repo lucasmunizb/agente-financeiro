@@ -27,7 +27,10 @@
     @if ($estado === 'carregando')
         <x-dashboard.loading />
     @elseif ($estado === 'vazio')
-        <x-dashboard.empty-state :month-label="$mesLabel" />
+        <x-dashboard.empty-state
+            :month-label="$mesLabel"
+            :prev-url="isset($mesAnterior) ? route('home', ['mes' => $mesAnterior]) : null"
+            :next-url="isset($mesSeguinte) ? route('home', ['mes' => $mesSeguinte]) : null" />
     @else
     <div class="w-full space-y-gutter">
         {{-- Elemento-assinatura: a régua do mês. --}}

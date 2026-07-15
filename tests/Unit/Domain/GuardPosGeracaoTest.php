@@ -138,6 +138,157 @@ it('bloqueia data que não existe no payload e a reporta', function () {
         ->and($resultado->datasDivergentes)->toContain('15/08/2026');
 });
 
+/* -------- Formatos coloquiais — bypasses da auditoria P1-1 -------- */
+
+it('bloqueia "1500 reais" divergente (dígitos com sufixo por extenso)', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Você gastou 1500 reais este mês.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('aprova "1500 reais" quando o valor existe no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Você gastou 1500 reais este mês.',
+        payload(valoresEmCentavos: [150000]),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('bloqueia "1 real" divergente', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Sobrou 1 real na conta.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('valida "R$ 35,9" (um dígito decimal) como 35,90 — não como 35,00', function () {
+    // Com payload contendo só 3500, "R$ 35,9" (=3590) tem de reprovar.
+    $resultado = (new GuardPosGeracao)->validar(
+        'Foram R$ 35,9 na farmácia.',
+        payload(valoresEmCentavos: [3500]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+
+    $aprovado = (new GuardPosGeracao)->validar(
+        'Foram R$ 35,9 na farmácia.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($aprovado->aprovado)->toBeTrue();
+});
+
+it('bloqueia "R$ 1500" (sem centavos e sem ponto de milhar) divergente', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Sua fatura fechou em R$ 1500.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('aprova "R$ 1500" quando 150000 centavos está no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Sua fatura fechou em R$ 1500.',
+        payload(valoresEmCentavos: [150000]),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('bloqueia valor por extenso "mil e quinhentos reais" divergente', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Você gastou mil e quinhentos reais este mês.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('aprova valor por extenso quando o número existe no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Você gastou mil e quinhentos reais este mês.',
+        payload(valoresEmCentavos: [150000]),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('valida "dois reais e cinquenta centavos" como 250 centavos', function () {
+    $reprova = (new GuardPosGeracao)->validar(
+        'O café custou dois reais e cinquenta centavos.',
+        payload(valoresEmCentavos: [200]),
+    );
+
+    $aprova = (new GuardPosGeracao)->validar(
+        'O café custou dois reais e cinquenta centavos.',
+        payload(valoresEmCentavos: [250]),
+    );
+
+    expect($reprova->aprovado)->toBeFalse()
+        ->and($aprova->aprovado)->toBeTrue();
+});
+
+it('valida "cinquenta centavos" isolado como 50 centavos', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Faltaram cinquenta centavos.',
+        payload(valoresEmCentavos: [3590]),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('não inventa valor a partir de "reais" sem número ("vários reais")', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Foram vários reais economizados.',
+        payload(),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('bloqueia data por extenso "cinco de junho" ausente do payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'A conta vence em cinco de junho.',
+        payload(datasIso: ['2026-07-10']),
+    );
+
+    expect($resultado->aprovado)->toBeFalse();
+});
+
+it('aprova "5 de junho de 2026" presente no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'A conta vence em 5 de junho de 2026.',
+        payload(datasIso: ['2026-06-05']),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('aprova "vinte e cinco de dezembro" presente no payload', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'O vencimento cai em vinte e cinco de dezembro.',
+        payload(datasIso: ['2026-12-25']),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
+it('não trata "depois de junho" como data', function () {
+    $resultado = (new GuardPosGeracao)->validar(
+        'Isso só muda depois de junho.',
+        payload(),
+    );
+
+    expect($resultado->aprovado)->toBeTrue();
+});
+
 it('bloqueia quando valor e data divergem ao mesmo tempo', function () {
     $resultado = (new GuardPosGeracao)->validar(
         'Você gastou R$ 1,00 e vence em 01/01/2030.',

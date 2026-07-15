@@ -27,8 +27,14 @@ if (panel) {
     openBtn?.addEventListener('click', () => setOpen(true));
     closeBtn?.addEventListener('click', () => setOpen(false));
     backdrop?.addEventListener('click', () => setOpen(false));
+    // Só fecha se a folha está de fato aberta e nenhuma camada acima (modal)
+    // consumiu este Esc — um Esc fecha UMA camada por vez (P3-6).
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') setOpen(false);
+        if (e.key !== 'Escape' || e.defaultPrevented) return;
+        if (panel.classList.contains('translate-x-full')) return; // já fechada
+        if (document.body.classList.contains('modal-aberto')) return;
+        e.preventDefault();
+        setOpen(false);
     });
 
     /* ---- Realce dos valores em mono (mesma regra do TextoDoChat no backend). ---- */

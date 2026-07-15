@@ -203,4 +203,22 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Limites de uso (rate limit) das rotas de IA — auditoria P1-2
+    |--------------------------------------------------------------------------
+    |
+    | Cada mensagem (chat web ou Telegram) pode disparar chamadas aos provedores.
+    | Sem teto, um loop de um único usuário esgota as cotas free-tier (nega o
+    | serviço a todos) ou gera custo real. Janelas por usuário/remetente.
+    |
+    */
+
+    'limites' => [
+        'web_por_minuto' => (int) env('AI_LIMITE_WEB_POR_MINUTO', 15),
+        'web_por_dia' => (int) env('AI_LIMITE_WEB_POR_DIA', 300),
+        'telegram_por_minuto' => (int) env('AI_LIMITE_TELEGRAM_POR_MINUTO', 15),
+        'telegram_por_dia' => (int) env('AI_LIMITE_TELEGRAM_POR_DIA', 300),
+    ],
+
 ];
