@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Domain\Recorrencia;
 
 use App\Domain\Calendar\RelativeDate;
+use App\Domain\Shared\Money;
 use App\Models\AuditLog;
+use App\Models\Category;
 use App\Models\PaymentMethod;
 use App\Models\Recurrence;
 use Carbon\CarbonImmutable;
@@ -24,6 +26,35 @@ use InvalidArgumentException;
  */
 final class RegistrarRecorrencia
 {
+    /**
+     * Prévia do molde, para a confirmação (regra 7) — NÃO persiste nada. Resolve forma de
+     * pagamento e categoria em texto aqui, no domínio, para a apresentação não consultar o
+     * banco (mesmo contrato de {@see \App\Domain\Gasto\RegistrarGastoManual::preview()}).
+     */
+    public function preview(DadosRecorrencia $dados): PreviaRecorrencia
+    {
+        return new PreviaRecorrencia(
+            descricao: $dados->descricao,
+            valor: Money::fromCents($dados->valorCents),
+            dia: $dados->dia,
+            formaPagamento: (string) PaymentMethod::whereKey($dados->paymentMethodId)->value('tipo'),
+            categoria: $this->nomeDaCategoria($dados),
+        );
+    }
+
+    /** Escopo estrito por usuário; null quando não há categoria (ou não é do usuário). */
+    private function nomeDaCategoria(DadosRecorrencia $dados): ?string
+    {
+        if ($dados->categoriaId === null) {
+            return null;
+        }
+
+        return Category::query()
+            ->where('id', $dados->categoriaId)
+            ->where('user_id', $dados->userId)
+            ->value('nome');
+    }
+
     public function registrar(
         DadosRecorrencia $dados,
         CarbonImmutable $hoje,

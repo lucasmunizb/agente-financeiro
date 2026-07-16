@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\IA;
 
 use App\Domain\Gasto\RegistrarGastoManual;
+use App\Domain\Recorrencia\RegistrarRecorrencia;
 use Carbon\CarbonImmutable;
 
 /**
@@ -19,6 +20,7 @@ final class PrepararConfirmacaoDeGasto
     public function __construct(
         private readonly NormalizadorDeGastoExtraido $normalizador,
         private readonly RegistrarGastoManual $registrar,
+        private readonly RegistrarRecorrencia $registrarRecorrencia,
     ) {}
 
     public function preparar(GastoExtraido $extraido, int $userId, CarbonImmutable $agora): ConfirmacaoDeGasto
@@ -27,6 +29,16 @@ final class PrepararConfirmacaoDeGasto
 
         if ($resultado->precisaEsclarecer()) {
             return new ConfirmacaoDeGasto(null, null, $resultado->esclarecimentos);
+        }
+
+        // Recorrência (spec 10c): a prévia mostra o MOLDE — não há parcelas a projetar, o
+        // lançamento só nasce quando o materializador enfileirar, no dia (spec 10).
+        if ($resultado->recorrencia !== null) {
+            return new ConfirmacaoDeGasto(
+                null, null, [],
+                recorrencia: $resultado->recorrencia,
+                previaRecorrencia: $this->registrarRecorrencia->preview($resultado->recorrencia),
+            );
         }
 
         $previa = $this->registrar->preview($resultado->dados, $agora);

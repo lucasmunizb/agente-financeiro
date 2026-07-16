@@ -69,3 +69,51 @@ it('converte para o DTO cru de extração quando completo', function () {
         ->and($gasto->dataTexto)->toBe('hoje')
         ->and($gasto->parcelas)->toBe(3);
 });
+
+/*
+ * Recorrência via bot (spec 10c). O dia-do-mês é só mais um slot CRU: a IA copia o número,
+ * o domínio valida e resolve. Precisa sobreviver ao multi-turno — o incidente de produção
+ * (2026-07-16) nasceu de "todo dia 10" não ter para onde ir.
+ */
+
+it('mescla o dia da recorrência preservando-o entre turnos (C12 da spec 10c)', function () {
+    // 1º turno: o usuário disse o que repete e quando, mas não o valor nem a forma.
+    $acumulado = new GastoParcial(
+        descricao: 'ingles carol', valorTexto: null, formaPagamento: null,
+        cartao: null, categoria: 'estudos', dataTexto: null, parcelas: null,
+        recorrenciaDiaTexto: '10',
+    );
+
+    // 2º turno: "520 no pix" — o extrator não repete o dia, e ele NÃO pode se perder.
+    $novo = new GastoParcial(
+        descricao: null, valorTexto: '520', formaPagamento: 'pix',
+        cartao: null, categoria: null, dataTexto: null, parcelas: null,
+        recorrenciaDiaTexto: null,
+    );
+
+    $mesclado = $acumulado->mesclar($novo);
+
+    expect($mesclado->recorrenciaDiaTexto)->toBe('10')
+        ->and($mesclado->valorTexto)->toBe('520')
+        ->and($mesclado->formaPagamento)->toBe('pix')
+        ->and($mesclado->completo())->toBeTrue();
+});
+
+it('deixa o dia novo corrigir o anterior', function () {
+    $acumulado = new GastoParcial('ingles', '520', 'pix', null, null, null, null, '10');
+    $novo = new GastoParcial(null, null, null, null, null, null, null, '15');
+
+    expect($acumulado->mesclar($novo)->recorrenciaDiaTexto)->toBe('15');
+});
+
+it('não torna o dia da recorrência obrigatório (gasto avulso segue completo sem ele)', function () {
+    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null);
+
+    expect($parcial->completo())->toBeTrue();
+});
+
+it('propaga o dia da recorrência para o DTO cru', function () {
+    $parcial = new GastoParcial('ingles carol', '520', 'pix', null, 'estudos', null, null, '10');
+
+    expect($parcial->paraExtraido()->recorrenciaDiaTexto)->toBe('10');
+});

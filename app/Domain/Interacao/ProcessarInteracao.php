@@ -21,6 +21,8 @@ use App\Domain\Telegram\Confirmacao\InterpretadorDeConfirmacao;
 use App\Domain\Telegram\Confirmacao\RespostaDeConfirmacao;
 use App\Domain\Telegram\Resposta\ResultadoDaInteracao;
 use App\Jobs\ProcessarMensagemDoBot;
+use App\Models\Recurrence;
+use App\Models\Transaction;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
@@ -100,11 +102,15 @@ final class ProcessarInteracao
 
     private function gravarConfirmado(int $userId, CarbonImmutable $agora): ResultadoDaInteracao
     {
-        $transaction = $this->confirmar->confirmar($userId, $agora);
+        // O pendente carrega um de dois moldes (spec 10c): gasto → lançamento; recorrência →
+        // molde mensal (o lançamento vem depois, do materializador da spec 10).
+        $gravado = $this->confirmar->confirmar($userId, $agora);
 
-        return $transaction !== null
-            ? ResultadoDaInteracao::gravado($transaction)
-            : ResultadoDaInteracao::nadaParaConfirmar();
+        return match (true) {
+            $gravado instanceof Transaction => ResultadoDaInteracao::gravado($gravado),
+            $gravado instanceof Recurrence => ResultadoDaInteracao::recorrenciaGravada($gravado),
+            default => ResultadoDaInteracao::nadaParaConfirmar(),
+        };
     }
 
     private function descartar(int $userId): ResultadoDaInteracao

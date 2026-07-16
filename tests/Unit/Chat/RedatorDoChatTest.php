@@ -7,8 +7,11 @@ use App\Domain\Gasto\ParcelaPrevia;
 use App\Domain\Gasto\PreviaGastoManual;
 use App\Domain\IA\ConfirmacaoDeGasto;
 use App\Domain\IA\Consulta\RespostaDaConsulta;
+use App\Domain\Recorrencia\DadosRecorrencia;
+use App\Domain\Recorrencia\PreviaRecorrencia;
 use App\Domain\Shared\Money;
 use App\Domain\Telegram\Resposta\ResultadoDaInteracao;
+use App\Models\Recurrence;
 use Carbon\CarbonImmutable;
 
 function confirmacaoComCategoria(?string $categoria, bool $sugeridaPorIa): ConfirmacaoDeGasto
@@ -92,4 +95,83 @@ it('omite a linha de categoria quando nenhuma foi identificada', function () {
 
     expect($texto)->toContain('Confirme o gasto:')
         ->and($texto)->not->toContain('Categoria');
+});
+
+/*
+ * Recorrência via bot/chat (spec 10c §8 — etapa de apresentação). O backend já grava o molde
+ * mensal; aqui garantimos que o usuário LÊ uma recorrência, e não a mensagem de um gasto
+ * avulso. Continua determinístico: só transcreve o que o domínio calculou (regra 4).
+ */
+
+function previaDeRecorrencia(?string $categoria = null): PreviaRecorrencia
+{
+    return new PreviaRecorrencia(
+        descricao: 'ingles carol',
+        valor: Money::fromCents(52000),
+        dia: 10,
+        formaPagamento: 'pix',
+        categoria: $categoria,
+    );
+}
+
+function textoDaRecorrencia(?string $categoria = null): string
+{
+    $confirmacao = new ConfirmacaoDeGasto(null, null, [], recorrencia: dadosDeRecorrencia(), previaRecorrencia: previaDeRecorrencia($categoria));
+
+    return (new RedatorDoChat)->redigir(ResultadoDaInteracao::registro($confirmacao))->texto;
+}
+
+function dadosDeRecorrencia(): DadosRecorrencia
+{
+    return new DadosRecorrencia(
+        userId: 1,
+        descricao: 'ingles carol',
+        valorCents: 52000,
+        paymentMethodId: 1,
+        dia: 10,
+    );
+}
+
+it('prévia da recorrência: diz que REPETE todo mês, com valor, dia e forma', function () {
+    $texto = textoDaRecorrencia();
+
+    expect($texto)
+        ->toContain('ingles carol')
+        ->toContain('R$ 520,00')
+        ->toContain('todo dia 10')
+        ->toContain('pix')
+        // Precisa ficar claro que é recorrência, não um gasto de hoje.
+        ->toContain('recorrência')
+        ->toContain('sim');
+});
+
+it('prévia da recorrência: não promete lançamento — ele só nasce no dia (spec 10)', function () {
+    expect(textoDaRecorrencia())->not->toContain('Confirme o gasto');
+});
+
+it('prévia da recorrência: mostra a categoria quando há', function () {
+    expect(textoDaRecorrencia('Estudos'))->toContain('Estudos');
+});
+
+it('recorrência gravada: confirma o cadastro sem dizer que registrou um gasto', function () {
+    $recorrencia = new Recurrence([
+        'descricao' => 'ingles carol', 'valor_cents' => 52000, 'dia' => 10,
+    ]);
+
+    $texto = (new RedatorDoChat)->redigir(ResultadoDaInteracao::recorrenciaGravada($recorrencia))->texto;
+
+    expect($texto)
+        ->toContain('ingles carol')
+        ->toContain('R$ 520,00')
+        ->toContain('todo dia 10')
+        ->not->toContain('registrei:');
+});
+
+it('esclarecimento: pede o dia da recorrência em pt-BR, não o código do schema', function () {
+    $confirmacao = new ConfirmacaoDeGasto(null, null, ['recorrencia_dia']);
+
+    $texto = (new RedatorDoChat)->redigir(ResultadoDaInteracao::registro($confirmacao))->texto;
+
+    expect($texto)->toContain('o dia do mês')
+        ->and($texto)->not->toContain('recorrencia_dia');
 });

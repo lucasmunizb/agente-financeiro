@@ -7,9 +7,11 @@ namespace App\Domain\Chat;
 use App\Domain\Gasto\PreviaGastoManual;
 use App\Domain\IA\ConfirmacaoDeGasto;
 use App\Domain\IA\Consulta\TraceDaConsulta;
+use App\Domain\Recorrencia\PreviaRecorrencia;
 use App\Domain\Shared\Money;
 use App\Domain\Telegram\Resposta\ResultadoDaInteracao;
 use App\Domain\Telegram\Resposta\TipoDeInteracao;
+use App\Models\Recurrence;
 use App\Models\Transaction;
 use App\Support\TextoDoChat;
 
@@ -33,6 +35,7 @@ final class RedatorDoChat
         'data' => 'a data',
         'cartao' => 'o cartão',
         'parcelas' => 'as parcelas',
+        'recorrencia_dia' => 'o dia do mês em que repete',
     ];
 
     public function redigir(ResultadoDaInteracao $resultado): RespostaDoChat
@@ -48,6 +51,7 @@ final class RedatorDoChat
             ),
             TipoDeInteracao::REGISTRO => $this->registro($resultado->registro),
             TipoDeInteracao::GRAVADO => new RespostaDoChat($this->gravado($resultado->transacao), null, []),
+            TipoDeInteracao::RECORRENCIA_GRAVADA => new RespostaDoChat($this->recorrenciaGravada($resultado->recorrencia), null, []),
             TipoDeInteracao::CONFIRMACAO_CANCELADA => new RespostaDoChat('Cancelei — nada foi gravado.', null, []),
             TipoDeInteracao::CONFIRMACAO_AMBIGUA => new RespostaDoChat(
                 'Não entendi sua resposta. Responda "sim" para gravar ou "não" para cancelar.', null, [],
@@ -63,7 +67,37 @@ final class RedatorDoChat
             return new RespostaDoChat($this->esclarecimentos($confirmacao->esclarecimentos), null, []);
         }
 
+        if ($confirmacao->ehRecorrencia()) {
+            return new RespostaDoChat($this->previaDaRecorrencia($confirmacao->previaRecorrencia), null, []);
+        }
+
         return new RespostaDoChat($this->previa($confirmacao->previa), null, []);
+    }
+
+    /**
+     * Prévia do molde mensal (spec 10c). Diz explicitamente que REPETE e que nada foi gravado
+     * ainda — o usuário não pode confundir isto com um gasto lançado hoje.
+     */
+    private function previaDaRecorrencia(PreviaRecorrencia $previa): string
+    {
+        $linha = "{$previa->descricao} — {$previa->valor->formatBRL()}, todo dia {$previa->dia}, no {$previa->formaPagamento}";
+        $categoria = $previa->categoria !== null ? "\nCategoria: {$previa->categoria}." : '';
+
+        return "Confirme a recorrência:\n{$linha}.{$categoria}"
+            ."\nTodo mês eu te lembro para confirmar o pagamento."
+            ."\nResponda \"sim\" para gravar ou \"não\" para cancelar.";
+    }
+
+    /**
+     * O "sim" cadastrou o molde — NENHUM lançamento nasceu. A redação evita "registrei" para
+     * não sugerir que o gasto do mês já está lançado (ele nasce no dia, via materializador).
+     */
+    private function recorrenciaGravada(Recurrence $recorrencia): string
+    {
+        $valor = Money::fromCents((int) $recorrencia->valor_cents)->formatBRL();
+
+        return "Pronto, criei a recorrência: {$recorrencia->descricao} — {$valor}, todo dia {$recorrencia->dia}."
+            ."\nTe lembro no dia para confirmar o pagamento.";
     }
 
     private function previa(PreviaGastoManual $previa): string

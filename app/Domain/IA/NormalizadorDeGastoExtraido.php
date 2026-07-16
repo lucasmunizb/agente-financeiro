@@ -7,6 +7,8 @@ namespace App\Domain\IA;
 use App\Domain\Calendar\RelativeDate;
 use App\Domain\Categoria\ResolvedorDeCategoria;
 use App\Domain\Gasto\DadosGastoManual;
+use App\Domain\Recorrencia\DadosRecorrencia;
+use App\Domain\Recorrencia\OcorrenciaMensal;
 use App\Domain\Shared\Money;
 use App\Domain\Shared\Normalizador;
 use App\Models\Card;
@@ -40,6 +42,13 @@ final class NormalizadorDeGastoExtraido
 
     public function normalizar(GastoExtraido $extraido, int $userId, CarbonImmutable $agora): ResultadoDaNormalizacao
     {
+        return $extraido->recorrenciaDiaTexto !== null
+            ? $this->normalizarRecorrencia($extraido, $userId)
+            : $this->normalizarGasto($extraido, $userId, $agora);
+    }
+
+    private function normalizarGasto(GastoExtraido $extraido, int $userId, CarbonImmutable $agora): ResultadoDaNormalizacao
+    {
         $esclarecimentos = [];
 
         $valorCents = $this->resolverValor($extraido->valorTexto);
@@ -52,13 +61,15 @@ final class NormalizadorDeGastoExtraido
             $esclarecimentos[] = 'data';
         }
 
+        $forma = Normalizador::texto($extraido->formaPagamento);
+
         $paymentMethodId = PaymentMethod::idFor($extraido->formaPagamento);
         if ($paymentMethodId === null) {
             $esclarecimentos[] = 'forma_pagamento';
         }
 
         $cardId = null;
-        if ($extraido->formaPagamento === PaymentMethod::CREDITO) {
+        if ($forma === PaymentMethod::CREDITO) {
             $cardId = $this->resolverCartao($userId, $extraido->cartao);
             if ($cardId === null) {
                 $esclarecimentos[] = 'cartao';
@@ -85,6 +96,80 @@ final class NormalizadorDeGastoExtraido
         );
 
         return new ResultadoDaNormalizacao($dados, []);
+    }
+
+    /**
+     * Recorrência mensal (spec 10c): o usuário disse que aquilo REPETE todo mês. Aqui NÃO
+     * existe data de compra — existe dia-do-mês —, então `data` é deliberadamente ignorada
+     * (o modelo às vezes ecoa "todo dia 10" nos dois campos; o dia é a verdade). O clamp ao
+     * fim do mês e o cálculo de `proxima_em` são do domínio ({@see OcorrenciaMensal}), não
+     * daqui e muito menos da IA (regra 4).
+     */
+    private function normalizarRecorrencia(GastoExtraido $extraido, int $userId): ResultadoDaNormalizacao
+    {
+        $esclarecimentos = [];
+
+        $valorCents = $this->resolverValor($extraido->valorTexto);
+        if ($valorCents === null) {
+            $esclarecimentos[] = 'valor';
+        }
+
+        $dia = $this->resolverDia($extraido->recorrenciaDiaTexto);
+        if ($dia === null) {
+            $esclarecimentos[] = 'recorrencia_dia';
+        }
+
+        // "Todo dia 10 em 3x" é contraditório: ou repete todo mês, ou é parcelado. Perguntar
+        // é mais barato que gravar a interpretação errada de um compromisso mensal.
+        if (($extraido->parcelas ?? 1) > 1) {
+            $esclarecimentos[] = 'recorrencia_dia';
+        }
+
+        // Recorrência é SÓ fora de cartão (spec 10 §2: crédito usa parcelas). Barramos aqui,
+        // como esclarecimento, para o usuário nunca ver a exceção do RegistrarRecorrencia.
+        $forma = Normalizador::texto($extraido->formaPagamento);
+        $paymentMethodId = PaymentMethod::idFor($extraido->formaPagamento);
+
+        if ($paymentMethodId === null || $forma === PaymentMethod::CREDITO) {
+            $esclarecimentos[] = 'forma_pagamento';
+        }
+
+        if ($esclarecimentos !== []) {
+            return new ResultadoDaNormalizacao(null, array_values(array_unique($esclarecimentos)));
+        }
+
+        $categoria = $this->categoria->para($userId, $extraido->descricao);
+
+        $dados = new DadosRecorrencia(
+            userId: $userId,
+            descricao: $extraido->descricao,
+            valorCents: $valorCents,
+            paymentMethodId: $paymentMethodId,
+            dia: $dia,
+            categoriaId: $categoria->categoriaId,
+        );
+
+        return new ResultadoDaNormalizacao(null, [], $dados);
+    }
+
+    /**
+     * Dia-do-mês (1..31) a partir do texto cru da IA ("10", "todo dia 10"), ou null quando
+     * não há dia válido — vira PERGUNTA, nunca chute (§3.4). Um número colado a "-" não conta
+     * ("-3" não é dia 3). O dia 31 é aceito como está: o clamp é do {@see OcorrenciaMensal}.
+     */
+    private function resolverDia(?string $texto): ?int
+    {
+        if ($texto === null) {
+            return null;
+        }
+
+        if (preg_match('/(?<![\d-])(\d{1,2})(?!\d)/', $texto, $m) !== 1) {
+            return null;
+        }
+
+        $dia = (int) $m[1];
+
+        return $dia >= 1 && $dia <= 31 ? $dia : null;
     }
 
     /**

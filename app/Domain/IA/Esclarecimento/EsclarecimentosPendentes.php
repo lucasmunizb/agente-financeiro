@@ -72,6 +72,7 @@ final class EsclarecimentosPendentes
             'categoria' => $parcial->categoria,
             'data' => $parcial->dataTexto,
             'parcelas' => $parcial->parcelas,
+            'recorrencia_dia' => $parcial->recorrenciaDiaTexto,
         ];
     }
 
@@ -88,6 +89,7 @@ final class EsclarecimentosPendentes
             categoria: $payload['categoria'] ?? null,
             dataTexto: $payload['data'] ?? null,
             parcelas: isset($payload['parcelas']) ? (int) $payload['parcelas'] : null,
+            recorrenciaDiaTexto: $payload['recorrencia_dia'] ?? null,
         );
     }
 }

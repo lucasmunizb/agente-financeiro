@@ -69,5 +69,6 @@ function gastoExtraidoFake(array $over = []): App\Domain\IA\GastoExtraido
         categoria: $over['categoria'] ?? null,
         dataTexto: array_key_exists('dataTexto', $over) ? $over['dataTexto'] : 'hoje',
         parcelas: $over['parcelas'] ?? null,
+        recorrenciaDiaTexto: $over['recorrenciaDiaTexto'] ?? null,
     );
 }

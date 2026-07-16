@@ -3,6 +3,7 @@
 use App\Ai\Agents\SugeridorDeCategoria;
 use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\IA\NormalizadorDeGastoExtraido;
+use App\Domain\Recorrencia\DadosRecorrencia;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\PaymentMethod;
@@ -268,4 +269,135 @@ it('acumula múltiplos esclarecimentos e não monta os dados', function () {
     expect($r->dados)->toBeNull()
         ->and($r->esclarecimentos)->toContain('valor')
         ->and($r->esclarecimentos)->toContain('forma_pagamento');
+});
+
+/* -------- recorrência (spec 10c) -------- */
+
+/*
+ * Incidente de produção 2026-07-16: "registra uma recorrencia no pix para pagar todo dia 10
+ * 520 reias ingles carol categoria estudos" respondeu "me diga também a data e a forma de
+ * pagamento" — pedindo dois campos que a mensagem TINHA. Duas causas: (1) recorrência não
+ * existia no pipeline de IA, então "todo dia 10" caiu no campo `data` e não parseou; (2)
+ * idFor() casava o tipo literal, então qualquer "PIX" da IA era rejeitado.
+ */
+
+it('monta uma recorrência (não um gasto) quando há dia de recorrência', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake([
+        'descricao' => 'ingles carol',
+        'valorTexto' => '520',
+        'formaPagamento' => 'pix',
+        'recorrenciaDiaTexto' => '10',
+        'dataTexto' => null,
+    ]), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->dados)->toBeNull()
+        ->and($r->recorrencia)->toBeInstanceOf(DadosRecorrencia::class)
+        ->and($r->recorrencia->dia)->toBe(10)
+        ->and($r->recorrencia->valorCents)->toBe(52000)
+        ->and($r->recorrencia->descricao)->toBe('ingles carol')
+        ->and($r->recorrencia->userId)->toBe($user->id)
+        ->and($r->recorrencia->paymentMethodId)->toBe(PaymentMethod::idFor('pix'));
+});
+
+it('NÃO exige data numa recorrência — ela tem dia-do-mês, não data de compra (C2)', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake([
+        'recorrenciaDiaTexto' => '10',
+        'dataTexto' => null,
+    ]), $user->id);
+
+    expect($r->esclarecimentos)->not->toContain('data')
+        ->and($r->precisaEsclarecer())->toBeFalse();
+});
+
+it('descarta a data que o modelo repetiu no campo errado, sem pedir esclarecimento (C3)', function () {
+    $user = User::factory()->create();
+
+    // Exatamente o payload do incidente: o modelo ecoou "todo dia 10" também em `data`.
+    $r = normalizar(gastoExtraidoFake([
+        'recorrenciaDiaTexto' => '10',
+        'dataTexto' => 'todo dia 10',
+    ]), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->recorrencia->dia)->toBe(10);
+});
+
+it('pede esclarecimento quando o dia é impossível ou não tem dígito (C4)', function (string $dia) {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake(['recorrenciaDiaTexto' => $dia]), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeTrue()
+        ->and($r->recorrencia)->toBeNull()
+        ->and($r->esclarecimentos)->toContain('recorrencia_dia');
+})->with(['32', '0', 'todo mês', '-3']);
+
+it('mantém o dia 31 como está — o clamp ao fim do mês é do domínio, não da IA (C5)', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake(['recorrenciaDiaTexto' => '31']), $user->id);
+
+    expect($r->recorrencia->dia)->toBe(31);
+});
+
+it('recusa recorrência em cartão de crédito — crédito usa parcelas (C6)', function () {
+    $user = User::factory()->create();
+    Card::factory()->for($user)->create(['descricao' => 'Nubank']);
+
+    $r = normalizar(gastoExtraidoFake([
+        'recorrenciaDiaTexto' => '10',
+        'formaPagamento' => 'credito',
+        'cartao' => 'nubank',
+    ]), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeTrue()
+        ->and($r->recorrencia)->toBeNull()
+        ->and($r->esclarecimentos)->toContain('forma_pagamento');
+});
+
+it('recusa a contradição "recorrente E parcelado" (C7)', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake([
+        'recorrenciaDiaTexto' => '10',
+        'parcelas' => 3,
+    ]), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeTrue()
+        ->and($r->esclarecimentos)->toContain('recorrencia_dia');
+});
+
+/* -------- forma de pagamento: normalização determinística (causa raiz 2) -------- */
+
+it('casa a forma de pagamento independente de caixa e espaço (C8)', function (string $forma) {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake(['formaPagamento' => $forma]), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->dados->paymentMethodId)->toBe(PaymentMethod::idFor('pix'));
+})->with(['PIX', 'Pix', ' pix ', 'PIX ']);
+
+it('pede esclarecimento quando a forma está fora do conjunto suportado (C9)', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake(['formaPagamento' => 'pix recorrente']), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeTrue()
+        ->and($r->esclarecimentos)->toContain('forma_pagamento');
+});
+
+it('não muda nada no gasto avulso quando não há recorrência (C13 — regressão zero)', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake(['recorrenciaDiaTexto' => null]), $user->id);
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->recorrencia)->toBeNull()
+        ->and($r->dados)->toBeInstanceOf(DadosGastoManual::class);
 });

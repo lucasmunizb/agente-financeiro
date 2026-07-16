@@ -18,6 +18,9 @@ use App\Domain\Importacao\PreImportacao;
  * indefinida — mantém o pendente e pede de novo) e NADA_PARA_CONFIRMAR (não havia pendente
  * válido — expirou ou já fora confirmado).
  *
+ * Recorrência via bot (spec 10c): RECORRENCIA_GRAVADA — o "sim" cadastrou o molde mensal;
+ * nenhum lançamento nasceu (ele vem do materializador da spec 10, no dia).
+ *
  * Importação de fatura (spec 07): IMPORTACAO_PRONTA (a pré-importação foi montada e está
  * pronta para revisão — carrega a {@see PreImportacao}),
  * IMPORTACAO_PROTEGIDA_POR_SENHA (PDF com senha — pedir versão sem senha, C2) e
@@ -32,6 +35,7 @@ enum TipoDeInteracao
     case CONFIRMACAO_CANCELADA;
     case CONFIRMACAO_AMBIGUA;
     case NADA_PARA_CONFIRMAR;
+    case RECORRENCIA_GRAVADA;
     case IMPORTACAO_PRONTA;
     case IMPORTACAO_PROTEGIDA_POR_SENHA;
     case IMPORTACAO_FALHOU;

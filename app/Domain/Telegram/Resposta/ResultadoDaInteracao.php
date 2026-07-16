@@ -7,6 +7,7 @@ namespace App\Domain\Telegram\Resposta;
 use App\Domain\IA\ConfirmacaoDeGasto;
 use App\Domain\IA\Consulta\RespostaDaConsulta;
 use App\Domain\Importacao\PreImportacao;
+use App\Models\Recurrence;
 use App\Models\Transaction;
 
 /**
@@ -27,6 +28,7 @@ final readonly class ResultadoDaInteracao
         public ?RespostaDaConsulta $consulta = null,
         public ?Transaction $transacao = null,
         public ?PreImportacao $preImportacao = null,
+        public ?Recurrence $recorrencia = null,
     ) {}
 
     public static function registro(ConfirmacaoDeGasto $confirmacao): self
@@ -47,6 +49,16 @@ final readonly class ResultadoDaInteracao
     public static function gravado(Transaction $transacao): self
     {
         return new self(TipoDeInteracao::GRAVADO, transacao: $transacao);
+    }
+
+    /**
+     * O "sim" cadastrou uma recorrência mensal (spec 10c) — nenhum lançamento nasceu ainda.
+     * Tipo próprio porque a redação é outra ("passei a repetir todo dia X"), e a mensagem do
+     * bot é frontend (regra 3).
+     */
+    public static function recorrenciaGravada(Recurrence $recorrencia): self
+    {
+        return new self(TipoDeInteracao::RECORRENCIA_GRAVADA, recorrencia: $recorrencia);
     }
 
     public static function confirmacaoCancelada(): self

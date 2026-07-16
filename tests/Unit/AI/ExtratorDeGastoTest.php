@@ -20,7 +20,13 @@ function schemaExtrator(): array
 
 it('declara os campos de um gasto', function () {
     expect(array_keys(schemaExtrator()))
-        ->toEqualCanonicalizing(['descricao', 'valor', 'forma_pagamento', 'cartao', 'categoria', 'data', 'parcelas']);
+        ->toEqualCanonicalizing(['descricao', 'valor', 'forma_pagamento', 'cartao', 'categoria', 'data', 'parcelas', 'recorrencia_dia']);
+});
+
+it('mantém o dia da recorrência como TEXTO cru — a IA não calcula data (spec 10c C1)', function () {
+    // "todo dia 10" → "10". Quem valida 1..31 e resolve proxima_em (com clamp no fim do mês)
+    // é o domínio determinístico (OcorrenciaMensal), nunca a IA (regra 4).
+    expect(schemaExtrator()['recorrencia_dia'])->toBeInstanceOf(StringType::class);
 });
 
 it('mantém valor e data como TEXTO — a IA não calcula nem resolve', function () {

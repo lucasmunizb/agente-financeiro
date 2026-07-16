@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\IA;
 
+use App\Domain\Shared\Normalizador;
+
 /**
  * Extração CRUA e possivelmente INCOMPLETA de um gasto, acumulada entre turnos de
  * esclarecimento (spec 04 §3.3; bug do slot-filling multi-turno). Cada campo é opcional:
@@ -14,6 +16,11 @@ namespace App\Domain\IA;
  * novo vence o anterior (preenche o que faltava e permite correção); null não apaga o
  * que já se sabia. `faltantes()` aplica a MESMA regra de obrigatoriedade do extrator
  * (descrição/valor/forma; crédito exige cartão) para decidir se ainda falta esclarecer.
+ *
+ * `recorrenciaDiaTexto` (spec 10c) é um slot como os outros — NÃO obrigatório: preenchido
+ * significa "isto repete todo mês no dia X" (vira recorrência em vez de gasto avulso). Ele
+ * precisa sobreviver ao multi-turno: o usuário diz "todo dia 10" no 1º turno e completa
+ * valor/forma no 2º, quando o extrator já não repete o dia.
  */
 final readonly class GastoParcial
 {
@@ -25,6 +32,7 @@ final readonly class GastoParcial
         public ?string $categoria,
         public ?string $dataTexto,
         public ?int $parcelas,
+        public ?string $recorrenciaDiaTexto = null,
     ) {}
 
     /**
@@ -40,6 +48,7 @@ final readonly class GastoParcial
             categoria: $novo->categoria ?? $this->categoria,
             dataTexto: $novo->dataTexto ?? $this->dataTexto,
             parcelas: $novo->parcelas ?? $this->parcelas,
+            recorrenciaDiaTexto: $novo->recorrenciaDiaTexto ?? $this->recorrenciaDiaTexto,
         );
     }
 
@@ -65,7 +74,10 @@ final readonly class GastoParcial
             $faltantes[] = 'forma_pagamento';
         }
 
-        if ($this->formaPagamento === 'credito' && $this->cartao === null) {
+        // Compara a forma NORMALIZADA: a IA às vezes devolve "Crédito"/"CREDITO" e a
+        // barreira do cartão não pode depender da caixa/acento do que o modelo escreveu
+        // (mesma causa raiz do incidente de 2026-07-16 no lado da normalização).
+        if (Normalizador::texto((string) $this->formaPagamento) === 'credito' && $this->cartao === null) {
             $faltantes[] = 'cartao';
         }
 
@@ -90,6 +102,7 @@ final readonly class GastoParcial
             categoria: $this->categoria,
             dataTexto: $this->dataTexto,
             parcelas: $this->parcelas,
+            recorrenciaDiaTexto: $this->recorrenciaDiaTexto,
         );
     }
 }

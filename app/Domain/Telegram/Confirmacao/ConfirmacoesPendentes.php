@@ -7,6 +7,8 @@ namespace App\Domain\Telegram\Confirmacao;
 use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Gasto\RegistrarGastoManual;
 use App\Domain\IA\ConfirmacaoDeGasto;
+use App\Domain\Recorrencia\DadosRecorrencia;
+use App\Domain\Recorrencia\RegistrarRecorrencia;
 use App\Models\TelegramPendingConfirmation;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -28,10 +30,20 @@ final class ConfirmacoesPendentes
     /** Discriminador na fila compartilhada `telegram_pending_confirmations` (ver EsclarecimentosPendentes). */
     public const TIPO = 'confirmacao';
 
+    /**
+     * Discriminador DENTRO do payload (não confundir com a coluna `tipo`, que discrimina a
+     * FILA): o mesmo pendente carrega ou o molde de um gasto, ou o de uma recorrência
+     * (spec 10c). Ausente ⇒ gasto — pendentes gravados antes da 10c seguem válidos.
+     */
+    private const MOLDE_GASTO = 'gasto';
+
+    private const MOLDE_RECORRENCIA = 'recorrencia';
+
     private const TZ = 'America/Sao_Paulo';
 
     public function __construct(
         private readonly RegistrarGastoManual $registrar,
+        private readonly RegistrarRecorrencia $registrarRecorrencia,
     ) {}
 
     public function guardar(int $userId, ConfirmacaoDeGasto $confirmacao, CarbonImmutable $agora): string
@@ -43,7 +55,9 @@ final class ConfirmacoesPendentes
             [
                 'tipo' => self::TIPO,
                 'token' => $token,
-                'payload' => $this->serializar($confirmacao->dados),
+                'payload' => $confirmacao->ehRecorrencia()
+                    ? $this->serializarRecorrencia($confirmacao->recorrencia)
+                    : $this->serializar($confirmacao->dados),
                 'expira_em' => $agora->addMinutes(self::TTL_MINUTOS)->setTimezone('UTC'),
             ],
         );
@@ -63,6 +77,16 @@ final class ConfirmacoesPendentes
             return null;
         }
 
+        if (($pendente->payload['molde'] ?? self::MOLDE_GASTO) === self::MOLDE_RECORRENCIA) {
+            $recorrencia = $this->desserializarRecorrencia($pendente->payload);
+
+            return new ConfirmacaoDeGasto(
+                null, null, [],
+                recorrencia: $recorrencia,
+                previaRecorrencia: $this->registrarRecorrencia->preview($recorrencia),
+            );
+        }
+
         $dados = $this->desserializar($pendente->payload);
         $previa = $this->registrar->preview($dados, $agora);
 
@@ -75,11 +99,49 @@ final class ConfirmacoesPendentes
     }
 
     /**
+     * Molde da recorrência (spec 10c). Não há data/parcelas/cartão: recorrência é sempre
+     * mensal e fora de cartão. O `dia` é inteiro validado (1..31); `proxima_em` NÃO é
+     * serializada — é recalculada pelo domínio no "sim" (regra 4, determinismo).
+     *
+     * @return array<string, mixed>
+     */
+    private function serializarRecorrencia(DadosRecorrencia $dados): array
+    {
+        return [
+            'molde' => self::MOLDE_RECORRENCIA,
+            'userId' => $dados->userId,
+            'descricao' => $dados->descricao,
+            'valorCents' => $dados->valorCents,
+            'paymentMethodId' => $dados->paymentMethodId,
+            'dia' => $dados->dia,
+            'categoriaId' => $dados->categoriaId,
+            'periodicidade' => $dados->periodicidade,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function desserializarRecorrencia(array $payload): DadosRecorrencia
+    {
+        return new DadosRecorrencia(
+            userId: (int) $payload['userId'],
+            descricao: (string) $payload['descricao'],
+            valorCents: (int) $payload['valorCents'],
+            paymentMethodId: (int) $payload['paymentMethodId'],
+            dia: (int) $payload['dia'],
+            categoriaId: isset($payload['categoriaId']) ? (int) $payload['categoriaId'] : null,
+            periodicidade: (string) $payload['periodicidade'],
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function serializar(DadosGastoManual $dados): array
     {
         return [
+            'molde' => self::MOLDE_GASTO,
             'userId' => $dados->userId,
             'descricao' => $dados->descricao,
             'valorTotalCents' => $dados->valorTotalCents,

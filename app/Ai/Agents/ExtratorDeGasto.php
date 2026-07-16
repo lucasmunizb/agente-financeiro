@@ -84,6 +84,7 @@ class ExtratorDeGasto implements Agent, Conversational, HasProviderOptions, HasS
             categoria: self::limpar($dados['categoria'] ?? null),
             dataTexto: self::limpar($dados['data'] ?? null),
             parcelas: $parcelas !== null ? (int) $parcelas : null,
+            recorrenciaDiaTexto: self::limpar($dados['recorrencia_dia'] ?? null),
         );
     }
 
@@ -111,6 +112,7 @@ class ExtratorDeGasto implements Agent, Conversational, HasProviderOptions, HasS
         - NÃO resolva datas. Copie a data EXATAMENTE como dita ("hoje", "ontem", "amanhã", "mês que vem", "05/06"). O fuso é o de São Paulo, mas quem resolve é o sistema, não você.
         - Preencha apenas o que estiver explícito ou claramente implícito. Campo que você não souber, deixe ausente — NUNCA invente.
         - Forma de pagamento "crédito" exige a identificação do cartão (ex.: "cartão pai"); se não houver, deixe o cartão ausente.
+        - Gasto que SE REPETE todo mês ("todo dia 10", "toda mês no dia 5", "mensalidade", "assinatura", "recorrência") NÃO é uma data: copie SÓ o número do dia em `recorrencia_dia` e deixe `data` ausente. Sem ideia de repetição ("paguei dia 10"), `recorrencia_dia` fica ausente e o dia vai para `data`.
         TXT;
     }
 
@@ -155,6 +157,8 @@ class ExtratorDeGasto implements Agent, Conversational, HasProviderOptions, HasS
                 ->description('A data EXATAMENTE como dita ("hoje", "ontem", "amanhã", "mês que vem", "05/06"). NUNCA resolva a data. null se não disser.'),
             'parcelas' => $schema->integer()->required()->nullable()
                 ->description('Número de parcelas quando parcelado (ex.: "3x" → 3). null significa à vista.'),
+            'recorrencia_dia' => $schema->string()->required()->nullable()
+                ->description('Dia do mês, como TEXTO, quando o usuário disser que aquilo SE REPETE todo mês ("todo dia 10" → "10"; "toda mês no dia 5" → "5"; "mensalidade dia 20" → "20"). NUNCA calcule nem resolva a data. null quando for um gasto avulso (inclusive "dia 10" sem ideia de repetição).'),
         ];
     }
 }
