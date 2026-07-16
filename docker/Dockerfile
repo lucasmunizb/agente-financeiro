@@ -44,6 +44,22 @@ ENTRYPOINT ["entrypoint"]
 CMD ["frankenphp", "run", "-c", "/etc/caddy/Caddyfile"]
 
 # ---------------------------------------------------------------------
+# Assets: compila o frontend (Vite + Tailwind v4) num stage Node isolado.
+# public/build é gitignored → NÃO vai no Git. Um checkout limpo (o que o CI
+# faz) não traz os assets; sem este stage o @vite quebra em produção
+# ("Vite manifest not found") e toda página dá 500. Funciona só localmente
+# porque o public/build da sua máquina entra no `COPY . /app`.
+# ---------------------------------------------------------------------
+FROM node:22-alpine AS assets
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+# Tailwind v4 (@tailwindcss/vite) varre os templates/js para gerar as classes,
+# então precisa do fonte completo (resources/ + views/) presente no build.
+COPY . .
+RUN npm run build
+
+# ---------------------------------------------------------------------
 # Produção: copia o código e otimiza. Usado pelo docker-stack.yml (Swarm).
 # ---------------------------------------------------------------------
 FROM base AS prod
@@ -52,6 +68,9 @@ FROM base AS prod
 COPY docker/php-prod.ini /usr/local/etc/php/conf.d/zz-prod.ini
 
 COPY . /app
+# Assets compilados vêm do stage Node (public/build é gitignored, não está no
+# contexto num checkout limpo). Precisa vir DEPOIS do `COPY . /app`.
+COPY --from=assets /app/public/build /app/public/build
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
     && rm -rf /app/.env \
     # /data e /config são do Caddy (XDG_* na imagem FrankenPHP); precisam ser

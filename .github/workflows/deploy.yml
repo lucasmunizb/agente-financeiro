@@ -1,0 +1,143 @@
+# =====================================================================
+# CI/CD → Docker Hub → Docker Swarm (VPS).
+# Pipeline: test (GATE) → build+scan+push → deploy → smoke.
+# Nada publica sem a suíte verde (regra 2: TDD é o portão do deploy).
+#
+# Segredos de RUNTIME (DB, IA, Telegram, APP_KEY) NÃO ficam aqui — estão
+# como Docker Secrets no Swarm. O CI só conhece: login do Docker Hub e a
+# chave SSH de deploy. Ver GitHub → Settings → Secrets and variables → Actions.
+#
+# Antes do primeiro push que dispara isto, configure no repositório:
+#   DOCKERHUB_USERNAME  DOCKERHUB_TOKEN  VPS_HOST  VPS_USER  VPS_SSH_KEY
+# E troque "SEU_DOMINIO" no job `smoke` pelo domínio real.
+# =====================================================================
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:            # nunca dois deploys ao mesmo tempo
+  group: production
+  cancel-in-progress: false
+
+env:
+  IMAGE: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/agente-financeiro
+
+jobs:
+  # ── PORTÃO: a suíte roda em Postgres (schema usa timestamptz/softDeletesTz).
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: financeiro_test      # phpunit.xml força DB_DATABASE=financeiro_test
+          POSTGRES_USER: financeiro
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U financeiro"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build imagem de teste (stage base — traz PHP+ext, com dev deps)
+        run: docker build -f docker/Dockerfile --target base -t financeiro-ci .
+      - name: Rodar a suíte (gate TDD)
+        run: |
+          APP_KEY="base64:$(openssl rand -base64 32)"
+          docker run --rm --network host -v "$PWD":/app -w /app \
+            -e APP_ENV=testing -e APP_KEY="$APP_KEY" \
+            -e DB_CONNECTION=pgsql -e DB_HOST=127.0.0.1 -e DB_PORT=5432 \
+            -e DB_USERNAME=financeiro -e DB_PASSWORD=secret \
+            financeiro-ci sh -c 'composer install --no-interaction --prefer-dist && php artisan test'
+
+  build-scan-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}   # access token (Read/Write), NUNCA a senha
+      - name: Build (target prod — copia código, otimiza autoload, compila Vite)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: prod
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          load: true                # carrega local p/ o Trivy escanear antes do push
+      - name: Scan Trivy — falha em HIGH/CRITICAL
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+      - name: Push (SHA imutável + latest móvel)
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+  deploy:
+    needs: build-scan-push
+    runs-on: ubuntu-latest
+    environment: production        # opcional: exige aprovação manual se você ativar no repo
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enviar o stack file pro VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: docker-stack.yml
+          target: /opt/financeiro
+      - name: docker stack deploy (rolling update + migrate job)
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_IMAGE: ${{ env.IMAGE }}
+          APP_TAG: ${{ github.sha }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: APP_IMAGE,APP_TAG,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/financeiro
+            # login p/ o Swarm puxar a imagem PRIVADA (sem echo do token em log)
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            export APP_IMAGE APP_TAG
+            # re-deploy: fixa a tag=SHA, roda o job `migrate` (com secrets) e faz
+            # rolling update do app (update_config: start-first) e do worker.
+            docker stack deploy --with-registry-auth --resolve-image always \
+              -c docker-stack.yml financeiro
+            docker logout
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Healthcheck público (/up)
+        run: |
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://agentefinanceiro.muniztecnologia.com.br/up) || true
+            [ "$code" = "200" ] && echo "ok ($code)" && exit 0
+            echo "tentativa $i: $code"; sleep 6
+          done
+          echo "health falhou — considere: docker service rollback financeiro_app"; exit 1

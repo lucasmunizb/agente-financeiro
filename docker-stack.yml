@@ -20,7 +20,7 @@ x-app-environment: &app-environment
   APP_ENV: production
   APP_DEBUG: "false"
   APP_TIMEZONE: America/Sao_Paulo
-  APP_URL: https://seu-dominio.example
+  APP_URL: https://agentefinanceiro.muniztecnologia.com.br
   # Logs para stderr: visíveis em `docker service logs`, sem arquivo sem rotação.
   LOG_CHANNEL: stderr
   LOG_LEVEL: warning
@@ -29,46 +29,54 @@ x-app-environment: &app-environment
   DB_DATABASE: financeiro
   DB_USERNAME: financeiro
   QUEUE_CONNECTION: database
-  # Rede overlay do Swarm (o serviço proxy tem IP dinâmico nessa faixa).
-  TRUSTED_PROXIES: 10.0.0.0/8
-  AI_PROVIDER: anthropic
+  # Proxies confiáveis: o Nginx do host alcança o app via 127.0.0.1:8001, então o
+  # IP de origem visto pelo app é RFC1918 (gateway da bridge 172.x / overlay 10.x).
+  # Sem isto o X-Forwarded-For/Proto do Nginx não é aceito e o rate-limit/IP real
+  # e o cookie Secure ficam errados. Seguro porque a 8001 é interna (firewall).
+  TRUSTED_PROXIES: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+  # IA no free tier com ROTAÇÃO entre 3 provedores (fila LRU + cooldown, spec 04c).
+  # Distribui as chamadas e faz bench de quem falhar/estourar limite. Só entram na
+  # rotação provedores COM chave presente (as 3 secrets abaixo). AI_PROVIDER é só o
+  # default nominal da SDK quando a rotação não decide.
+  AI_PROVIDER: groq
+  AI_ROTACAO_ENABLED: "true"
+  AI_ROTACAO_POOL: groq,mistral,gemini
+  AI_ROTACAO_COOLDOWN: "60"
+  AI_ROTACAO_STORE: database
+  AI_ROTACAO_LOCK_TTL: "5"
+  # @username público do bot (NÃO é sensível → env comum, não secret). Usado no
+  # link de vínculo t.me/<username>?start=... Troque pelo @ real do SEU bot (sem @).
+  TELEGRAM_BOT_USERNAME: AgenteFinanceiroMensagemBot
   # Segredos resolvidos pelo entrypoint a partir de /run/secrets:
   APP_KEY_FILE: /run/secrets/app_key
   DB_PASSWORD_FILE: /run/secrets/db_password
-  ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+  GROQ_API_KEY_FILE: /run/secrets/groq_api_key
+  MISTRAL_API_KEY_FILE: /run/secrets/mistral_api_key
+  GEMINI_API_KEY_FILE: /run/secrets/gemini_api_key
   TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
   TELEGRAM_WEBHOOK_SECRET_FILE: /run/secrets/telegram_webhook_secret
 
 x-app-secrets: &app-secrets
   - app_key
   - db_password
-  - anthropic_api_key
+  - groq_api_key
+  - mistral_api_key
+  - gemini_api_key
   - telegram_bot_token
   - telegram_webhook_secret
 
 services:
-  # Borda TLS: Caddy com HTTPS automático (Let's Encrypt). O app NÃO publica
-  # porta — só o proxy fala com a internet. Necessário porque o cookie de
-  # sessão é Secure e o webhook do Telegram exige HTTPS.
-  proxy:
-    image: caddy:2-alpine
-    command: caddy reverse-proxy --from seu-dominio.example --to app:8000
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
+  # Borda: NÃO há proxy nesta stack. A Cloudflare (cobre o VPS inteiro) termina o
+  # TLS do cliente e envia para as 80/443 do VPS, onde o Nginx do HOST (já
+  # existente, compartilhado com o discord-bot) faz o roteamento. O Nginx dá
+  # proxy_pass para http://127.0.0.1:8001 (porta que o app publica abaixo).
+  # Bloco server{} de exemplo: docs/deploy/nginx-agentefinanceiro.conf.example
 
   # Migrations como job de deploy: roda 1× até concluir a cada `stack deploy`
   # (cria sessions/cache/jobs no primeiro deploy — sem isso o app sobe em 500).
   # replicated-job com 1 réplica = sem corrida; `--force` porque APP_ENV=production.
   migrate:
-    image: financeiro-app:prod
+    image: ${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_TAG:-latest}
     command: php artisan migrate --force
     environment:
       <<: *app-environment
@@ -80,10 +88,18 @@ services:
         condition: on-failure
 
   app:
-    image: financeiro-app:prod
+    image: ${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_TAG:-latest}
     environment:
       <<: *app-environment
     secrets: *app-secrets
+    # Porta publicada só para o Nginx do host alcançar (proxy_pass 127.0.0.1:8001).
+    # mode:host = não usa a malha de ingresso; o firewall bloqueia 8001 de fora,
+    # então só o próprio host (Nginx) fala com o app.
+    ports:
+      - target: 8000
+        published: 8001
+        protocol: tcp
+        mode: host
     # Healthcheck de verdade: /up sobe o framework (detecta APP_KEY/DB quebrados),
     # em vez do endpoint administrativo do FrankenPHP.
     healthcheck:
@@ -102,7 +118,7 @@ services:
         order: start-first
 
   worker:
-    image: financeiro-app:prod
+    image: ${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_TAG:-latest}
     command: sh -c "php artisan schedule:work & exec php artisan queue:work --tries=3 --timeout=120 --sleep=2"
     environment:
       <<: *app-environment
@@ -134,19 +150,33 @@ services:
       restart_policy:
         condition: on-failure
 
+# Secrets são GLOBAIS no Swarm (não recebem prefixo da stack como serviços/redes).
+# Por isso o nome REAL no cluster é prefixado com `financeiro_` (convive com os
+# `discord_bot_*` do outro projeto). O `name:` mapeia a chave local curta
+# (app_key) → secret real (financeiro_app_key); dentro do container o arquivo
+# continua montado em /run/secrets/app_key, então os *_FILE acima NÃO mudam.
 secrets:
   app_key:
     external: true
+    name: financeiro_app_key
   db_password:
     external: true
-  anthropic_api_key:
+    name: financeiro_db_password
+  groq_api_key:
     external: true
+    name: financeiro_groq_api_key
+  mistral_api_key:
+    external: true
+    name: financeiro_mistral_api_key
+  gemini_api_key:
+    external: true
+    name: financeiro_gemini_api_key
   telegram_bot_token:
     external: true
+    name: financeiro_telegram_bot_token
   telegram_webhook_secret:
     external: true
+    name: financeiro_telegram_webhook_secret
 
 volumes:
   pgdata:
-  caddy_data:
-  caddy_config:
