@@ -11,17 +11,23 @@ use Carbon\CarbonImmutable;
 
 /**
  * Camada de PREVISÃO de recorrências (spec 10b) — projeção READ-ONLY que, a partir do molde em
- * `recurrences`, deriva as ocorrências de um mês FUTURO para a visão de mês futuro do dashboard.
+ * `recurrences`, deriva as ocorrências AINDA NÃO MATERIALIZADAS de um mês, para os quadros do
+ * dashboard e para o extrato.
  *
  * Coexiste com a materialização just-in-time (spec 10 §10): NÃO grava lançamento nem enfileira
- * confirmação (regra 7) — só lê e calcula. Age APENAS em meses estritamente futuros
- * (`mesAlvo > mesCorrente`, comparação de YYYY-MM no fuso SP a partir do "agora" injetado):
- * o mês corrente é servido pela fila just-in-time e os passados pelos lançamentos reais, então
- * uma ocorrência nunca é contada duas vezes. "Agora" é INJETADO (determinismo, regra 4/5).
+ * confirmação (regra 7) — só lê e calcula. Age do mês CORRENTE em diante (mês passado ⇒ vazio,
+ * comparação de YYYY-MM no fuso SP a partir do "agora" injetado, determinismo/regra 4/5).
  *
- * Projeta uma ocorrência por recorrência `ativo` que já COMEÇOU até o mês-alvo
+ * Projeta uma ocorrência por recorrência `ativo` cujo ponteiro ainda não passou do mês-alvo
  * (`proxima_em <= fim do mês-alvo`), com o `dia` resolvido/clampado NAQUELE mês via
  * {@see OcorrenciaMensal}. Escopo ESTRITO por `user_id`. Valores em centavos (regra 5).
+ *
+ * ANTI-DUPLA-CONTAGEM: o filtro por `proxima_em` é o que separa esta projeção da fila e dos
+ * lançamentos reais — {@see MaterializarRecorrencias} AVANÇA o ponteiro no mesmo instante (e na
+ * mesma transação) em que enfileira a ocorrência. Logo, uma ocorrência já materializada tem o
+ * ponteiro além do mês e cai fora desta query: ela é servida pela fila
+ * ({@see ProjetarRecorrenciasPendentes}) até ser confirmada, e pela parcela real depois disso.
+ * As três fontes são disjuntas por construção — não por um guard de calendário.
  */
 final class ProjetarRecorrencias
 {
@@ -30,8 +36,9 @@ final class ProjetarRecorrencias
         $agoraSp = $agora->setTimezone(RelativeDate::TIMEZONE);
         $inicioMesAlvo = CarbonImmutable::createFromFormat('!Y-m-d', $mesAlvo.'-01', RelativeDate::TIMEZONE);
 
-        // Só meses estritamente futuros (anti-dupla-contagem): mês corrente/passado ⇒ vazio.
-        if ($mesAlvo <= $agoraSp->format('Y-m')) {
+        // Mês passado é retrato fechado: só lançamento real conta (e um ponteiro atrasado ali só
+        // existe se o agendador falhou — projetar seria inventar um gasto que ninguém confirmou).
+        if ($mesAlvo < $agoraSp->format('Y-m')) {
             return $this->vazio($mesAlvo);
         }
 

@@ -144,7 +144,7 @@ it('não paga a ocorrência pendente de outro usuário (404)', function () {
     expect(Transaction::count())->toBe(0);
 });
 
-it('no mês CORRENTE não projeta previstas — servido pela materialização (regressão 10b)', function () {
+it('no mês CORRENTE mostra a recorrência cujo dia ainda não chegou, com selo Previsto', function () {
     $user = User::factory()->create();
     Recurrence::factory()->for($user)->create([
         'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 20,
@@ -153,7 +153,20 @@ it('no mês CORRENTE não projeta previstas — servido pela materialização (r
 
     $this->actingAs($user)->get('/lancamentos')
         ->assertOk()
-        ->assertDontSee('Previsto');
+        ->assertSee('Netflix')
+        ->assertSee('Previsto');
+});
+
+it('no mês CORRENTE não mostra a recorrência já materializada pelo molde — o ponteiro avançado a exclui', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 20,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-20',
+    ]);
+
+    $this->actingAs($user)->get('/lancamentos')
+        ->assertOk()
+        ->assertDontSee('Netflix');
 });
 
 it('mostra o estado vazio quando o usuário não tem lançamentos', function () {

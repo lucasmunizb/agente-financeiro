@@ -308,15 +308,27 @@ it('inclui as recorrências previstas do mês futuro no total e na quebra por ca
         ->and($r->trace->registros)->toBe(2); // 1 real + 1 prevista
 });
 
-it('não conta a recorrência no mês corrente — guard anti-dupla-contagem', function () {
+it('conta a recorrência do mês corrente ainda não materializada — mesma regra do mês futuro', function () {
     $user = User::factory()->create();
 
     gastoFiltravel($user, 50000, '2026-07-20');
-    recorrenciaAtiva($user, 180000, 20, '2026-07-20');
+    recorrenciaAtiva($user, 180000, 20, '2026-07-20'); // ponteiro neste mês: o dia ainda não chegou
 
     $r = app(ConsultarGastos::class)->para($user->id, '2026-07', agora: gastosAgora());
 
-    expect($r->totalCents)->toBe(50000); // só o lançamento real; recorrência do mês não é projetada
+    expect($r->totalCents)->toBe(230000);
+});
+
+it('não conta em dobro a recorrência do mês corrente já materializada (ponteiro avançado)', function () {
+    $user = User::factory()->create();
+
+    gastoFiltravel($user, 50000, '2026-07-20');
+    // O materializador já enfileirou a de julho e avançou o ponteiro para agosto.
+    recorrenciaAtiva($user, 180000, 20, '2026-08-20');
+
+    $r = app(ConsultarGastos::class)->para($user->id, '2026-07', agora: gastosAgora());
+
+    expect($r->totalCents)->toBe(50000);
 });
 
 it('não conta a recorrência em mês passado', function () {

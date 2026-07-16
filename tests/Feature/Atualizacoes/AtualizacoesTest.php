@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Domain\Atualizacoes\AssinaturaDeAtualizacoes;
 use App\Models\Installment;
+use App\Models\PendingConfirmation;
+use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -67,6 +69,56 @@ it('muda a assinatura quando uma parcela é paga', function () {
     $tx->installments()->first()->update([
         'status_id' => StatusPagamento::idFor(StatusPagamento::PAGO),
     ]);
+
+    expect($svc->para($user->id))->not->toBe($antes);
+});
+
+it('muda a assinatura quando uma recorrência é criada — ela já aparece nos quadros', function () {
+    $user = User::factory()->create();
+    $svc = app(AssinaturaDeAtualizacoes::class);
+
+    $antes = $svc->para($user->id);
+    Recurrence::factory()->for($user)->create(['dia' => 25, 'proxima_em' => '2026-07-25']);
+
+    expect($svc->para($user->id))->not->toBe($antes);
+});
+
+it('muda a assinatura quando uma recorrência é cancelada', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create(['dia' => 25, 'proxima_em' => '2026-07-25']);
+    $svc = app(AssinaturaDeAtualizacoes::class);
+
+    $antes = $svc->para($user->id);
+    $rec->update(['status' => Recurrence::STATUS_CANCELADO]);
+
+    expect($svc->para($user->id))->not->toBe($antes);
+});
+
+it('muda a assinatura quando o agendador enfileira uma ocorrência na fila', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create(['dia' => 25, 'proxima_em' => '2026-07-25']);
+    $svc = app(AssinaturaDeAtualizacoes::class);
+
+    $antes = $svc->para($user->id);
+    PendingConfirmation::factory()->for($user)->create([
+        'origem' => PendingConfirmation::ORIGEM_RECORRENCIA,
+        'status' => PendingConfirmation::STATUS_PENDENTE,
+        'recurrence_id' => $rec->id,
+    ]);
+
+    expect($svc->para($user->id))->not->toBe($antes);
+});
+
+it('muda a assinatura quando um pendente é rejeitado (a linha some do quadro)', function () {
+    $user = User::factory()->create();
+    $pendente = PendingConfirmation::factory()->for($user)->create([
+        'origem' => PendingConfirmation::ORIGEM_RECORRENCIA,
+        'status' => PendingConfirmation::STATUS_PENDENTE,
+    ]);
+    $svc = app(AssinaturaDeAtualizacoes::class);
+
+    $antes = $svc->para($user->id);
+    $pendente->update(['status' => PendingConfirmation::STATUS_REJEITADO]);
 
     expect($svc->para($user->id))->not->toBe($antes);
 });

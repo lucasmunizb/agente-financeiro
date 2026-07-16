@@ -134,7 +134,7 @@ it('na visão de mês FUTURO lista as recorrências previstas no quadro de conta
         ->assertSee('Previsto');  // com o selo de projeção
 });
 
-it('no mês ATUAL não abate por recorrência — previsão é só futura (regressão 10b)', function () {
+it('no mês ATUAL lista a recorrência a vencer e abate o disponível', function () {
     $user = User::factory()->create();
     Income::factory()->for($user)->create(['valor_cents' => 400000, 'data' => '2026-06-05']);
     competenciaGasto($user, 50000, '2026-06-20');
@@ -146,7 +146,8 @@ it('no mês ATUAL não abate por recorrência — previsão é só futura (regre
     $this->actingAs($user)->get('/')
         ->assertOk()
         ->assertSee('Junho de 2026')
-        ->assertSee('R$ 3.500,00'); // 4000 − 500, sem abater a recorrência do mês corrente
+        ->assertSee('Netflix')            // a conta fixa aparece no quadro "a vencer"
+        ->assertSee('R$ 3.444,10');       // 4000 − 500 − 55,90
 });
 
 it('mantém o isolamento por usuário ao navegar por competência', function () {

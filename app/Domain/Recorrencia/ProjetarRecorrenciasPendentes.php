@@ -11,26 +11,45 @@ use App\Models\PendingConfirmation;
 use Carbon\CarbonImmutable;
 
 /**
- * Ponte "fila ↔ extrato" (spec 10, decisão: fila e extrato COEXISTEM). Lê as ocorrências de
+ * Ponte "fila ↔ tela" (spec 10, decisão: fila e extrato COEXISTEM). Lê as ocorrências de
  * recorrência que estão na FILA (confirmação pendente `pendente`, origem `recorrencia`) vencendo
- * no mês pedido e as devolve como ocorrências para o extrato/dashboard — status de exibição
+ * no recorte pedido e as devolve como ocorrências para o extrato/dashboard — status de exibição
  * derivado por DATA ("previsto" se ainda não venceu, "atraso" se o dia passou) e o id OPACO do
  * pendente para o botão "marcar como pago" ({@see PagarRecorrenciaPendente}).
  *
  * Read-only: não grava nada (regra 7). Escopo ESTRITO por usuário. "Agora" injetado (regra 4/5).
- * Complementa {@see ProjetarRecorrencias} (molde de mês FUTURO): aqui é o mês corrente/atrasado,
- * onde a ocorrência já foi materializada na fila pelo agendador mas ainda não foi confirmada.
+ * Complementa {@see ProjetarRecorrencias} (o MOLDE, cujo dia ainda não chegou): aqui é a
+ * ocorrência que o agendador já materializou na fila mas o usuário ainda não confirmou. As duas
+ * fontes são disjuntas pelo ponteiro `proxima_em`, que o materializador avança ao enfileirar.
  */
 final class ProjetarRecorrenciasPendentes
 {
     /**
-     * @return list<array<string, mixed>>  ocorrências ordenadas por vencimento asc
+     * Ocorrências da fila vencendo NO MÊS pedido — recorte do extrato/donut, que são mensais.
+     *
+     * @return list<array<string, mixed>> ocorrências ordenadas por vencimento asc
      */
     public function para(int $userId, string $mesAlvo, CarbonImmutable $agora): array
     {
         $inicio = CarbonImmutable::createFromFormat('!Y-m-d', $mesAlvo.'-01', RelativeDate::TIMEZONE);
-        $fim = $inicio->endOfMonth();
+
+        return $this->naJanela($userId, $inicio, $inicio->endOfMonth(), $agora);
+    }
+
+    /**
+     * Ocorrências da fila vencendo dentro de uma JANELA DE DATAS — recorte dos quadros do
+     * dashboard, que não são mensais: "a vencer" é [hoje, hoje+N] (cruza a fronteira do mês) e
+     * "em atraso" é tudo até ontem (`$de` null ⇒ sem limite inferior).
+     *
+     * @param  CarbonImmutable|null  $de  limite inferior inclusivo; null ⇒ sem limite
+     * @param  CarbonImmutable  $ate  limite superior inclusivo
+     * @return list<array<string, mixed>> ocorrências ordenadas por vencimento asc
+     */
+    public function naJanela(int $userId, ?CarbonImmutable $de, CarbonImmutable $ate, CarbonImmutable $agora): array
+    {
         $hojeData = $agora->setTimezone(RelativeDate::TIMEZONE)->startOfDay();
+        $deData = $de?->setTimezone(RelativeDate::TIMEZONE)->toDateString();
+        $ateData = $ate->setTimezone(RelativeDate::TIMEZONE)->toDateString();
 
         $pendentes = PendingConfirmation::query()
             ->where('user_id', $userId)
@@ -38,10 +57,13 @@ final class ProjetarRecorrenciasPendentes
             ->where('origem', PendingConfirmation::ORIGEM_RECORRENCIA)
             ->where(fn ($q) => $q->whereNull('expira_em')->orWhere('expira_em', '>', $agora))
             ->get()
-            ->filter(function (PendingConfirmation $p) use ($inicio, $fim): bool {
+            // O vencimento mora no payload (JSON), então o recorte por data é em PHP — o
+            // conjunto é pequeno (fila aberta de um usuário) e a comparação de 'Y-m-d' é
+            // lexicográfica, equivalente à cronológica.
+            ->filter(function (PendingConfirmation $p) use ($deData, $ateData): bool {
                 $data = (string) ($p->payload['dataCompra'] ?? '');
 
-                return $data >= $inicio->toDateString() && $data <= $fim->toDateString();
+                return ($deData === null || $data >= $deData) && $data <= $ateData;
             });
 
         if ($pendentes->isEmpty()) {
@@ -61,6 +83,7 @@ final class ProjetarRecorrenciasPendentes
         $ocorrencias = [];
 
         foreach ($pendentes as $p) {
+            /** @var CarbonImmutable $venc */
             $venc = CarbonImmutable::createFromFormat('!Y-m-d', (string) $p->payload['dataCompra'], RelativeDate::TIMEZONE);
             $catId = isset($p->payload['categoriaId']) ? (int) $p->payload['categoriaId'] : null;
             $cat = $catId !== null ? $categorias->get($catId) : null;

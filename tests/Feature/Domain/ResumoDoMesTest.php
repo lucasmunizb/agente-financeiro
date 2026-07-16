@@ -11,6 +11,8 @@ use App\Domain\ProximasContas\ConsultarProximasContas;
 use App\Models\Card;
 use App\Models\Income;
 use App\Models\Installment;
+use App\Models\PaymentMethod;
+use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
@@ -290,6 +292,25 @@ function resumoRecorrencia(User $user, int $valorCents, int $dia, string $proxim
     ]);
 }
 
+/** Ocorrência já materializada aguardando confirmação na fila (o ponteiro do molde já avançou). */
+function resumoFila(User $user, Recurrence $recorrencia, string $vencimento, int $cents, string $descricao): void
+{
+    PendingConfirmation::factory()->for($user)->create([
+        'origem' => PendingConfirmation::ORIGEM_RECORRENCIA,
+        'status' => PendingConfirmation::STATUS_PENDENTE,
+        'recurrence_id' => $recorrencia->id,
+        'expira_em' => null,
+        'payload' => [
+            'descricao' => $descricao,
+            'valorTotalCents' => $cents,
+            'dataCompra' => $vencimento,
+            'paymentMethodId' => PaymentMethod::idFor(PaymentMethod::BOLETO),
+            'parcelas' => 1,
+            'categoriaId' => null,
+        ],
+    ]);
+}
+
 it('na visão de mês FUTURO injeta as recorrências previstas nas próximas contas e abate o disponível (P1/P2/P10)', function () {
     $user = User::factory()->create();
 
@@ -314,20 +335,70 @@ it('na visão de mês FUTURO injeta as recorrências previstas nas próximas con
     expect($resumo->disponivelCents())->toBe(344410);
 });
 
-it('não projeta recorrências no mês corrente — chamada default fica idêntica ao atual (P3, regressão)', function () {
+it('no MÊS CORRENTE lista a recorrência cujo dia ainda não chegou e abate o disponível', function () {
     $user = User::factory()->create();
 
     resumoReceita($user, 400000, '2026-06-05');
     resumoParcela($user, 50000, '2026-06-20');
-    resumoRecorrencia($user, 5590, 20, '2026-06-20'); // ocorrência neste mês — servida pela fila, não projetada
+    resumoRecorrencia($user, 5590, 20, '2026-06-20'); // conta fixa deste mês, ainda não materializada
 
-    // Chamada default (sem "agora"): âncora == agora == mês corrente ⇒ sem previsão.
     $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
 
-    expect($resumo->totalProximasContasCents())->toBe(50000)      // só a real
-        ->and($resumo->disponivelCents())->toBe(350000)           // 4000 - 500, sem abater a recorrência
-        ->and($resumo->proximasContas->contas)->toHaveCount(1)
-        ->and($resumo->proximasContas->contas[0]['prevista'])->toBeFalse();
+    expect($resumo->totalProximasContasCents())->toBe(55590)      // real (500) + prevista (55,90)
+        ->and($resumo->disponivelCents())->toBe(344410)           // 4000 - 500 - 55,90
+        ->and($resumo->proximasContas->contas)->toHaveCount(2);
+
+    $previstas = collect($resumo->proximasContas->contas)->firstWhere('prevista', true);
+    expect($previstas['descricao'])->toBe('Netflix')
+        ->and($previstas['vencimento'])->toBe('2026-06-20');
+});
+
+it('no MÊS CORRENTE não conta em dobro a recorrência já materializada na fila', function () {
+    $user = User::factory()->create();
+
+    resumoReceita($user, 400000, '2026-06-05');
+    // Enfileirada para 20/06; o materializador já avançou o ponteiro para julho.
+    $rec = resumoRecorrencia($user, 5590, 20, '2026-07-20');
+    resumoFila($user, $rec, '2026-06-20', 5590, 'Netflix');
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
+
+    // Uma linha só: a da fila. O molde não projeta junho (ponteiro em julho).
+    expect($resumo->proximasContas->contas)->toHaveCount(1)
+        ->and($resumo->totalProximasContasCents())->toBe(5590)
+        ->and($resumo->disponivelCents())->toBe(394410);          // 4000 - 55,90
+});
+
+it('no MÊS CORRENTE não conta em dobro a recorrência já confirmada — vale a parcela real', function () {
+    $user = User::factory()->create();
+
+    resumoReceita($user, 400000, '2026-06-05');
+    $rec = resumoRecorrencia($user, 5590, 20, '2026-07-20'); // ponteiro já em julho
+    resumoParcela($user, 5590, '2026-06-20')->update(['recurrence_id' => $rec->id]);
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
+
+    expect($resumo->proximasContas->contas)->toHaveCount(1)
+        ->and($resumo->totalProximasContasCents())->toBe(5590)
+        ->and($resumo->proximasContas->contas[0]['prevista'])->toBeFalse()
+        ->and($resumo->disponivelCents())->toBe(394410);
+});
+
+it('lista no quadro "em atraso" a recorrência vencida esquecida na fila', function () {
+    $user = User::factory()->create();
+
+    $rec = resumoRecorrencia($user, 5590, 5, '2026-07-05'); // ponteiro já avançado
+    resumoFila($user, $rec, '2026-06-05', 5590, 'Netflix'); // venceu dia 5, hoje é 15
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
+
+    expect($resumo->contasVencidas->contas)->toHaveCount(1)
+        ->and($resumo->totalContasVencidasCents())->toBe(5590)
+        ->and($resumo->contasVencidas->contas[0])->toMatchArray([
+            'descricao' => 'Netflix',
+            'vencimento' => '2026-06-05',
+            'prevista' => true,
+        ]);
 });
 
 it('na visão de mês FUTURO o donut (gastos por categoria) inclui as recorrências previstas', function () {
@@ -342,15 +413,15 @@ it('na visão de mês FUTURO o donut (gastos por categoria) inclui as recorrênc
     expect($resumo->gastos->totalCents)->toBe(55590);
 });
 
-it('no mês corrente o donut (gastos) não muda — sem projeção (regressão)', function () {
+it('no MÊS CORRENTE o donut também inclui a recorrência prevista — mesma verdade do quadro', function () {
     $user = User::factory()->create();
 
     resumoParcela($user, 50000, '2026-06-20');
-    resumoRecorrencia($user, 5590, 20, '2026-06-20'); // ocorrência deste mês — servida pela fila, não projetada
+    resumoRecorrencia($user, 5590, 20, '2026-06-20'); // conta fixa deste mês, ainda não materializada
 
     $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
 
-    expect($resumo->gastos->totalCents)->toBe(50000);
+    expect($resumo->gastos->totalCents)->toBe(55590);
 });
 
 it('a previsão respeita o escopo por usuário na visão futura (P8)', function () {

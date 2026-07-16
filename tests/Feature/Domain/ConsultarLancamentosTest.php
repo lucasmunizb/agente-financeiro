@@ -331,9 +331,19 @@ it('soma as previstas no total exibido e na contagem de registros', function () 
         ->and($r->registros)->toBe(2);
 });
 
-it('não projeta recorrência no mês corrente — sem dupla contagem com a materializada', function () {
+it('projeta no mês corrente a recorrência cujo dia ainda não chegou (molde não materializado)', function () {
     $user = User::factory()->create();
     Recurrence::factory()->for($user)->create(['dia' => 20, 'proxima_em' => '2026-06-20']);
+
+    $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
+
+    expect($r->registros)->toBe(1)
+        ->and(itensDoExtrato($r)[0]['prevista'])->toBeTrue();
+});
+
+it('não projeta no mês corrente a recorrência já materializada — o ponteiro avançado a exclui', function () {
+    $user = User::factory()->create();
+    Recurrence::factory()->for($user)->create(['dia' => 20, 'proxima_em' => '2026-07-20']);
 
     $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
 

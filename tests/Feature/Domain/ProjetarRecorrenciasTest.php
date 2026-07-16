@@ -69,9 +69,27 @@ it('projeta várias ordenadas por vencimento e soma o total (P10)', function () 
         ->and($resultado->totalCents)->toBe(185590);
 });
 
-it('não projeta nada no mês corrente — servido pela fila just-in-time (guard/P3)', function () {
+it('projeta no MÊS CORRENTE a ocorrência cujo dia ainda não chegou (molde não materializado)', function () {
     $user = User::factory()->create();
-    Recurrence::factory()->for($user)->create(['dia' => 20, 'proxima_em' => '2026-07-20']);
+    // Ponteiro no dia 20 deste mês: o agendador ainda não passou por ela.
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Aluguel', 'valor_cents' => 180000, 'dia' => 20, 'proxima_em' => '2026-07-20',
+    ]);
+
+    $resultado = (new ProjetarRecorrencias)->para($user->id, '2026-07', agoraFixo());
+
+    expect($resultado->totalCents)->toBe(180000)
+        ->and($resultado->ocorrencias)->toHaveCount(1)
+        ->and($resultado->ocorrencias[0])->toMatchArray([
+            'vencimento' => '2026-07-20',
+            'prevista' => true,
+        ]);
+});
+
+it('não projeta a ocorrência do mês corrente já materializada — o ponteiro avançado a exclui (anti-dupla-contagem)', function () {
+    $user = User::factory()->create();
+    // O materializador enfileirou a de julho e avançou o ponteiro para agosto no mesmo instante.
+    Recurrence::factory()->for($user)->create(['dia' => 5, 'proxima_em' => '2026-08-05']);
 
     $resultado = (new ProjetarRecorrencias)->para($user->id, '2026-07', agoraFixo());
 

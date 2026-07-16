@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Dashboard;
 
 use App\Domain\ContasVencidas\ConsultarContasVencidas;
+use App\Domain\ContasVencidas\ResultadoConsultaContasVencidas;
 use App\Domain\Disponivel\ConsultarDisponivelDoMes;
 use App\Domain\Disponivel\DisponivelDoMes;
 use App\Domain\Disponivel\ResultadoConsultaDisponivel;
@@ -13,6 +14,7 @@ use App\Domain\Gastos\ConsultarGastos;
 use App\Domain\ProximasContas\ConsultarProximasContas;
 use App\Domain\ProximasContas\ResultadoConsultaProximasContas;
 use App\Domain\Recorrencia\ProjetarRecorrencias;
+use App\Domain\Recorrencia\ProjetarRecorrenciasPendentes;
 use App\Domain\Recorrencia\ResultadoProjecaoRecorrencias;
 use App\Models\Card;
 use Carbon\CarbonImmutable;
@@ -33,11 +35,13 @@ use Carbon\CarbonImmutable;
  *    (lista previsível; o frontend decide o que esconder);
  *  - janela default de próximas contas = 30 dias (parâmetro injetável).
  *
- * Previsão de recorrências (spec 10b): na visão de um mês FUTURO — quando `$agora` (hoje real)
- * é distinto da `$ancora` (mês navegado) e a competência é estritamente futura — as ocorrências
- * PREVISTAS das recorrências ({@see ProjetarRecorrencias}, read-only) são mescladas nas próximas
- * contas (flag `prevista`) e ABATEM o disponível projetado. No mês corrente/passado a previsão é
- * vazia e nada muda (retrocompatível: `$agora` omitido ⇒ igual à `$ancora`).
+ * Recorrências nos quadros (spec 10b): uma conta fixa é uma conta como outra qualquer e aparece
+ * do mês corrente em diante, por UMA de três fontes, disjuntas pelo ponteiro `proxima_em` (ver
+ * {@see ProjetarRecorrencias}) — a parcela real quando já confirmada (vem das consultas), a FILA
+ * quando materializada à espera do "sim" ({@see ProjetarRecorrenciasPendentes}) e o MOLDE
+ * enquanto o dia não chega ({@see ProjetarRecorrencias}). As duas últimas são read-only, entram
+ * marcadas com `prevista` e ABATEM o disponível — o que ainda vai vencer não é dinheiro livre.
+ * Mês passado é retrato fechado: só lançamento real (`$agora` omitido ⇒ igual à `$ancora`).
  */
 final class ResumoDoMes
 {
@@ -48,6 +52,7 @@ final class ResumoDoMes
         private readonly ConsultarFaturaCartao $faturaCartao,
         private readonly ConsultarDisponivelDoMes $disponivel,
         private readonly ProjetarRecorrencias $projetarRecorrencias = new ProjetarRecorrencias,
+        private readonly ProjetarRecorrenciasPendentes $projetarPendentes = new ProjetarRecorrenciasPendentes,
     ) {}
 
     /**
@@ -67,11 +72,29 @@ final class ResumoDoMes
         $contasVencidas = $this->contasVencidas->para($userId, $ancora);
         $disponivel = $this->disponivel->para($userId, $mes);
 
-        // Só em meses estritamente futuros a projeção é não-vazia; caso contrário as mesclas
-        // abaixo são no-op e o resultado é idêntico ao das consultas reais (retrocompat).
+        // Uma conta fixa aparece nos quadros por UMA de três fontes, disjuntas pelo ponteiro
+        // `proxima_em` (ver ProjetarRecorrencias): parcela real (já nas consultas acima) quando
+        // confirmada, fila quando materializada e aguardando o "sim", molde enquanto o dia não
+        // chega. As duas últimas entram aqui.
+        $inicioJanela = $ancora->setTimezone('America/Sao_Paulo')->startOfDay();
         $previsao = $this->projetarRecorrencias->para($userId, $mes, $agora);
-        $proximasContas = $this->mesclarPrevistas($proximasContas, $previsao);
-        $disponivel = $this->abaterPrevistas($disponivel, $previsao);
+        $fila = $this->projetarPendentes->naJanela(
+            $userId,
+            $inicioJanela,
+            $inicioJanela->addDays($janelaProximasContas),
+            $agora,
+        );
+        // Sem limite inferior, espelhando a consulta de vencidas: tudo que venceu antes da âncora.
+        $filaEmAtraso = $this->projetarPendentes->naJanela($userId, null, $inicioJanela->subDay(), $agora);
+
+        $proximasContas = $this->mesclarPrevistas($proximasContas, $previsao, $fila);
+        $contasVencidas = $this->mesclarVencidasPrevistas($contasVencidas, $filaEmAtraso);
+        // O disponível é MENSAL, então o abatimento não pode usar a janela de 30 dias dos quadros
+        // (ela vaza para o mês seguinte): recorta a fila pelo mês.
+        $disponivel = $this->abaterPrevistas(
+            $disponivel,
+            $previsao->totalCents + $this->somar($this->projetarPendentes->para($userId, $mes, $agora)),
+        );
 
         // Uma fatura por cartão ativo do usuário (escopo por user_id). Resolve pelo ID do
         // cartão já em mãos — final_4 não é único (dois cartões podem repetir o final) —
@@ -95,44 +118,97 @@ final class ResumoDoMes
     }
 
     /**
-     * Mescla as ocorrências PREVISTAS nas próximas contas reais: marca as reais com
-     * `prevista=false`, concatena as previstas (já com `prevista=true`), reordena por
-     * vencimento e soma os totais. Previsão vazia ⇒ só normaliza a flag (nada muda no total).
+     * Mescla as ocorrências PREVISTAS (molde + fila) nas próximas contas reais: marca as reais
+     * com `prevista=false`, concatena as previstas, reordena por vencimento e soma os totais.
+     * Nada previsto ⇒ só normaliza a flag (nada muda no total).
+     *
+     * @param  list<array<string, mixed>>  $fila  ocorrências materializadas aguardando confirmação
      */
     private function mesclarPrevistas(
         ResultadoConsultaProximasContas $reais,
         ResultadoProjecaoRecorrencias $previsao,
+        array $fila,
     ): ResultadoConsultaProximasContas {
         $contas = array_map(
             static fn (array $conta): array => $conta + ['prevista' => false],
             $reais->contas,
         );
 
-        $contas = [...$contas, ...$previsao->ocorrencias];
+        $contas = [...$contas, ...$previsao->ocorrencias, ...$this->comoContas($fila)];
         usort($contas, static fn (array $a, array $b): int => $a['vencimento'] <=> $b['vencimento']);
 
         return new ResultadoConsultaProximasContas(
-            totalCents: $reais->totalCents + $previsao->totalCents,
+            totalCents: $reais->totalCents + $previsao->totalCents + $this->somar($fila),
             contas: array_values($contas),
             trace: $reais->trace,
         );
     }
 
     /**
-     * Abate o total das previstas do disponível projetado, recompondo pelo calculador puro
-     * {@see DisponivelDoMes} (regra 4 — a agregação só passa componentes já somados). As
-     * recorrências são fora de cartão, então entram como gasto do mês vencendo. Previsão
-     * vazia ⇒ resultado idêntico ao real.
+     * Espelho retrospectivo de {@see mesclarPrevistas()}: junta as ocorrências da fila que já
+     * venceram e seguem sem confirmação — a conta fixa esquecida é justamente o caso que o quadro
+     * "em atraso" existe para mostrar. O molde não entra aqui: o materializador avança o ponteiro
+     * no dia, então `proxima_em` no passado só existe se o agendador falhou (não é atraso do
+     * usuário, e projetá-lo inventaria um gasto que ninguém confirmou).
+     *
+     * @param  list<array<string, mixed>>  $fila  ocorrências da fila vencidas
+     */
+    private function mesclarVencidasPrevistas(
+        ResultadoConsultaContasVencidas $reais,
+        array $fila,
+    ): ResultadoConsultaContasVencidas {
+        $contas = array_map(
+            static fn (array $conta): array => $conta + ['prevista' => false],
+            $reais->contas,
+        );
+
+        $contas = [...$contas, ...$this->comoContas($fila)];
+        usort($contas, static fn (array $a, array $b): int => $a['vencimento'] <=> $b['vencimento']);
+
+        return new ResultadoConsultaContasVencidas(
+            totalCents: $reais->totalCents + $this->somar($fila),
+            contas: array_values($contas),
+            trace: $reais->trace,
+        );
+    }
+
+    /**
+     * Normaliza a ocorrência da fila para a forma de "conta" dos quadros. Vem da fila ⇒ é sempre
+     * recorrência e ainda não é lançamento (`prevista`) — o selo é etapa de frontend (regra 3).
+     *
+     * @param  list<array<string, mixed>>  $fila
+     * @return list<array<string, mixed>>
+     */
+    private function comoContas(array $fila): array
+    {
+        return array_map(
+            static fn (array $oc): array => $oc + ['prevista' => true, 'recorrente' => true],
+            $fila,
+        );
+    }
+
+    /** @param  list<array<string, mixed>>  $ocorrencias */
+    private function somar(array $ocorrencias): int
+    {
+        return (int) array_sum(array_column($ocorrencias, 'cents'));
+    }
+
+    /**
+     * Abate o total das previstas DO MÊS (molde + fila) do disponível, recompondo pelo calculador
+     * puro {@see DisponivelDoMes} (regra 4 — a agregação só passa componentes já somados). As
+     * recorrências são fora de cartão, então entram como gasto do mês vencendo. O
+     * {@see ConsultarDisponivelDoMes} soma só parcelas reais, então não há dupla contagem: o que
+     * ainda não é lançamento nunca passou por lá. Nada previsto ⇒ resultado idêntico ao real.
      */
     private function abaterPrevistas(
         ResultadoConsultaDisponivel $real,
-        ResultadoProjecaoRecorrencias $previsao,
+        int $previstasCents,
     ): ResultadoConsultaDisponivel {
-        if ($previsao->totalCents === 0) {
+        if ($previstasCents === 0) {
             return $real;
         }
 
-        $gastosComPrevistas = $real->gastosDoMesCents + $previsao->totalCents;
+        $gastosComPrevistas = $real->gastosDoMesCents + $previstasCents;
 
         $disponivel = DisponivelDoMes::calcular(
             receitasCents: $real->receitasCents,
