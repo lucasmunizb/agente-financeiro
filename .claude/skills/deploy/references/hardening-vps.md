@@ -19,7 +19,17 @@ install -d -m 700 -o deploy -g deploy /home/deploy/.ssh
 printf '%s\n' "ssh-ed25519 AAAA... operador" > /home/deploy/.ssh/authorized_keys
 chown deploy:deploy /home/deploy/.ssh/authorized_keys
 chmod 600 /home/deploy/.ssh/authorized_keys
+
+# diretório do stack, dono do `deploy` — SEM isto o scp do CI falha.
+# `/opt` é do root; o `scp` (drone-scp) não usa sudo, então não consegue
+# criar `/opt/financeiro` sozinho e morre com "Process exited with status 1".
+install -d -m 755 -o deploy -g deploy /opt/financeiro
 ```
+
+> O workflow (`.github/workflows/deploy.yml`) envia `docker-stack.yml` para
+> `/opt/financeiro` via `scp-action` e depois faz `cd /opt/financeiro`. Se o alvo
+> não existir com dono `deploy`, o passo "Enviar o stack file pro VPS" falha antes
+> de qualquer deploy. Troque `deploy` pelo valor real do secret `VPS_USER`.
 
 `/etc/ssh/sshd_config.d/hardening.conf` (drop-in, não edite o arquivo principal):
 

@@ -54,6 +54,8 @@ Portanto, o vínculo seguro usa **`telegram_user_id` + telefone verificado**, **
 ## 3. Notas de implementação
 
 - O webhook chega no próprio app (sem contêiner extra no MVP); o adaptador Telegram é isolado no código.
+- **Registro do webhook (por bot, do lado do Telegram):** o webhook **não** é setado no deploy — registra-se uma vez por ambiente com `php artisan telegram:webhook <url>`. Ele **persiste** entre deploys (não some num redeploy normal). Em produção, rodar de dentro de um container do app garante que o `secret_token` casa com o secret `telegram_webhook_secret`. Inspecionar/remover: `telegram:webhook --info` / `--delete`.
+- **Use um bot SEPARADO em dev.** O webhook é único por bot. Se dev e produção usam o mesmo token, apontar o webhook para o túnel de dev (`telegram:webhook https://<túnel>/telegram/webhook`) **rouba** o webhook da produção — o bot de prod fica mudo até re-registrar a URL real. Bot de dev com token próprio (ver `.env.example`) elimina o conflito.
 - A deduplicação por `update_id` usa **unique constraint** no banco — garante idempotência sem Redis.
 - A IA atua só nos três papéis definidos (intenção, extração, redação); **nunca calcula dinheiro** — ver Governança de IA (seção 3).
 - Processamento pesado (PDF, chamadas de IA) roda no **worker** via fila, fora do request.

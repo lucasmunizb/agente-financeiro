@@ -192,7 +192,7 @@ Todos os alvos encapsulam `docker compose` — nenhum comando roda no host.
 - **Dev:** `.env` (não versionado) + `.env.example`.
 - **Produção:** sem `.env`. Chaves (DB, IA, Telegram, `APP_KEY`) vêm de **Docker Secrets**, lidas pelo
   *entrypoint* via padrão `*_FILE` apontando para `/run/secrets/<nome>`.
-
+|ssh -i ~/.ssh/financeiro_deploy deploy@IP_DO_VPS|
 ---
 
 ## 📂 Estrutura do projeto

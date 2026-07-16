@@ -93,17 +93,22 @@ services:
       <<: *app-environment
     secrets: *app-secrets
     # Porta publicada só para o Nginx do host alcançar (proxy_pass 127.0.0.1:8001).
-    # mode:host = não usa a malha de ingresso; o firewall bloqueia 8001 de fora,
-    # então só o próprio host (Nginx) fala com o app.
+    # mode:ingress (routing mesh): balanceia a 8001 entre as N réplicas. mode:host
+    # NÃO serve aqui — num nó só, cada réplica tentaria ligar a 8001 no host e só
+    # uma consegue (trava em 1/2), e o start-first conflita no rolling update. O
+    # firewall segue bloqueando a 8001 de fora; só o Nginx do host fala com o app.
     ports:
       - target: 8000
         published: 8001
         protocol: tcp
-        mode: host
+        mode: ingress
     # Healthcheck de verdade: /up sobe o framework (detecta APP_KEY/DB quebrados),
     # em vez do endpoint administrativo do FrankenPHP.
+    # O Host TEM de ser o do APP_URL: o trustHosts (bootstrap/app.php, fix L11 do
+    # pentest) fixa o Host aceito em produção e responde 400 a qualquer outro —
+    # incluindo `localhost`. Sem este -H o healthcheck falha e o Swarm mata a task.
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/up"]
+      test: ["CMD", "curl", "-fsS", "-H", "Host: agentefinanceiro.muniztecnologia.com.br", "http://localhost:8000/up"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -113,7 +118,11 @@ services:
     deploy:
       replicas: 2
       restart_policy:
-        condition: on-failure
+        # `any`, não `on-failure`: uma task morta pelo healthcheck sai com código 0
+        # (SIGTERM limpo), e `on-failure` NÃO a ressuscita — o serviço trava em 0/N.
+        # `any` garante que o Swarm sempre reponha a réplica.
+        condition: any
+        delay: 5s
       update_config:
         order: start-first
 
