@@ -34,12 +34,39 @@ Causa raiz apurada:
    campos e nenhum de recorrência; `Intencao` só tinha REGISTRAR/CONSULTAR. "todo dia 10"
    não tinha para onde ir e caiu no campo `data`, que `NormalizadorDeGastoExtraido::
    resolverData()` não parseia (não é uma data) → esclarecimento `data`.
-2. **`forma_pagamento` sem normalização determinística.** A mensagem de erro tinha
-   exatamente 2 campos na ordem do `NormalizadorDeGastoExtraido` (valor → data →
-   forma_pagamento), logo a **barreira 1** (`GastoParcial::faltantes()`, que **não** checa
-   `data`) passou — ou seja, a IA **extraiu** a forma. Quem rejeitou foi
-   `PaymentMethod::idFor()`, que faz `where('tipo', $tipo)` **exato**: qualquer coisa fora
-   de `pix` literal (`"PIX"`, `"pix recorrente"`) devolve null.
+2. **~~`forma_pagamento` sem normalização determinística.~~ — DIAGNÓSTICO ERRADO, ver §2b.**
+   A hipótese era: `PaymentMethod::idFor()` faz `where('tipo', $tipo)` **exato**, então um
+   `"PIX"` vindo da IA devolveria null. Plausível pela forma da mensagem, mas **nunca
+   verificada** — e refutada pelo teste seguinte em produção (§2b). A normalização de
+   `idFor()` foi mantida como defesa em profundidade; ela **não era a causa**.
+
+## 2b. Causa raiz REAL (apurada em 2026-07-16, 2º teste em produção)
+
+Após o deploy da extração de recorrência, o bot passou a pedir **só** "a forma de pagamento"
+(a `data` sumiu — o desvio de recorrência funcionou), mas continuou pedindo **em loop
+infinito**, mesmo o usuário respondendo `pix` minúsculo puro — que casaria até no código
+antigo. Isso refuta a hipótese da caixa alta.
+
+**A causa era o caminho de DEPLOY, não o código:** as migrations criam
+`payment_methods`/`status_pagamento`/`banks` **vazias**; quem as popula é seeder. O job de
+deploy (`docker-stack.yml`) rodava apenas:
+
+```
+command: php artisan migrate --force        # ← nenhum seed, em lugar nenhum do pipeline
+```
+
+Logo, em produção `payment_methods` estava **vazia**, `PaymentMethod::idFor('pix')` devolvia
+null **sempre**, e nenhum gasto podia ser registrado — nem recorrência, nem avulso. As duas
+mensagens do incidente (a original com `data`+`forma`, e o loop só com `forma`) são o mesmo
+`idFor()` null.
+
+**Por que a suíte não pegou (a lição que importa):** todo teste de domínio roda
+`$this->seed([PaymentMethodSeeder::class, ...])` no `beforeEach`. O teste prova o código
+contra um banco **seedado**; a produção rodava contra um banco **vazio**. A divergência não
+estava no código — estava entre o ambiente de teste e o de deploy, que nenhum teste unitário
+ou de feature enxerga. Guardado agora por
+`tests/Feature/Database/ReferenciaSeederTest.php`, que inclui uma asserção sobre o **próprio
+`docker-stack.yml`**.
 
 > **Por que os testes não pegaram:** toda a cobertura de extração usa `Ai::fakeAgent`, e o
 > fake devolve o payload que **nós** escrevemos — sempre `"pix"` certinho. O defeito estava
@@ -211,10 +238,17 @@ Te lembro no dia para confirmar o pagamento.
     redação não consultar o banco) · `ConfirmacaoDeGasto` ganha o par
     `previaRecorrencia`/`recorrencia` · `RedatorDoChat` (prévia, `RECORRENCIA_GRAVADA`,
     rótulo `recorrencia_dia`). `RespostaTelegram` **não mudou**: reusa o `RedatorDoChat`.
+  - **Correção da causa raiz real (§2b) — commit de DevOps, separado:**
+    `database/seeders/ReferenciaSeeder.php` (novo; fonte única das tabelas de referência, o
+    `DatabaseSeeder` delega a ele) · `docker-stack.yml` job `migrate` passa a rodar
+    `migrate --force && db:seed --force --class=ReferenciaSeeder` (idempotente).
+    `--class` vai **sem namespace** de propósito: o FQCN exigiria escapar `\` por YAML +
+    shlex + `sh -c` e chegaria corrompido.
   - Testes: `tests/Feature/IA/RecorrenciaViaBotTest.php` (novo, com a mensagem literal do
     incidente) · `tests/Feature/AI/NormalizadorDeGastoExtraidoTest.php` ·
     `tests/Unit/IA/GastoParcialTest.php` · `tests/Unit/AI/ExtratorDeGastoTest.php` ·
-    `tests/Unit/Chat/RedatorDoChatTest.php`.
+    `tests/Unit/Chat/RedatorDoChatTest.php` ·
+    `tests/Feature/Database/ReferenciaSeederTest.php` (novo).
 - **Adiado para:** *golden set* contra provedor real (dívida registrada em §2) — é o único
   teste que pegaria a classe de bug deste incidente.
 - **Decisões de regra tomadas:** recorrência entra como **campo do `ExtratorDeGasto`** (1

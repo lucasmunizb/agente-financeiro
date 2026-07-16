@@ -72,12 +72,26 @@ services:
   # proxy_pass para http://127.0.0.1:8001 (porta que o app publica abaixo).
   # Bloco server{} de exemplo: docs/deploy/nginx-agentefinanceiro.conf.example
 
-  # Migrations como job de deploy: roda 1× até concluir a cada `stack deploy`
-  # (cria sessions/cache/jobs no primeiro deploy — sem isso o app sobe em 500).
-  # replicated-job com 1 réplica = sem corrida; `--force` porque APP_ENV=production.
+  # Migrations + tabelas de referência como job de deploy: roda 1× até concluir a
+  # cada `stack deploy` (cria sessions/cache/jobs no primeiro deploy — sem isso o
+  # app sobe em 500). replicated-job com 1 réplica = sem corrida; `--force` porque
+  # APP_ENV=production.
+  #
+  # O db:seed NÃO é opcional: as migrations criam payment_methods/status_pagamento/
+  # banks VAZIAS, e sem as linhas de referência `PaymentMethod::idFor()` devolve null
+  # e NENHUM gasto pode ser registrado (incidente 2026-07-16: o bot pedia a forma de
+  # pagamento em loop, mesmo o usuário respondendo "pix"). Seeda só o ReferenciaSeeder
+  # — nunca o DatabaseSeeder, que pode ganhar dado de demonstração. É idempotente
+  # (firstOrCreate), então rodar a cada deploy é seguro; `&&` garante que um seed não
+  # roda sobre uma migration que falhou.
+  #
+  # `--class=ReferenciaSeeder` SEM namespace de propósito: o Laravel prefixa
+  # `Database\Seeders\` quando não há barra invertida. Escrever o FQCN aqui exigiria
+  # escapar `\` duas vezes (YAML → shlex do Docker → sh -c) e o nome chegaria
+  # corrompido ("DatabaseSeedersReferenciaSeeder"), com o job falhando no deploy.
   migrate:
     image: ${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_TAG:-latest}
-    command: php artisan migrate --force
+    command: sh -c "php artisan migrate --force && php artisan db:seed --force --class=ReferenciaSeeder"
     environment:
       <<: *app-environment
     secrets: *app-secrets
