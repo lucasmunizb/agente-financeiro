@@ -79,12 +79,19 @@ jobs:
             ${{ env.IMAGE }}:latest
           load: true                # carrega local p/ o Trivy escanear antes do push
       - name: Scan Trivy — falha em HIGH/CRITICAL
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
-          severity: HIGH,CRITICAL
-          exit-code: '1'
-          ignore-unfixed: true
+        # Roda o Trivy pela imagem oficial (não pelo setup-trivy, que baixa o
+        # binário da API do GitHub e falha silenciosamente por rate-limit —
+        # trivy-action#516 / setup-trivy#30). A imagem já está carregada
+        # localmente (load: true), então escaneamos via socket do Docker.
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e TRIVY_GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            aquasec/trivy:0.65.0 image \
+              --severity HIGH,CRITICAL \
+              --exit-code 1 \
+              --ignore-unfixed \
+              ${{ env.IMAGE }}:${{ github.sha }}
       - name: Push (SHA imutável + latest móvel)
         run: |
           docker push ${{ env.IMAGE }}:${{ github.sha }}
