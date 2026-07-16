@@ -114,6 +114,32 @@ it('calcula o disponível do mês pela fórmula oficial', function () {
 
 ---
 
+## 🔁 Validar o pipeline localmente (antes do `git push`)
+
+O deploy é automatizado por GitHub Actions (`.github/workflows/deploy.yml`):
+**`test` (gate TDD) → `build` → `scan` (Trivy) → `deploy` (Swarm) → `smoke`**. Para não
+descobrir falha só depois do push, dá para **reproduzir localmente os estágios que não
+tocam produção**:
+
+```bash
+make ci-local      # pipeline inteiro sem produção: test + build + scan
+make ci-test       # só o gate de teste
+make ci-build      # só o build do target de produção
+make ci-scan       # só o scan Trivy (HIGH/CRITICAL) da última imagem
+```
+
+**Por que não basta `make test`:** o `ci-*` roda contra uma **exportação limpa do git**
+(`git archive`), igual ao `actions/checkout` do runner — **sem** `public/build`, `vendor`
+nem `node_modules` (todos gitignored). Isso reproduz bugs que só aparecem no checkout
+limpo (ex.: *"Vite manifest not found"*), que um `make test` na sua árvore de trabalho
+mascararia. Inclui suas mudanças **em arquivos rastreados** ainda não commitadas; ignora
+o que o git ignora.
+
+> `deploy` e `smoke` tocam a produção e **não** rodam localmente — são promovidos só por
+> você via `git push` (regra inviolável 1). Detalhes em [`scripts/ci-local.sh`](scripts/ci-local.sh).
+
+---
+
 ## 🛠️ Comandos úteis (Makefile)
 
 Todos os alvos encapsulam `docker compose` — nenhum comando roda no host.
@@ -131,6 +157,8 @@ Todos os alvos encapsulam `docker compose` — nenhum comando roda no host.
 | `make worker-shell` | Bash no contêiner `worker` |
 | `make test` | Roda a suíte de testes |
 | `make pest` | Roda o Pest |
+| `make ci-local` | Reproduz o pipeline (test + build + scan) contra árvore limpa do git |
+| `make ci-test` · `make ci-build` · `make ci-scan` | Estágios individuais do CI local |
 | `make migrate` · `make fresh` · `make seed` | Migrations / recriar do zero / seeds |
 | `make key` | Gera a `APP_KEY` |
 | `make tinker` | Abre o Tinker |

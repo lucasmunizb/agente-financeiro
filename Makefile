@@ -22,7 +22,7 @@ WEBHOOK_PATH := /telegram/webhook
 .PHONY: help setup bootstrap up down build rebuild restart ps logs logs-app \
         logs-worker shell worker-shell test migrate fresh seed key artisan \
         composer pest pint pint-test tinker stop npm assets vite db-test \
-        webhook-up webhook-down
+        webhook-up webhook-down ci-local ci-test ci-build ci-scan
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -157,3 +157,21 @@ webhook-down: ## Remove o webhook do Telegram e derruba o túnel
 	  $(EXEC_T) php artisan telegram:webhook --delete >/dev/null 2>&1 || true; \
 	fi; \
 	$(DC) --profile tools rm -sf cloudflared >/dev/null 2>&1 || true
+
+# ---------------------------------------------------------------------
+# CI local — reproduz os estágios do pipeline que NÃO tocam produção
+# (test → build → scan), contra uma árvore LIMPA do git (espelha o
+# checkout do runner). Pega falhas antes do push. Ver scripts/ci-local.sh.
+# Deploy + smoke tocam produção e são promovidos só por você via git push.
+# ---------------------------------------------------------------------
+ci-local: ## Roda o pipeline local inteiro (test + build + scan) sem tocar produção
+	@bash scripts/ci-local.sh all
+
+ci-test: ## CI local: só o gate de teste (contra árvore limpa do git)
+	@bash scripts/ci-local.sh test
+
+ci-build: ## CI local: só o build do target de produção
+	@bash scripts/ci-local.sh build
+
+ci-scan: ## CI local: só o scan Trivy (HIGH/CRITICAL) da última imagem
+	@bash scripts/ci-local.sh scan

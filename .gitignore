@@ -41,3 +41,6 @@ yarn-error.log
 
 .perf-tmp/
 docs/AUDITORIA-2026-07.md
+
+# CI local (make ci-local): árvore limpa temporária
+.ci-local.*
