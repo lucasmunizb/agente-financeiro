@@ -13,6 +13,12 @@
 
 pest()->extend(Tests\TestCase::class)
  // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    // Testes de feature renderizam Blade com @vite. Sem o manifest compilado
+    // (public/build é gitignored → ausente num checkout limpo do CI) o Vite lança
+    // ViteManifestNotFoundException e a view dá 500. withoutVite() stuba a diretiva:
+    // a suíte valida o conteúdo renderizado, não o pipeline de assets (build fica na
+    // imagem de produção, stage `assets`). Desacopla o gate de teste do npm build.
+    ->beforeEach(fn () => $this->withoutVite())
     ->in('Feature');
 
 /*
