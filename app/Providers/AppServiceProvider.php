@@ -25,8 +25,6 @@ use App\Domain\Telegram\RoteadorDeComandos;
 use App\Domain\Telegram\RoteadorDeMensagem;
 use App\Domain\Telegram\Saida\ClienteTelegram;
 use App\Domain\Telegram\Saida\ClienteTelegramHttp;
-use App\Events\PendenteRecorrenteRejeitado;
-use App\Listeners\CancelarRecorrenciaAoRejeitar;
 use App\Listeners\LogarFailoverDeIA;
 use App\Listeners\PenalizarProvedorNaRotacao;
 use App\Models\ChatMessage;
@@ -136,10 +134,6 @@ class AppServiceProvider extends ServiceProvider
         // age com a rotação ligada (retrocompatível quando desligada).
         Event::listen(AgentFailedOver::class, PenalizarProvedorNaRotacao::class);
 
-        // Cascata "rejeitar → cancela a recorrência" (spec 10, C7): o "não" na fila de um
-        // pendente vindo de recorrência encerra a regra inteira (decisão do usuário).
-        Event::listen(PendenteRecorrenteRejeitado::class, CancelarRecorrenciaAoRejeitar::class);
-
         // Parâmetro {transaction} das rotas chega SEMPRE criptografado (requisito
         // inegociável — README §"Identificadores nas URLs"). Decodifica o token opaco de
         // volta no id inteiro; token forjado ou id em claro (`/lancamentos/123`) → 404. O
@@ -157,6 +151,10 @@ class AppServiceProvider extends ServiceProvider
         // Idem para {recorrencia} (recurrence) — gerenciar/cancelar (spec 10). O escopo por
         // usuário fica no domínio (findOrFail por user_id).
         Route::bind('recorrencia', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
+
+        // Idem para {ocorrencia} (recurrence_occurrence) — "marcar como paga" (spec 12). O
+        // escopo por usuário é aplicado no domínio (findOrFail por user_id).
+        Route::bind('ocorrencia', fn (string $token): int => OpaqueId::decode($token) ?? abort(404));
 
         // Idem para {cartao} (card) — editar/remover na tela §7.13. Só afeta o parâmetro de
         // PATH; a seleção por ?cartao= (query) é decodificada à parte no controller.

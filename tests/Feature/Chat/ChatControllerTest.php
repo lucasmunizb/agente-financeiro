@@ -75,7 +75,7 @@ it('store: registrar um gasto pelo chat devolve a prévia e deixa pendente (regr
     $user = User::factory()->create();
     Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'registrar']]);
     Ai::fakeAgent(ExtratorDeGasto::class, [[
-        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje', 'pago' => true,
     ]]);
 
     $resp = $this->actingAs($user)->postJson(route('chat.store'), ['mensagem' => 'gastei 90 no mercado no pix hoje']);
@@ -90,7 +90,7 @@ it('store: registro → "sim" grava o gasto (confirmação persiste entre requis
     $user = User::factory()->create();
     Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'registrar']]);
     Ai::fakeAgent(ExtratorDeGasto::class, [[
-        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje', 'pago' => true,
     ]]);
 
     // 1ª requisição: propõe e deixa pendente (nada gravado).

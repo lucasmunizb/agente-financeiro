@@ -3,7 +3,6 @@
 use App\Domain\IA\Guard\GuardPosGeracao;
 use App\Domain\IA\Guard\PayloadDeResposta;
 use App\Domain\IA\Guard\ResultadoDoGuard;
-use App\Domain\Shared\Money;
 use Carbon\CarbonImmutable;
 
 /*

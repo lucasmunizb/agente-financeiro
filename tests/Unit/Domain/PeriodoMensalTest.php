@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Shared\PeriodoMensal;
+use Carbon\CarbonImmutable;
 
 /*
  * PeriodoMensal — janela [início, fim] de um mês civil no fuso base (America/Sao_Paulo).
@@ -28,6 +29,6 @@ it('rejeita formato inválido', function () {
 it('indica se uma data pertence ao mês', function () {
     $periodo = PeriodoMensal::fromString('2026-02');
 
-    expect($periodo->contem(\Carbon\CarbonImmutable::parse('2026-02-15')))->toBeTrue()
-        ->and($periodo->contem(\Carbon\CarbonImmutable::parse('2026-03-01')))->toBeFalse();
+    expect($periodo->contem(CarbonImmutable::parse('2026-02-15')))->toBeTrue()
+        ->and($periodo->contem(CarbonImmutable::parse('2026-03-01')))->toBeFalse();
 });

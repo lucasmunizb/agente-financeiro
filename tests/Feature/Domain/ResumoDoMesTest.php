@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domain\ContasVencidas\ConsultarContasVencidas;
 use App\Domain\Dashboard\ResumoDoMes;
 use App\Domain\Dashboard\ResumoDoMesResultado;
 use App\Domain\Disponivel\ConsultarDisponivelDoMes;
@@ -12,8 +13,8 @@ use App\Models\Card;
 use App\Models\Income;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
-use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -262,7 +263,7 @@ it('agrega também as contas em atraso, batendo com a consulta isolada (C8 — s
 
     $hoje = hojeSP();
     $resumo = app(ResumoDoMes::class)->para($user->id, $hoje);
-    $vencidas = app(App\Domain\ContasVencidas\ConsultarContasVencidas::class)->para($user->id, $hoje);
+    $vencidas = app(ConsultarContasVencidas::class)->para($user->id, $hoje);
 
     expect($resumo->totalContasVencidasCents())->toBe(48000)                 // 300 + 180
         ->and($resumo->totalContasVencidasCents())->toBe($vencidas->totalCents) // reuso, não recálculo
@@ -293,21 +294,19 @@ function resumoRecorrencia(User $user, int $valorCents, int $dia, string $proxim
 }
 
 /** Ocorrência já materializada aguardando confirmação na fila (o ponteiro do molde já avançou). */
-function resumoFila(User $user, Recurrence $recorrencia, string $vencimento, int $cents, string $descricao): void
+/** A OCORRÊNCIA real de uma recorrência num mês (spec 12) — o que o agendador gera. */
+function resumoOcorrencia(User $user, Recurrence $recorrencia, string $vencimento, int $cents, string $descricao, ?string $status = null): RecurrenceOccurrence
 {
-    PendingConfirmation::factory()->for($user)->create([
-        'origem' => PendingConfirmation::ORIGEM_RECORRENCIA,
-        'status' => PendingConfirmation::STATUS_PENDENTE,
+    return RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id,
         'recurrence_id' => $recorrencia->id,
-        'expira_em' => null,
-        'payload' => [
-            'descricao' => $descricao,
-            'valorTotalCents' => $cents,
-            'dataCompra' => $vencimento,
-            'paymentMethodId' => PaymentMethod::idFor(PaymentMethod::BOLETO),
-            'parcelas' => 1,
-            'categoriaId' => null,
-        ],
+        'competencia' => substr($vencimento, 0, 7),
+        'descricao' => $descricao,
+        'valor_cents' => $cents,
+        'data_cobranca' => $vencimento,
+        'vencimento' => $vencimento,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::BOLETO),
+        'status_id' => StatusPagamento::idFor($status ?? StatusPagamento::ABERTO),
     ]);
 }
 
@@ -353,42 +352,42 @@ it('no MÊS CORRENTE lista a recorrência cujo dia ainda não chegou e abate o d
         ->and($previstas['vencimento'])->toBe('2026-06-20');
 });
 
-it('no MÊS CORRENTE não conta em dobro a recorrência já materializada na fila', function () {
+it('no MÊS CORRENTE não conta em dobro a competência já gerada (R2/R4)', function () {
     $user = User::factory()->create();
 
     resumoReceita($user, 400000, '2026-06-05');
-    // Enfileirada para 20/06; o materializador já avançou o ponteiro para julho.
-    $rec = resumoRecorrencia($user, 5590, 20, '2026-07-20');
-    resumoFila($user, $rec, '2026-06-20', 5590, 'Netflix');
+    // Junho já foi gerado (o ponteiro está em julho): a projeção o exclui por NOT EXISTS.
+    $rec = resumoRecorrencia($user, 5590, 20, '2026-07-01');
+    resumoOcorrencia($user, $rec, '2026-06-20', 5590, 'Netflix');
 
     $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
 
-    // Uma linha só: a da fila. O molde não projeta junho (ponteiro em julho).
+    // Uma linha só: a ocorrência real.
     expect($resumo->proximasContas->contas)->toHaveCount(1)
+        ->and($resumo->proximasContas->contas[0]['prevista'])->toBeFalse()
         ->and($resumo->totalProximasContasCents())->toBe(5590)
         ->and($resumo->disponivelCents())->toBe(394410);          // 4000 - 55,90
 });
 
-it('no MÊS CORRENTE não conta em dobro a recorrência já confirmada — vale a parcela real', function () {
+it('a ocorrência JÁ PAGA sai do quadro a vencer mas segue abatendo o disponível', function () {
     $user = User::factory()->create();
 
     resumoReceita($user, 400000, '2026-06-05');
-    $rec = resumoRecorrencia($user, 5590, 20, '2026-07-20'); // ponteiro já em julho
-    resumoParcela($user, 5590, '2026-06-20')->update(['recurrence_id' => $rec->id]);
+    $rec = resumoRecorrencia($user, 5590, 20, '2026-07-01');
+    resumoOcorrencia($user, $rec, '2026-06-20', 5590, 'Netflix', StatusPagamento::PAGO);
 
     $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
 
-    expect($resumo->proximasContas->contas)->toHaveCount(1)
-        ->and($resumo->totalProximasContasCents())->toBe(5590)
-        ->and($resumo->proximasContas->contas[0]['prevista'])->toBeFalse()
+    expect($resumo->proximasContas->contas)->toHaveCount(0)
+        // Pago é gasto igual: continua fora do dinheiro livre do mês.
         ->and($resumo->disponivelCents())->toBe(394410);
 });
 
-it('lista no quadro "em atraso" a recorrência vencida esquecida na fila', function () {
+it('lista no quadro "em atraso" a ocorrência vencida e não paga', function () {
     $user = User::factory()->create();
 
-    $rec = resumoRecorrencia($user, 5590, 5, '2026-07-05'); // ponteiro já avançado
-    resumoFila($user, $rec, '2026-06-05', 5590, 'Netflix'); // venceu dia 5, hoje é 15
+    $rec = resumoRecorrencia($user, 5590, 5, '2026-07-01'); // junho já gerado
+    resumoOcorrencia($user, $rec, '2026-06-05', 5590, 'Netflix'); // venceu dia 5, hoje é 15
 
     $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
 
@@ -397,7 +396,8 @@ it('lista no quadro "em atraso" a recorrência vencida esquecida na fila', funct
         ->and($resumo->contasVencidas->contas[0])->toMatchArray([
             'descricao' => 'Netflix',
             'vencimento' => '2026-06-05',
-            'prevista' => true,
+            'prevista' => false,
+            'recorrente' => true,
         ]);
 });
 

@@ -36,6 +36,7 @@ function confirmacaoDe(User $user, array $over = []): ConfirmacaoDeGasto
         dataCompra: $over['dataCompra'] ?? CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo'),
         paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
         parcelas: $over['parcelas'] ?? 1,
+        dataPagamento: $over['dataPagamento'] ?? null,
     );
 
     $previa = (new RegistrarGastoManual)->preview($dados, CarbonImmutable::parse('2026-06-26 12:00', 'America/Sao_Paulo'));
@@ -116,4 +117,23 @@ it('descartar remove o pendente do usuário', function () {
     $svc->descartar($user->id);
 
     expect($svc->recuperar($user->id, $this->agora))->toBeNull();
+});
+
+it('preserva a data de pagamento no round-trip do pendente (gasto já pago)', function () {
+    $user = User::factory()->create();
+    $confirmacao = confirmacaoDe($user, ['dataPagamento' => CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo')]);
+
+    app(ConfirmacoesPendentes::class)->guardar($user->id, $confirmacao, $this->agora);
+    $recuperado = app(ConfirmacoesPendentes::class)->recuperar($user->id, $this->agora);
+
+    expect($recuperado->dados->dataPagamento?->toDateString())->toBe('2026-06-10')
+        ->and($recuperado->dados->dataPagamento?->timezone->getName())->toBe('America/Sao_Paulo');
+});
+
+it('mantém null quando o gasto não foi pago', function () {
+    $user = User::factory()->create();
+
+    app(ConfirmacoesPendentes::class)->guardar($user->id, confirmacaoDe($user), $this->agora);
+
+    expect(app(ConfirmacoesPendentes::class)->recuperar($user->id, $this->agora)->dados->dataPagamento)->toBeNull();
 });

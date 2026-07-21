@@ -41,6 +41,7 @@ final class RegistrarGastoManual
             parcelas: $this->montarParcelas($dados, $hoje),
             categoria: $this->nomeDaCategoria($dados),
             categoriaSugeridaPorIa: $dados->categoriaSugeridaPorIa,
+            dataPagamento: $dados->cardId === null ? $dados->dataPagamento : null,
         );
     }
 
@@ -75,7 +76,6 @@ final class RegistrarGastoManual
                 'card_id' => $dados->cardId,
                 'account_id' => $dados->accountId,
                 'categoria_id' => $dados->categoriaId,
-                'recurrence_id' => $dados->recurrenceId,
                 'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
                 'origem' => $dados->origem,
                 'moeda' => 'BRL',
@@ -109,8 +109,33 @@ final class RegistrarGastoManual
                 'origem' => $dados->origem,
             ]);
 
+            $this->marcarPrimeiraParcelaPaga($transaction, $dados);
+
             return $transaction->load('installments');
         });
+    }
+
+    /**
+     * Gasto que o usuário declarou JÁ pago no ato do cadastro (decisão 2026-07-21). Marca
+     * SÓ a 1ª parcela — pagamento é por parcela, e "paguei" em um 3x significa que apenas a
+     * primeira saiu; as demais seguem abertas e a transação vira `pago_parcial`. Reusa
+     * {@see RegistrarPagamentoParcela} para não duplicar a derivação do status agregado nem
+     * a auditoria. Compra em cartão é ignorada em silêncio: a quitação é da fatura (§4.3).
+     */
+    private function marcarPrimeiraParcelaPaga(Transaction $transaction, DadosGastoManual $dados): void
+    {
+        if ($dados->dataPagamento === null || $dados->cardId !== null) {
+            return;
+        }
+
+        $primeira = $transaction->installments()->orderBy('numero')->firstOrFail();
+
+        (new RegistrarPagamentoParcela)->confirmar($primeira->id, $dados->userId, $dados->dataPagamento);
+
+        // O status agregado é reavaliado em OUTRA instância do model: sem o refresh, quem
+        // recebe a transaction de volta (a redação da confirmação) ainda lê `aberto` e diz
+        // ao usuário que a conta ficou em aberto — quando ela acabou de nascer paga.
+        $transaction->refresh();
     }
 
     /**

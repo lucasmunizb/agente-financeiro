@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\Income>
+ * @extends Factory<Income>
  */
 class IncomeFactory extends Factory
 {

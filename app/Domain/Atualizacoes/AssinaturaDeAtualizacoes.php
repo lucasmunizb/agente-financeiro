@@ -7,6 +7,7 @@ namespace App\Domain\Atualizacoes;
 use App\Models\Installment;
 use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\Transaction;
 
 /**
@@ -16,8 +17,8 @@ use App\Models\Transaction;
  * apresentação (polling + reload) é etapa separada (regra 3): aqui só produzimos
  * o opaco.
  *
- * É um hash de agregados das quatro tabelas que alimentam os quadros — `transactions`,
- * `installments`, `recurrences` e `pending_confirmations` — por contagem (total e por
+ * É um hash de agregados das cinco tabelas que alimentam os quadros — `transactions`,
+ * `installments`, `recurrences`, `recurrence_occurrences` e `pending_confirmations` — por contagem (total e por
  * status), somatório de valor/status e maior id. Muda a cada registro, edição (as parcelas
  * são regeneradas, então o max id sobe), pagamento, cancelamento (o status da parcela
  * muda), e também quando o agendador enfileira uma ocorrência, quando um pendente é
@@ -64,6 +65,18 @@ final class AssinaturaDeAtualizacoes
             )
             ->first();
 
+        // A conta fixa de um mês é uma OCORRÊNCIA (spec 12): sem esta agregação a tela não
+        // recarrega quando o agendador gera o mês, quando o cartão liquida sozinho nem quando
+        // o usuário marca a ocorrência como paga — nada disso toca transactions/installments.
+        // A soma de `status_id` capta justamente as mudanças in-place (aberto → pago/cancelado).
+        $oc = RecurrenceOccurrence::query()
+            ->where('user_id', $userId)
+            ->selectRaw(
+                'count(*) as n, coalesce(sum(valor_cents), 0) as soma,'
+                .' coalesce(sum(status_id), 0) as status, coalesce(max(id), 0) as maxid'
+            )
+            ->first();
+
         $fila = PendingConfirmation::query()
             ->where('user_id', $userId)
             ->selectRaw(
@@ -76,6 +89,7 @@ final class AssinaturaDeAtualizacoes
             $tx->n, $tx->soma, $tx->maxid,
             $inst->n, $inst->soma, $inst->maxid,
             $rec->n, $rec->soma, $rec->dias, $rec->maxid, $rec->ativos,
+            $oc->n, $oc->soma, $oc->status, $oc->maxid,
             $fila->n, $fila->maxid, $fila->pendentes,
         ]));
     }

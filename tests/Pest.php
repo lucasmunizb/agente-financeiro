@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\IA\GastoExtraido;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -11,7 +14,7 @@
 |
 */
 
-pest()->extend(Tests\TestCase::class)
+pest()->extend(TestCase::class)
  // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     // Testes de feature renderizam Blade com @vite. Sem o manifest compilado
     // (public/build é gitignored → ausente num checkout limpo do CI) o Vite lança
@@ -59,9 +62,9 @@ function something()
  *
  * @param  array<string, mixed>  $over
  */
-function gastoExtraidoFake(array $over = []): App\Domain\IA\GastoExtraido
+function gastoExtraidoFake(array $over = []): GastoExtraido
 {
-    return new App\Domain\IA\GastoExtraido(
+    return new GastoExtraido(
         descricao: $over['descricao'] ?? 'mercado',
         valorTexto: $over['valorTexto'] ?? '35',
         formaPagamento: $over['formaPagamento'] ?? 'pix',
@@ -70,5 +73,7 @@ function gastoExtraidoFake(array $over = []): App\Domain\IA\GastoExtraido
         dataTexto: array_key_exists('dataTexto', $over) ? $over['dataTexto'] : 'hoje',
         parcelas: $over['parcelas'] ?? null,
         recorrenciaDiaTexto: $over['recorrenciaDiaTexto'] ?? null,
+        pago: $over['pago'] ?? null,
+        dataPagamentoTexto: $over['dataPagamentoTexto'] ?? null,
     );
 }

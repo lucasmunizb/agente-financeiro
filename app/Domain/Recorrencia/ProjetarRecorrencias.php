@@ -7,37 +7,38 @@ namespace App\Domain\Recorrencia;
 use App\Domain\Calendar\RelativeDate;
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use Carbon\CarbonImmutable;
 
 /**
- * Camada de PREVISÃO de recorrências (spec 10b) — projeção READ-ONLY que, a partir do molde em
- * `recurrences`, deriva as ocorrências AINDA NÃO MATERIALIZADAS de um mês, para os quadros do
- * dashboard e para o extrato.
+ * Camada de PREVISÃO de recorrências (spec 10b, revista pela spec 12) — projeção READ-ONLY
+ * que, a partir do molde em `recurrences`, deriva as ocorrências de um mês que AINDA NÃO
+ * FORAM GERADAS, para os quadros do dashboard e para o extrato. Não grava nada (regra 7):
+ * só lê e calcula.
  *
- * Coexiste com a materialização just-in-time (spec 10 §10): NÃO grava lançamento nem enfileira
- * confirmação (regra 7) — só lê e calcula. Age do mês CORRENTE em diante (mês passado ⇒ vazio,
- * comparação de YYYY-MM no fuso SP a partir do "agora" injetado, determinismo/regra 4/5).
+ * FONTE ÚNICA POR COMPETÊNCIA (spec 12): a separação entre projeção e realidade deixou de ser
+ * o ponteiro `proxima_em` e passou a ser um `NOT EXISTS` sobre `recurrence_occurrences`. Se a
+ * competência já foi materializada, ela é servida por {@see ConsultarOcorrencias} e cai fora
+ * daqui — sem depender de o ponteiro e a data do lançamento concordarem, que era exatamente a
+ * origem da dupla contagem.
  *
- * Projeta uma ocorrência por recorrência `ativo` cujo ponteiro ainda não passou do mês-alvo
- * (`proxima_em <= fim do mês-alvo`), com o `dia` resolvido/clampado NAQUELE mês via
- * {@see OcorrenciaMensal}. Escopo ESTRITO por `user_id`. Valores em centavos (regra 5).
- *
- * ANTI-DUPLA-CONTAGEM: o filtro por `proxima_em` é o que separa esta projeção da fila e dos
- * lançamentos reais — {@see MaterializarRecorrencias} AVANÇA o ponteiro no mesmo instante (e na
- * mesma transação) em que enfileira a ocorrência. Logo, uma ocorrência já materializada tem o
- * ponteiro além do mês e cai fora desta query: ela é servida pela fila
- * ({@see ProjetarRecorrenciasPendentes}) até ser confirmada, e pela parcela real depois disso.
- * As três fontes são disjuntas por construção — não por um guard de calendário.
+ * Age do mês CORRENTE em diante (mês passado ⇒ vazio): retrato fechado só mostra o que
+ * aconteceu. A competência é calculada por {@see CalcularOcorrencia} — em cartão ela é a da
+ * FATURA, então o mês de origem projetado pode ser anterior ao mês exibido. Escopo ESTRITO por
+ * `user_id`; valores em centavos (regra 5); "agora" injetado (regras 4 e 5).
  */
 final class ProjetarRecorrencias
 {
+    public function __construct(
+        private readonly CalcularOcorrencia $calcular = new CalcularOcorrencia,
+    ) {}
+
     public function para(int $userId, string $mesAlvo, CarbonImmutable $agora): ResultadoProjecaoRecorrencias
     {
         $agoraSp = $agora->setTimezone(RelativeDate::TIMEZONE);
-        $inicioMesAlvo = CarbonImmutable::createFromFormat('!Y-m-d', $mesAlvo.'-01', RelativeDate::TIMEZONE);
 
-        // Mês passado é retrato fechado: só lançamento real conta (e um ponteiro atrasado ali só
-        // existe se o agendador falhou — projetar seria inventar um gasto que ninguém confirmou).
+        // Mês passado é retrato fechado: só a ocorrência real conta (projetar ali inventaria
+        // uma cobrança que o agendador nunca gerou).
         if ($mesAlvo < $agoraSp->format('Y-m')) {
             return $this->vazio($mesAlvo);
         }
@@ -45,31 +46,51 @@ final class ProjetarRecorrencias
         $recorrencias = Recurrence::query()
             ->where('user_id', $userId)
             ->where('status', Recurrence::STATUS_ATIVO)
-            ->whereNotNull('proxima_em')
-            ->whereDate('proxima_em', '<=', $inicioMesAlvo->endOfMonth()->toDateString())
-            // Categoria/forma alimentam a linha e os filtros do extrato de mês futuro (F10).
-            ->with(['categoria', 'paymentMethod'])
+            // Categoria/forma/cartão alimentam a linha e os filtros do extrato de mês futuro.
+            ->with(['categoria', 'paymentMethod', 'card'])
             ->get();
+
+        // Competências já materializadas deste usuário: o `NOT EXISTS` da fonte única. Uma
+        // consulta só (o conjunto é pequeno) em vez de uma por recorrência.
+        $materializadas = RecurrenceOccurrence::query()
+            ->where('user_id', $userId)
+            ->get(['recurrence_id', 'competencia'])
+            ->map(fn (RecurrenceOccurrence $oc): string => $oc->recurrence_id.'|'.$oc->competencia)
+            ->flip();
 
         $ocorrencias = [];
         $total = 0;
 
         foreach ($recorrencias as $recorrencia) {
-            $vencimento = OcorrenciaMensal::aPartirDe($recorrencia->dia, $inicioMesAlvo);
+            // Antes do começo da regra não há o que prever: `proxima_em` é o primeiro mês
+            // ainda não gerado, então uma competência anterior a ele ou já é real (e cai no
+            // NOT EXISTS abaixo) ou é anterior ao início da recorrência.
+            if ($recorrencia->proxima_em === null || $recorrencia->proxima_em->format('Y-m') > $mesAlvo) {
+                continue;
+            }
+
+            $calculada = $this->projetarCompetencia($recorrencia, $mesAlvo);
+
+            if ($calculada === null || $materializadas->has($recorrencia->id.'|'.$mesAlvo)) {
+                continue;
+            }
+
             $cents = (int) $recorrencia->valor_cents;
             $total += $cents;
 
             $ocorrencias[] = [
                 'descricao' => $recorrencia->descricao,
-                'vencimento' => $vencimento->format('Y-m-d'),
+                'vencimento' => $calculada->vencimento->format('Y-m-d'),
                 'cents' => $cents,
                 'prevista' => true,
-                // Enriquecimento para o extrato (o dashboard ignora estas chaves extras).
                 'categoriaId' => $recorrencia->categoria_id,
                 'categoria' => $recorrencia->categoria !== null
                     ? ['nome' => (string) $recorrencia->categoria->nome, 'cor' => $recorrencia->categoria->cor]
                     : null,
                 'forma' => $recorrencia->paymentMethod?->tipo,
+                'cartaoId' => $recorrencia->card_id,
+                'cartaoDescricao' => $recorrencia->card?->descricao,
+                'recorrente' => true,
             ];
         }
 
@@ -80,6 +101,32 @@ final class ProjetarRecorrencias
             ocorrencias: $ocorrencias,
             trace: $this->trace($mesAlvo, count($ocorrencias)),
         );
+    }
+
+    /**
+     * A ocorrência desta recorrência que CAI na competência-alvo, ou null se nenhuma cai.
+     * Fora de cartão o mês de origem é a própria competência. Em cartão a competência é a da
+     * fatura, que fica 1 ou 2 meses à frente da cobrança — então testa os meses de origem
+     * candidatos para trás até achar o que aterrissa no mês pedido.
+     */
+    private function projetarCompetencia(Recurrence $recorrencia, string $mesAlvo): ?OcorrenciaCalculada
+    {
+        if ($recorrencia->card_id === null) {
+            return $this->calcular->para($recorrencia, $mesAlvo);
+        }
+
+        $alvo = CarbonImmutable::createFromFormat('!Y-m-d', $mesAlvo.'-01', RelativeDate::TIMEZONE);
+
+        // Uma fatura nunca vence mais de dois meses depois da compra (§4.2).
+        for ($atras = 0; $atras <= 2; $atras++) {
+            $calculada = $this->calcular->para($recorrencia, $alvo->subMonthsNoOverflow($atras)->format('Y-m'));
+
+            if ($calculada->competencia === $mesAlvo) {
+                return $calculada;
+            }
+        }
+
+        return null;
     }
 
     private function vazio(string $mesAlvo): ResultadoProjecaoRecorrencias

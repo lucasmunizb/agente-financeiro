@@ -8,15 +8,17 @@
     'status' => 'a_vencer', // pago | a_vencer | atraso | cancelado
     'showUrl' => null,   // detalhe do lançamento (a linha inteira abre daqui)
     'editarUrl' => null, // detalhe já com o modal de edição aberto (?editar=1)
-    'recorrente' => false, // nasceu de recorrência → ícone de repetição (spec 10)
-    'prevista' => false, // ocorrência de recorrência ainda NÃO paga (previsto/atraso, spec 10)
-    'pagarUrl' => null, // ocorrência na fila (pendente) → botão "marcar como pago" (spec 10)
+    'recorrente' => false, // é uma cobrança de recorrência → ícone de repetição (spec 12)
+    'prevista' => false, // PROJEÇÃO: competência ainda não gerada (mês futuro, spec 12)
+    'pagarUrl' => null, // ocorrência pagável (fora de cartão, em aberto) → "marcar como paga"
 ])
 
 @php
-    // Selo da ocorrência: real usa o próprio status; a recorrência ainda não paga vira
-    // "previsto" (não venceu) ou "atraso" (venceu) — nunca "pago" enquanto não materializada.
-    $selo = $prevista ? ($status === 'atraso' ? 'atraso' : 'previsto') : $status;
+    // Selo. A OCORRÊNCIA real já chega com o seu status derivado por data
+    // (pago | previsto | atraso) — usa-se como está. Só a PROJEÇÃO precisa de tradução: ela
+    // vem como "a_vencer" e é exibida como "Previsto", porque ainda não é uma cobrança
+    // gerada — a competência dela nem existe no banco (spec 12).
+    $selo = $prevista ? 'previsto' : $status;
 @endphp
 
 {{-- Linha de lançamento no estilo EXTRATO (spec FE §4.6/§7.6): descrição + chip de
@@ -33,7 +35,7 @@
         <span class="flex items-center gap-1.5 truncate font-body-md text-body-md font-medium text-on-surface">
             <span class="truncate">{{ $descricao }}</span>
             @if ($recorrente)
-                <x-icon name="refresh-cw" class="h-3.5 w-3.5 shrink-0 text-nevoa" title="Recorrente" />
+                <x-icon name="refresh-cw" class="h-3.5 w-3.5 shrink-0 text-nevoa" title="Cobrança recorrente" />
                 <span class="sr-only">recorrente</span>
             @endif
         </span>
@@ -57,19 +59,21 @@
             <x-ui.status-badge :status="$selo" />
         </div>
         @if ($pagarUrl)
-            {{-- Ocorrência de recorrência na fila: "marcar como pago" com prévia + confirmação
-                 embutida (regra 7, sem JS) — mesmo padrão <details> do detalhe. Fica ACIMA do
-                 link esticado (z-10). Ao confirmar, materializa o lançamento pago (spec 10). --}}
+            {{-- Ocorrência de recorrência EM ABERTO e fora de cartão: "marcar como paga" com
+                 confirmação embutida (regra 7, sem JS) — mesmo padrão <details> do detalhe.
+                 Fica ACIMA do link esticado (z-10). Confirmar só muda o status da própria
+                 ocorrência; nenhum lançamento é criado (spec 12). Cobrança em cartão não chega
+                 aqui: ela liquida sozinha no dia da cobrança (D3). --}}
             <details class="relative z-10 text-left">
                 <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full text-primary transition-colors hover:bg-primary-container/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    aria-label="Marcar {{ $descricao }} como pago" title="Marcar como pago">
+                    aria-label="Marcar {{ $descricao }} como paga" title="Marcar como paga">
                     <x-icon name="check" class="h-4 w-4" />
                 </summary>
                 <form method="POST" action="{{ $pagarUrl }}"
                     class="absolute right-0 z-20 mt-2 flex min-w-[13rem] flex-col gap-2 rounded-control border border-linha bg-surface-container-lowest p-3 shadow-md">
                     @csrf
                     <p class="font-label-sm text-label-sm text-on-surface-variant">
-                        Marcar <span class="text-on-surface">{{ $descricao }}</span> como pago —
+                        Marcar <span class="text-on-surface">{{ $descricao }}</span> como paga —
                         <span class="font-value-label text-on-surface">{{ $valor }}</span>?
                     </p>
                     <button type="submit"

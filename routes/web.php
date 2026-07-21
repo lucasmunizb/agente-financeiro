@@ -1,9 +1,9 @@
 <?php
 
+use App\Http\Controllers\AtualizacoesController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
-use App\Http\Controllers\AtualizacoesController;
 use App\Http\Controllers\CartaoController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\ChatController;
@@ -85,10 +85,10 @@ Route::middleware(['auth', ExigeConsentimentoLgpd::class])->group(function () {
     // sem tocar nas irmãs. {parcela} opaco; escopo por usuário no domínio.
     Route::post('/lancamentos/parcela/{parcela}/pagar', [LancamentoController::class, 'pagarParcela'])->name('lancamentos.parcela.pagar');
 
-    // Marcar como paga uma ocorrência de recorrência que está na FILA (confirmação pendente,
-    // spec 10 — fila e extrato coexistem): materializa o lançamento com o recurrence_id, marca
-    // pago e resolve o pendente (PagarRecorrenciaPendente). Idempotente. {pendente} opaco.
-    Route::post('/lancamentos/recorrencia/{pendente}/pagar', [LancamentoController::class, 'pagarRecorrencia'])->name('lancamentos.recorrencia.pagar');
+    // Marcar como paga uma OCORRÊNCIA de recorrência (spec 12): muda o status da própria
+    // ocorrência (PagarOcorrencia) — não materializa lançamento algum. Só fora de cartão
+    // (cartão liquida sozinho, D3). Idempotente. {ocorrencia} opaco; escopo no domínio.
+    Route::post('/lancamentos/recorrencia/{ocorrencia}/pagar', [LancamentoController::class, 'pagarRecorrencia'])->name('lancamentos.recorrencia.pagar');
 
     // Cancelar "esta e as próximas" (FE §7.8): marca o lançamento e as parcelas ainda não
     // finalizadas como 'cancelado', preservando as já pagas (CancelarGastoManual). Mantém a

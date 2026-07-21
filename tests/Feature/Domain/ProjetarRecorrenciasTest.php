@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\PaymentMethod;
 use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -86,10 +87,15 @@ it('projeta no MÊS CORRENTE a ocorrência cujo dia ainda não chegou (molde nã
         ]);
 });
 
-it('não projeta a ocorrência do mês corrente já materializada — o ponteiro avançado a exclui (anti-dupla-contagem)', function () {
+it('não projeta a competência que já tem OCORRÊNCIA real — NOT EXISTS (anti-dupla-contagem)', function () {
     $user = User::factory()->create();
-    // O materializador enfileirou a de julho e avançou o ponteiro para agosto no mesmo instante.
-    Recurrence::factory()->for($user)->create(['dia' => 5, 'proxima_em' => '2026-08-05']);
+    // Fonte única por competência (spec 12): a de julho já foi gerada, então a projeção a exclui
+    // pela existência da ocorrência — não mais por um ponteiro de calendário.
+    $rec = Recurrence::factory()->for($user)->create(['dia' => 5, 'proxima_em' => '2026-08-01']);
+    RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-07',
+        'vencimento' => '2026-07-05', 'data_cobranca' => '2026-07-05',
+    ]);
 
     $resultado = (new ProjetarRecorrencias)->para($user->id, '2026-07', agoraFixo());
 
@@ -119,7 +125,7 @@ it('clampa o dia ao fim do mês projetado (P5)', function () {
 it('só projeta a partir do mês em que a recorrência começa (P6)', function () {
     $user = User::factory()->create();
     // Começa em setembro (proxima_em 2026-09-05).
-    Recurrence::factory()->for($user)->create(['dia' => 5, 'proxima_em' => '2026-09-05']);
+    Recurrence::factory()->for($user)->create(['dia' => 5, 'proxima_em' => '2026-09-01']);
 
     // Agosto é futuro, mas antes do início → não aparece.
     expect((new ProjetarRecorrencias)->para($user->id, '2026-08', agoraFixo())->ocorrencias)->toBe([]);

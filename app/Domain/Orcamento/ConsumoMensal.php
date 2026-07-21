@@ -21,8 +21,7 @@ final class ConsumoMensal
     public function __construct(
         public readonly int $totalCents,
         public readonly array $porCategoria,
-    ) {
-    }
+    ) {}
 
     public function semCategoriaCents(): int
     {

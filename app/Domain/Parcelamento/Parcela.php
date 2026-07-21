@@ -21,8 +21,7 @@ final class Parcela
         public readonly int $total,
         public readonly CarbonImmutable $vencimento,
         public readonly Money $valor,
-    ) {
-    }
+    ) {}
 
     /**
      * Rótulo de exibição "n/total" (ex.: "2/3"). Formatação só na borda.

@@ -7,8 +7,8 @@ namespace App\Domain\Gastos;
 use App\Domain\Calendar\RelativeDate;
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\Orcamento\ConsumoMensal;
+use App\Domain\Recorrencia\ConsultarOcorrencias;
 use App\Domain\Recorrencia\ProjetarRecorrencias;
-use App\Domain\Recorrencia\ProjetarRecorrenciasPendentes;
 use App\Domain\Shared\PeriodoMensal;
 use App\Domain\Shared\SqlLike;
 use App\Models\Card;
@@ -30,10 +30,9 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class ConsultarGastos
 {
-
     public function __construct(
         private readonly ProjetarRecorrencias $projetarRecorrencias = new ProjetarRecorrencias,
-        private readonly ProjetarRecorrenciasPendentes $projetarPendentes = new ProjetarRecorrenciasPendentes,
+        private readonly ConsultarOcorrencias $ocorrencias = new ConsultarOcorrencias,
     ) {}
 
     /**
@@ -94,15 +93,15 @@ final class ConsultarGastos
             }
         }
 
-        // Ocorrências de recorrência ainda NÃO materializadas — a soma por categoria (donut e bot)
-        // tem de bater com o extrato, que já as lista. Duas fontes, sem dupla-contagem:
-        //  - mês FUTURO: molde ({@see ProjetarRecorrencias}) — o guard mantém o passado/corrente vazio;
-        //  - mês corrente/atrasado: a FILA ({@see ProjetarRecorrenciasPendentes}) — pendente ainda
-        //    não confirmado, some quando vira lançamento real. Read-only.
+        // Recorrências do período — a soma por categoria (donut e bot) tem de bater com o
+        // extrato, que já as lista. Duas fontes, disjuntas por competência (spec 12):
+        //  - competência JÁ materializada: a ocorrência real ({@see ConsultarOcorrencias});
+        //  - competência ainda não gerada: a projeção ({@see ProjetarRecorrencias}), que a
+        //    exclui por `NOT EXISTS`. Ambas read-only — nada é gravado aqui.
         $agoraResolvido = $agora ?? CarbonImmutable::now(RelativeDate::TIMEZONE);
         $ocorrenciasPrevistas = [
             ...$this->projetarRecorrencias->para($userId, $periodo, $agoraResolvido)->ocorrencias,
-            ...$this->projetarPendentes->para($userId, $periodo, $agoraResolvido),
+            ...$this->ocorrencias->paraMes($userId, $periodo, $agoraResolvido),
         ];
         $registrosPrevistos = 0;
 
@@ -154,20 +153,31 @@ final class ConsultarGastos
     }
 
     /**
-     * Aplica os filtros ativos à ocorrência PREVISTA (espelha o extrato/{@see ConsultarLancamentos}):
-     * recorrência é sempre fora de cartão e "a vencer" — filtro de cartão a descarta; filtro de
-     * status só a mantém no bucket em aberto; categoria casa pelo próprio id da recorrência.
+     * Aplica os filtros ativos a uma ocorrência de recorrência (real ou prevista), espelhando o
+     * extrato/{@see ConsultarLancamentos}. Recorrência em cartão passou a existir (spec 12, D3),
+     * então o filtro de cartão COMPARA o id em vez de descartar. Filtro de status: `aberto`
+     * mantém as não pagas, `pago` mantém as pagas — as demais não se aplicam à ocorrência.
      *
      * @param  array<string, mixed>  $ocorrencia
      */
     private function previstaCasaFiltros(array $ocorrencia, ?int $categoriaId, ?int $cardId, ?string $status): bool
     {
-        if ($cardId !== null) {
+        if ($cardId !== null && ($ocorrencia['cartaoId'] ?? null) !== $cardId) {
             return false;
         }
 
-        if ($status !== null && $status !== StatusPagamento::ABERTO) {
-            return false;
+        if ($status !== null) {
+            $ehPaga = ($ocorrencia['status'] ?? null) === 'pago';
+
+            $casa = match ($status) {
+                StatusPagamento::PAGO => $ehPaga,
+                StatusPagamento::ABERTO => ! $ehPaga,
+                default => false,
+            };
+
+            if (! $casa) {
+                return false;
+            }
         }
 
         if ($categoriaId !== null && ($ocorrencia['categoriaId'] ?? null) !== $categoriaId) {

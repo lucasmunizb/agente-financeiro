@@ -20,8 +20,7 @@ final class ResultadoOrcamento
         public readonly Money $consumido,
         public readonly Money $restante,
         public readonly bool $estourou,
-    ) {
-    }
+    ) {}
 
     public function percentual(): float
     {

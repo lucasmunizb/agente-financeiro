@@ -6,6 +6,7 @@ use App\Domain\Atualizacoes\AssinaturaDeAtualizacoes;
 use App\Models\Installment;
 use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -94,19 +95,23 @@ it('muda a assinatura quando uma recorrência é cancelada', function () {
     expect($svc->para($user->id))->not->toBe($antes);
 });
 
-it('muda a assinatura quando o agendador enfileira uma ocorrência na fila', function () {
+it('muda a assinatura quando o agendador gera a ocorrência do mês (spec 12)', function () {
     $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create(['dia' => 25, 'proxima_em' => '2026-07-25']);
+    $rec = Recurrence::factory()->for($user)->create(['dia' => 25, 'proxima_em' => '2026-07-01']);
     $svc = app(AssinaturaDeAtualizacoes::class);
 
     $antes = $svc->para($user->id);
-    PendingConfirmation::factory()->for($user)->create([
-        'origem' => PendingConfirmation::ORIGEM_RECORRENCIA,
-        'status' => PendingConfirmation::STATUS_PENDENTE,
-        'recurrence_id' => $rec->id,
+    $oc = RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-07',
+        'data_cobranca' => '2026-07-25', 'vencimento' => '2026-07-25',
     ]);
 
-    expect($svc->para($user->id))->not->toBe($antes);
+    $depois = $svc->para($user->id);
+    expect($depois)->not->toBe($antes);
+
+    // E também quando a ocorrência é liquidada — mudança in-place, sem mexer em contagem.
+    $oc->update(['status_id' => StatusPagamento::idFor(StatusPagamento::PAGO)]);
+    expect($svc->para($user->id))->not->toBe($depois);
 });
 
 it('muda a assinatura quando um pendente é rejeitado (a linha some do quadro)', function () {

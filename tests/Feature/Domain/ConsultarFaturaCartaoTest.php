@@ -5,6 +5,9 @@ use App\Domain\FaturaCartao\ResultadoConsultaFaturaCartao;
 use App\Domain\IA\Guard\PayloadDeResposta;
 use App\Models\Card;
 use App\Models\Installment;
+use App\Models\PaymentMethod;
+use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -203,4 +206,83 @@ it('expõe um payload para o guard com o total e o valor de cada cobrança', fun
         ->and($payload->permiteValor(30000))->toBeTrue() // cobrança 1
         ->and($payload->permiteValor(20000))->toBeTrue() // cobrança 2
         ->and($payload->permiteValor(123456))->toBeFalse(); // valor inventado
+});
+
+// ---- Assinaturas recorrentes na fatura (spec 12, R8) -------------------------------------
+
+it('itemiza a ocorrência de recorrência do cartão e a soma no total, mesmo já paga (R8)', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create([
+        'descricao' => 'cartão pai', 'final_4' => '1234',
+        'dia_fechamento' => 20, 'dia_vencimento' => 28,
+    ]);
+    $rec = Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 5590,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::CREDITO),
+        'card_id' => $cartao->id, 'dia' => 25, 'proxima_em' => null,
+    ]);
+
+    compraNaFatura($user, $cartao, 30000, '2026-08-28');
+
+    // Cobrança em 25/07 (após o fechamento) cai na fatura que vence em 28/08 ⇒ competência 08.
+    RecurrenceOccurrence::factory()->pago()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-08',
+        'descricao' => 'Netflix', 'valor_cents' => 5590,
+        'data_cobranca' => '2026-07-25', 'vencimento' => '2026-08-28',
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::CREDITO),
+        'card_id' => $cartao->id,
+    ]);
+
+    $fatura = app(ConsultarFaturaCartao::class)->para($user->id, 'cartão pai', '2026-08');
+
+    expect($fatura->totalCents)->toBe(35590)
+        ->and($fatura->itens)->toHaveCount(2)
+        ->and(collect($fatura->itens)->firstWhere('recorrente', true))->toMatchArray([
+            'descricao' => 'Netflix',
+            'vencimento' => '2026-08-28',
+            'cents' => 5590,
+        ]);
+});
+
+it('não coloca na fatura a ocorrência cancelada nem a de outra competência', function () {
+    $user = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'cartão pai', 'final_4' => '1234']);
+    $rec = Recurrence::factory()->for($user)->create([
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::CREDITO),
+        'card_id' => $cartao->id, 'proxima_em' => null,
+    ]);
+
+    RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-08',
+        'descricao' => 'Cancelada', 'valor_cents' => 5590,
+        'data_cobranca' => '2026-07-25', 'vencimento' => '2026-08-28',
+        'card_id' => $cartao->id, 'status_id' => StatusPagamento::idFor(StatusPagamento::CANCELADO),
+    ]);
+    RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-09',
+        'descricao' => 'Outro mês', 'valor_cents' => 5590,
+        'data_cobranca' => '2026-08-25', 'vencimento' => '2026-09-28',
+        'card_id' => $cartao->id,
+    ]);
+
+    $fatura = app(ConsultarFaturaCartao::class)->para($user->id, 'cartão pai', '2026-08');
+
+    expect($fatura->totalCents)->toBe(0)
+        ->and($fatura->itens)->toBe([]);
+});
+
+it('não vaza a ocorrência de cartão de outro usuário na fatura', function () {
+    $user = User::factory()->create();
+    $outro = User::factory()->create();
+    $cartao = Card::factory()->for($user)->create(['descricao' => 'cartão pai', 'final_4' => '1234']);
+    $rec = Recurrence::factory()->for($outro)->create(['card_id' => $cartao->id, 'proxima_em' => null]);
+
+    RecurrenceOccurrence::factory()->create([
+        'user_id' => $outro->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-08',
+        'descricao' => 'Alheia', 'valor_cents' => 999900,
+        'data_cobranca' => '2026-07-25', 'vencimento' => '2026-08-28',
+        'card_id' => $cartao->id,
+    ]);
+
+    expect(app(ConsultarFaturaCartao::class)->para($user->id, 'cartão pai', '2026-08')->totalCents)->toBe(0);
 });

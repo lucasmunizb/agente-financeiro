@@ -22,8 +22,7 @@ final class ChaveDeDuplicidade
         public readonly string $descricao,
         public readonly string $data,
         public readonly int $parcelas,
-    ) {
-    }
+    ) {}
 
     public static function de(int $valorCents, string $descricao, CarbonImmutable $data, int $parcelas): self
     {

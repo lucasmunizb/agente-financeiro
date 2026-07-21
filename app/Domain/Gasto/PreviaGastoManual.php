@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Gasto;
 
 use App\Domain\Shared\Money;
+use Carbon\CarbonImmutable;
 
 /**
  * Pré-visualização de um gasto manual antes da confirmação (regra inviolável 7:
@@ -14,6 +15,10 @@ use App\Domain\Shared\Money;
  * apresentação já resolvido pelo domínio, para a redação não consultar o banco.
  * `categoriaSugeridaPorIa` diz a procedência: true quando a categoria veio do fallback de
  * IA (mostrar como DICA a confirmar), false quando veio de regra aprendida ou não há.
+ *
+ * `dataPagamento` presente ⇒ a confirmação vai gravar a 1ª parcela já como PAGA nessa data
+ * (decisão 2026-07-21). Está aqui para a apresentação poder dizê-lo ANTES do "sim" — o
+ * usuário precisa ver que vai marcar pago antes de confirmar (regra 7).
  */
 final class PreviaGastoManual
 {
@@ -28,6 +33,6 @@ final class PreviaGastoManual
         public readonly array $parcelas,
         public readonly ?string $categoria = null,
         public readonly bool $categoriaSugeridaPorIa = false,
-    ) {
-    }
+        public readonly ?CarbonImmutable $dataPagamento = null,
+    ) {}
 }

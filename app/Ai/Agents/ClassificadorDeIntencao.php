@@ -6,6 +6,8 @@ namespace App\Ai\Agents;
 
 use App\Ai\Concerns\UsaFailoverDeProvedores;
 use App\Ai\Concerns\UsaRaciocinioBaixoNaGroq;
+use App\Domain\IA\Custo\LogDeUsoDeIA;
+use App\Domain\IA\Custo\TipoDeUsoIA;
 use App\Domain\IA\Intencao;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -51,7 +53,7 @@ class ClassificadorDeIntencao implements Agent, Conversational, HasProviderOptio
         $resposta = $this->prompt($texto);
 
         // Custo visível para TODOS os agentes, não só a consulta (auditoria P3-1).
-        \App\Domain\IA\Custo\LogDeUsoDeIA::registrar($resposta, \App\Domain\IA\Custo\TipoDeUsoIA::MENSAGEM, inicio: $inicio);
+        LogDeUsoDeIA::registrar($resposta, TipoDeUsoIA::MENSAGEM, inicio: $inicio);
 
         $dados = $resposta->toArray();
 

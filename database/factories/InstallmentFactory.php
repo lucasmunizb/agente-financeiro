@@ -2,12 +2,13 @@
 
 namespace Database\Factories;
 
+use App\Models\Installment;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\Installment>
+ * @extends Factory<Installment>
  */
 class InstallmentFactory extends Factory
 {

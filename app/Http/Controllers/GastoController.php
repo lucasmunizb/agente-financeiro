@@ -12,7 +12,6 @@ use App\Http\Controllers\Concerns\SerializaPreviaDeGasto;
 use App\Http\Requests\RegistrarGastoRequest;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Borda web do cadastro de gasto manual (modal §7.7b). Camada fina: valida na
@@ -23,14 +22,14 @@ use Illuminate\Support\Facades\DB;
  * - {@see self::previa()} calcula e devolve a prévia SEM persistir;
  * - {@see self::store()} persiste após a confirmação do usuário.
  *
- * Recorrência (§7.7, spec 10): com o switch "Repete todo mês?" ligado (só fora de cartão), o
- * gasto do mês atual é lançado normalmente E uma recorrência é criada começando no MÊS
- * SEGUINTE (não conta o mês atual em dobro). A recorrência nunca grava sozinha — enfileira
- * confirmações no dia (regra 7); o materializador é quem roda mês a mês.
+ * Recorrência (§7.7, spec 12): com o switch "Repete todo mês?" ligado — inclusive em cartão
+ * (D3) — NENHUM lançamento é criado. Nasce o molde e a OCORRÊNCIA do mês corrente (D2), que é
+ * a única representação daquela conta no mês (R1). Era exatamente a criação simultânea de
+ * gasto avulso + recorrência que duplicava a linha no extrato.
  *
- * Nota: "Data de pagamento" (marcar como pago na criação) ainda não é suportada
- * pelo domínio — o campo é aceito, porém ignorado; será uma feature própria (com
- * migration + TDD) quando entrar no escopo.
+ * "Data de pagamento" (decisão 2026-07-21): quem cadastra um gasto que JÁ pagou informa a
+ * data e a 1ª parcela nasce paga ({@see RegistrarGastoManual}). Só fora de cartão e nunca no
+ * futuro — a borda recusa o resto ({@see RegistrarGastoRequest}).
  */
 class GastoController extends Controller
 {
@@ -51,31 +50,25 @@ class GastoController extends Controller
         RegistrarGastoManual $registrar,
         RegistrarRecorrencia $recorrencias,
     ): JsonResponse {
-        // Gasto do mês + recorrência (quando houver) na MESMA transação: ou grava os dois, ou
-        // nenhum (nada de gasto órfão sem a regra que o repete, nem o contrário).
-        $transaction = DB::transaction(function () use ($request, $registrar, $recorrencias) {
-            $tx = $registrar->confirmar($request->paraDominio());
+        // Recorrente ⇒ SÓ o molde + a ocorrência do mês (spec 12, R1). Criar também um gasto
+        // avulso aqui era a origem da linha duplicada no extrato: as duas representavam a
+        // mesma cobrança do mesmo mês.
+        if ($dados = $request->dadosRecorrencia()) {
+            $recorrencia = $recorrencias->registrar($dados, CarbonImmutable::now(RelativeDate::TIMEZONE));
 
-            if ($dados = $request->dadosRecorrencia()) {
-                $hoje = CarbonImmutable::now(RelativeDate::TIMEZONE);
-                // Este mês já virou gasto acima; a recorrência começa no mês seguinte.
-                $recorrencia = $recorrencias->registrar($dados, $hoje, $hoje->startOfMonth()->addMonthNoOverflow());
-                // Liga o gasto DESTE mês à recorrência que nasceu junto: assim ele já aparece como
-                // recorrente na tela (com dia/próxima) e a edição oferece o alcance "este e os
-                // próximos". Os meses seguintes materializam outros lançamentos, todos vinculados.
-                $tx->update(['recurrence_id' => $recorrencia->id]);
-            }
+            return response()->json(['ok' => true, 'recorrencia' => true, 'id' => $recorrencia->getRouteKey()]);
+        }
 
-            return $tx;
-        });
+        $transaction = $registrar->confirmar($request->paraDominio());
 
-        return response()->json(['ok' => true, 'id' => $transaction->id]);
+        return response()->json(['ok' => true, 'recorrencia' => false, 'id' => $transaction->id]);
     }
 
     /**
      * Nota de recorrência para o painel de confirmação: o dia e o mês em que a recorrência
-     * COMEÇA (mês seguinte). A data é calculada aqui (regra 4 — a tela não calcula), formatada
-     * em pt-BR (regra 5). Null quando o gasto não é recorrente.
+     * COMEÇA — o mês CORRENTE (spec 12, D2: ela já vale no mês do cadastro). A data é calculada
+     * aqui (regra 4 — a tela não calcula), formatada em pt-BR (regra 5). Null quando não é
+     * recorrente.
      *
      * @return array{dia: int, primeiraEm: string}|null
      */
@@ -86,8 +79,10 @@ class GastoController extends Controller
         }
 
         $dia = (int) $request->input('dia_recorrencia');
-        $hoje = CarbonImmutable::now(RelativeDate::TIMEZONE);
-        $primeira = OcorrenciaMensal::aPartirDe($dia, $hoje->startOfMonth()->addMonthNoOverflow());
+        $primeira = OcorrenciaMensal::aPartirDe(
+            $dia,
+            CarbonImmutable::now(RelativeDate::TIMEZONE)->startOfMonth(),
+        );
 
         return [
             'dia' => $dia,

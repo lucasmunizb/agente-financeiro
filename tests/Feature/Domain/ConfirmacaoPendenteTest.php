@@ -215,3 +215,27 @@ it('não rejeita pendente de outro usuário', function () {
 
     (new RejeitarPendente)->rejeitar($pendente->id, $outro->id, $agora);
 })->throws(ModelNotFoundException::class);
+
+it('preserva a data de pagamento no payload do pendente e grava a parcela paga no "sim"', function () {
+    $user = User::factory()->create();
+
+    $dados = new DadosGastoManual(
+        userId: $user->id,
+        descricao: 'Netflix',
+        valorTotalCents: 5590,
+        dataCompra: CarbonImmutable::parse('2026-07-05', 'America/Sao_Paulo'),
+        paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
+        parcelas: 1,
+        dataPagamento: CarbonImmutable::parse('2026-07-05', 'America/Sao_Paulo'),
+    );
+
+    $pendente = app(EnfileirarConfirmacao::class)->enfileirar($dados, PendingConfirmation::ORIGEM_RECORRENCIA);
+
+    $tx = app(ConfirmarPendente::class)->confirmar(
+        $pendente->id,
+        $user->id,
+        CarbonImmutable::parse('2026-07-06 09:00', 'America/Sao_Paulo'),
+    );
+
+    expect($tx->installments()->first()->data_pagamento->toDateString())->toBe('2026-07-05');
+});

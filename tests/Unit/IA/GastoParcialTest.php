@@ -38,7 +38,7 @@ it('deixa o novo não-nulo vencer (correção de um campo já preenchido)', func
 });
 
 it('sinaliza os campos obrigatórios que faltam (descricao, valor, forma)', function () {
-    $parcial = new GastoParcial(null, '263,52', 'pix', null, 'viagem', 'amanhã', null);
+    $parcial = new GastoParcial(null, '263,52', 'pix', null, 'viagem', 'amanhã', null, null, false);
 
     expect($parcial->faltantes())->toBe(['descricao'])
         ->and($parcial->completo())->toBeFalse();
@@ -50,8 +50,8 @@ it('exige cartão quando a forma é crédito', function () {
     expect($parcial->faltantes())->toContain('cartao');
 });
 
-it('é completo quando tem descrição, valor e forma (sem crédito)', function () {
-    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null);
+it('é completo quando tem descrição, valor, forma e o "já pagou?" respondido (sem crédito)', function () {
+    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, false);
 
     expect($parcial->completo())->toBeTrue()
         ->and($parcial->faltantes())->toBe([]);
@@ -107,7 +107,7 @@ it('deixa o dia novo corrigir o anterior', function () {
 });
 
 it('não torna o dia da recorrência obrigatório (gasto avulso segue completo sem ele)', function () {
-    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null);
+    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, false);
 
     expect($parcial->completo())->toBeTrue();
 });
@@ -116,4 +116,71 @@ it('propaga o dia da recorrência para o DTO cru', function () {
     $parcial = new GastoParcial('ingles carol', '520', 'pix', null, 'estudos', null, null, '10');
 
     expect($parcial->paraExtraido()->recorrenciaDiaTexto)->toBe('10');
+});
+
+/*
+ * Já foi pago? (decisão 2026-07-21). O pagamento é mais um slot CRU: a IA só reporta que o
+ * usuário disse ter pago e COPIA a data como texto — quem resolve a data é o domínio
+ * (regra 4). Fora de cartão, o slot é OBRIGATÓRIO: sem ele o bot pergunta, em vez de
+ * assumir "não pago". Crédito não pergunta (quita pela fatura), e recorrência é molde:
+ * não há parcela a pagar no momento do cadastro.
+ */
+
+it('pergunta se já foi pago quando a forma é fora de cartão e o usuário não disse', function () {
+    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, null, null);
+
+    expect($parcial->faltantes())->toBe(['pago'])
+        ->and($parcial->completo())->toBeFalse();
+});
+
+it('não pergunta se já foi pago quando a forma é crédito (quita pela fatura)', function () {
+    $parcial = new GastoParcial('tv', '2000', 'credito', 'cartão pai', null, 'hoje', null, null, null, null);
+
+    expect($parcial->faltantes())->toBe([])
+        ->and($parcial->completo())->toBeTrue();
+});
+
+it('não pergunta se já foi pago antes de saber a forma de pagamento', function () {
+    $parcial = new GastoParcial('mercado', '90', null, null, null, 'hoje', null, null, null, null);
+
+    expect($parcial->faltantes())->toBe(['forma_pagamento']);
+});
+
+it('não pergunta se já foi pago numa recorrência mensal (é molde, não lançamento)', function () {
+    $parcial = new GastoParcial('ingles carol', '520', 'pix', null, null, null, null, '10', null, null);
+
+    expect($parcial->faltantes())->toBe([])
+        ->and($parcial->completo())->toBeTrue();
+});
+
+it('aceita o "não paguei ainda" como resposta válida do slot (false não é ausente)', function () {
+    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, false, null);
+
+    expect($parcial->completo())->toBeTrue();
+});
+
+it('preserva o pago=false entre turnos (mesclar não confunde false com ausente)', function () {
+    $acumulado = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, false, null);
+    $novo = new GastoParcial(null, '95', null, null, null, null, null, null, null, null);
+
+    expect($acumulado->mesclar($novo)->pago)->toBeFalse();
+});
+
+it('deixa o pago novo corrigir o anterior e preserva a data de pagamento crua', function () {
+    $acumulado = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, false, null);
+    $novo = new GastoParcial(null, null, null, null, null, null, null, null, true, 'ontem');
+
+    $mesclado = $acumulado->mesclar($novo);
+
+    expect($mesclado->pago)->toBeTrue()
+        ->and($mesclado->dataPagamentoTexto)->toBe('ontem');
+});
+
+it('propaga pago e a data de pagamento crua para o DTO de extração', function () {
+    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, true, 'ontem');
+
+    $gasto = $parcial->paraExtraido();
+
+    expect($gasto->pago)->toBeTrue()
+        ->and($gasto->dataPagamentoTexto)->toBe('ontem');
 });

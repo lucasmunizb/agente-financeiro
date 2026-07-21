@@ -8,7 +8,7 @@ use App\Models\Recurrence;
 use Illuminate\Support\Collection;
 
 /**
- * Lista as recorrências ATIVAS de um usuário para a tela de gerenciamento (spec 10). Leitura
+ * Lista as recorrências ATIVAS de um usuário para a tela de gerenciamento (spec 10/12). Leitura
  * determinística, escopo ESTRITO por `user_id` (nunca vaza de terceiros). Ordena por dia-do-mês
  * (e id como desempate estável). As canceladas ficam de fora — a tela mostra o que ainda gera.
  */
@@ -20,6 +20,9 @@ final class ConsultarRecorrencias
         return Recurrence::query()
             ->where('user_id', $userId)
             ->where('status', Recurrence::STATUS_ATIVO)
+            // Forma e cartão rotulam a linha da tela sem N+1 (spec 12: recorrência pode ser
+            // em cartão de crédito, e aí o cartão faz parte da identidade da cobrança).
+            ->with(['paymentMethod', 'card'])
             ->orderBy('dia')
             ->orderBy('id')
             ->get();

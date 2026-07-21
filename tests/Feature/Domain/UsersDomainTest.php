@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 /*
  * Ajustes da tabela users para o domínio (início do bloco 3 da F1):
@@ -30,7 +31,7 @@ it('persiste o aceite de LGPD como data/hora', function () {
     $user = User::factory()->create(['aceite_lgpd_em' => now()]);
 
     expect($user->fresh()->aceite_lgpd_em)
-        ->toBeInstanceOf(\Illuminate\Support\Carbon::class);
+        ->toBeInstanceOf(Carbon::class);
 });
 
 it('faz soft delete do usuário (exclusão lógica LGPD)', function () {

@@ -30,7 +30,7 @@ final class PayloadDoGasto
             'categoriaId' => $d->categoriaId,
             'categoriaSugeridaPorIa' => $d->categoriaSugeridaPorIa,
             'origem' => $d->origem,
-            'recurrenceId' => $d->recurrenceId,
+            'dataPagamento' => $d->dataPagamento?->format('Y-m-d'),
         ];
     }
 
@@ -48,8 +48,10 @@ final class PayloadDoGasto
             accountId: isset($p['accountId']) ? (int) $p['accountId'] : null,
             categoriaId: isset($p['categoriaId']) ? (int) $p['categoriaId'] : null,
             origem: (string) ($p['origem'] ?? 'manual'),
-            recurrenceId: isset($p['recurrenceId']) ? (int) $p['recurrenceId'] : null,
             categoriaSugeridaPorIa: (bool) ($p['categoriaSugeridaPorIa'] ?? false),
+            dataPagamento: isset($p['dataPagamento'])
+                ? CarbonImmutable::parse((string) $p['dataPagamento'], RelativeDate::TIMEZONE)
+                : null,
         );
     }
 }

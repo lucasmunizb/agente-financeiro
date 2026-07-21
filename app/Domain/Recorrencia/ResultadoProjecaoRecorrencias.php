@@ -16,7 +16,7 @@ use App\Domain\IA\Consulta\TraceDaConsulta;
 final class ResultadoProjecaoRecorrencias
 {
     /**
-     * @param  list<array{descricao: string, vencimento: string, cents: int, prevista: true, categoriaId: ?int, categoria: ?array{nome: string, cor: ?string}, forma: ?string}>  $ocorrencias  ordenada por vencimento asc
+     * @param  list<array{descricao: string, vencimento: string, cents: int, prevista: true, categoriaId: ?int, categoria: ?array{nome: string, cor: ?string}, forma: ?string, cartaoId: ?int, cartaoDescricao: ?string, recorrente: true}>  $ocorrencias  ordenada por vencimento asc
      */
     public function __construct(
         public readonly int $totalCents,

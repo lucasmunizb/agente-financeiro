@@ -6,7 +6,6 @@ use App\Domain\IA\Guard\PayloadDeResposta;
 use App\Domain\ProximasContas\ConsultarProximasContas;
 use App\Domain\ProximasContas\ResultadoConsultaProximasContas;
 use App\Models\Installment;
-use App\Models\Recurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -60,18 +59,17 @@ function contaAVencer(
     return $transaction;
 }
 
-it('marca a conta como recorrente quando a transação tem recurrence_id', function () {
+it('nunca marca uma parcela como recorrente: recorrência não vive em transactions (spec 12)', function () {
     $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create();
 
-    $recorrente = contaAVencer($user, 5000, '2026-06-28', 'Netflix');
-    $recorrente->update(['recurrence_id' => $rec->id]);
+    contaAVencer($user, 5000, '2026-06-28', 'Netflix');
     contaAVencer($user, 3000, '2026-06-29', 'Padaria');
 
     $contas = collect(app(ConsultarProximasContas::class)->para($user->id, hoje(), 30)->contas)
         ->keyBy('descricao');
 
-    expect($contas['Netflix']['recorrente'])->toBeTrue()
+    // A conta fixa entra pelo quadro do ResumoDoMes, via ocorrência — não por esta consulta.
+    expect($contas['Netflix']['recorrente'])->toBeFalse()
         ->and($contas['Padaria']['recorrente'])->toBeFalse();
 });
 

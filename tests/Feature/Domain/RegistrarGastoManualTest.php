@@ -39,6 +39,7 @@ function dadosPix(User $user, array $over = []): DadosGastoManual
         parcelas: $over['parcelas'] ?? 3,
         categoriaId: $over['categoriaId'] ?? null,
         categoriaSugeridaPorIa: $over['categoriaSugeridaPorIa'] ?? false,
+        dataPagamento: $over['dataPagamento'] ?? null,
     );
 }
 
@@ -227,4 +228,81 @@ it('confirmar registra a auditoria de criação', function () {
         ->and($log->user_id)->toBe($user->id)
         ->and($log->antes)->toBeNull()
         ->and($log->depois)->not->toBeNull();
+});
+
+/* -------- gasto já pago no ato do cadastro (decisão 2026-07-21) -------- */
+
+it('marca SÓ a primeira parcela como paga quando o gasto já foi pago', function () {
+    $user = User::factory()->create();
+
+    $tx = (new RegistrarGastoManual)->confirmar(
+        dadosPix($user, ['dataPagamento' => CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo')]),
+        CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'),
+    );
+
+    $parcelas = $tx->installments()->orderBy('numero')->get();
+
+    expect($parcelas[0]->status_id)->toBe(StatusPagamento::idFor(StatusPagamento::PAGO))
+        ->and($parcelas[0]->data_pagamento->toDateString())->toBe('2026-06-10')
+        ->and($parcelas[1]->status_id)->not->toBe(StatusPagamento::idFor(StatusPagamento::PAGO))
+        ->and($parcelas[1]->data_pagamento)->toBeNull()
+        ->and($tx->fresh()->status_id)->toBe(StatusPagamento::idFor(StatusPagamento::PAGO_PARCIAL));
+});
+
+it('gasto à vista já pago fica com a transação inteira paga', function () {
+    $user = User::factory()->create();
+
+    $tx = (new RegistrarGastoManual)->confirmar(
+        dadosPix($user, ['parcelas' => 1, 'dataPagamento' => CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo')]),
+        CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'),
+    );
+
+    // Sem refresh, a instância devolvida diria "aberto" para quem monta a confirmação.
+    expect($tx->status_id)->toBe(StatusPagamento::idFor(StatusPagamento::PAGO))
+        ->and($tx->fresh()->status_id)->toBe(StatusPagamento::idFor(StatusPagamento::PAGO))
+        ->and($tx->installments()->first()->data_pagamento->toDateString())->toBe('2026-06-10');
+});
+
+it('registra a auditoria do pagamento da parcela junto do cadastro', function () {
+    $user = User::factory()->create();
+
+    $tx = (new RegistrarGastoManual)->confirmar(
+        dadosPix($user, ['parcelas' => 1, 'dataPagamento' => CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo')]),
+        CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'),
+    );
+
+    expect(AuditLog::where('entidade', 'installment')
+        ->where('entidade_id', $tx->installments()->first()->id)
+        ->where('acao', AuditLog::ACAO_PAGAR)
+        ->exists())->toBeTrue();
+});
+
+it('nunca marca pago em compra no cartão, mesmo se a data de pagamento vier preenchida', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create(['dia_fechamento' => 20, 'dia_vencimento' => 5]);
+
+    $tx = (new RegistrarGastoManual)->confirmar(
+        new DadosGastoManual(
+            userId: $user->id,
+            descricao: 'TV',
+            valorTotalCents: 200000,
+            dataCompra: CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo'),
+            paymentMethodId: PaymentMethod::idFor(PaymentMethod::CREDITO),
+            parcelas: 1,
+            cardId: $card->id,
+            dataPagamento: CarbonImmutable::parse('2026-06-10', 'America/Sao_Paulo'),
+        ),
+        CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'),
+    );
+
+    expect($tx->installments()->first()->data_pagamento)->toBeNull()
+        ->and($tx->fresh()->status_id)->not->toBe(StatusPagamento::idFor(StatusPagamento::PAGO));
+});
+
+it('sem data de pagamento, nada é marcado como pago (comportamento padrão)', function () {
+    $user = User::factory()->create();
+
+    $tx = (new RegistrarGastoManual)->confirmar(dadosPix($user), CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo'));
+
+    expect($tx->installments()->whereNotNull('data_pagamento')->count())->toBe(0);
 });

@@ -10,7 +10,7 @@
 // exibimos os erros que ela devolve. Nada sensível persiste no cliente (regra 6).
 
 const FORMA_LABEL = { credito: 'Crédito', debito: 'Débito', pix: 'Pix', dinheiro: 'Dinheiro', boleto: 'Boleto' };
-const CAMPOS_INLINE = new Set(['descricao', 'valor', 'categoria_id', 'dia_recorrencia']); // resto cai no aviso geral
+const CAMPOS_INLINE = new Set(['descricao', 'valor', 'categoria_id', 'dia_recorrencia', 'data_pagamento']); // resto cai no aviso geral
 const instancias = new Map();
 
 // Toast: fonte única no shell (resources/js/toast.js). Aqui usamos o toast
@@ -83,36 +83,82 @@ function initGastoForm(root) {
         const credito = forma === 'credito';
         alternarGrupo(grupoCredito, credito);
         alternarGrupo(grupoAvista, !credito);
-        if (credito) setRecorrencia(false); // crédito usa parcelas, não recorrência
+        // "Já foi pago?" vive no grupo à vista: no crédito ele some E é desligado — senão a
+        // data seguiria no envio e o backend recusaria (quem se quita é a fatura, §4.3).
+        if (credito) setPago(false);
+        // Recorrência sobrevive à troca de forma (spec 12, D3: cartão é permitido) — só o
+        // aviso de "nasce paga" aparece/some conforme a forma.
+        atualizarAvisoDeCartao();
     }
     formaBtns.forEach((b) => b.addEventListener('click', () => selecionarForma(b)));
 
-    /* ---- Recorrência (só à vista): switch controla o hidden `recorrente` e revela os
-       campos (periodicidade + dia). A recorrência começa no mês seguinte — o backend
-       calcula quando (regra 4); aqui só ligamos e sugerimos o dia a partir do vencimento. -- */
+    /* ---- Recorrência (spec 12): vale em QUALQUER forma, cartão inclusive. O switch controla
+       o hidden `recorrente` e revela os campos (periodicidade + dia da cobrança). Ligar não
+       lança gasto avulso nenhum: a conta fixa É a cobrança do mês. O backend decide em que
+       mês ela começa (regra 4); aqui só ligamos e sugerimos o dia. ---------------------- */
     const recorrenciaBtn = root.querySelector('[data-rg-recorrencia]');
     const recorrenteInput = root.querySelector('[data-rg-recorrente-input]');
     const recorrenciaFields = root.querySelector('[data-rg-recorrencia-fields]');
+    const recorrenciaCartaoAviso = root.querySelector('[data-rg-recorrencia-cartao]');
     const diaInput = root.querySelector('#rg-dia_recorrencia');
-    // Lançamento que já é recorrente: switch marcado e imutável (o servidor renderiza
-    // aria-checked=true + disabled). O backend ignora o switch nesse caso; aqui só garantimos
-    // que nada — clique, troca de forma, mudança de parcelas — reabra ou desmarque.
-    const recorrenteTravado = recorrenciaBtn?.dataset.rgRecorrenteLock === '1';
+
+    const ehCredito = () => formaInput?.value === 'credito';
+
+    /**
+     * Dia sugerido a partir do vencimento já informado (fora de cartão) — só copia o dia da
+     * data, não calcula nada. No crédito não há campo de data no formulário, então o dia fica
+     * em branco para o usuário dizer qual é.
+     */
+    function diaSugerido() {
+        const venc = ehCredito() ? '' : vencimentoInput?.value;
+
+        return venc ? String(Number(venc.slice(8, 10))) : '';
+    }
 
     function setRecorrencia(ligado) {
-        if (!recorrenciaBtn || recorrenteTravado) return;
+        if (!recorrenciaBtn) return;
         recorrenciaBtn.setAttribute('aria-checked', String(ligado));
         if (recorrenteInput) recorrenteInput.value = ligado ? '1' : '0';
         if (recorrenciaFields) recorrenciaFields.hidden = !ligado;
-        // Sugere o dia a partir do vencimento informado (só copia o dia — não calcula dinheiro).
-        if (ligado && diaInput && !diaInput.value && vencimentoInput?.value) {
-            diaInput.value = String(Number(vencimentoInput.value.slice(8, 10)));
-        }
+        // Só copia o dia de uma data já informada — não calcula nada (regra 4).
+        if (ligado && diaInput && !diaInput.value) diaInput.value = diaSugerido();
+        atualizarAvisoDeCartao();
     }
+
+    /** No crédito a cobrança nasce paga (D3): o aviso evita procurar um botão que não existe. */
+    function atualizarAvisoDeCartao() {
+        if (recorrenciaCartaoAviso) recorrenciaCartaoAviso.hidden = !ehCredito();
+    }
+
     recorrenciaBtn?.addEventListener('click', () => {
-        if (recorrenteTravado) return;
-        setRecorrencia(recorrenciaBtn.getAttribute('aria-checked') !== 'true');
+        const ligado = recorrenciaBtn.getAttribute('aria-checked') !== 'true';
+        setRecorrencia(ligado);
+        // Conta que repete todo mês tem o seu próprio "marcar como pago" na cobrança do mês
+        // (spec 12) — o backend recusa a combinação; aqui evitamos o usuário chegar no 422.
+        if (ligado) setPago(false);
     });
+
+    /* ---- "Já foi pago?" (decisão 2026-07-21): lança uma conta que o usuário já quitou.
+       Só fora de cartão — no crédito quem se paga é a fatura (§4.3). O input fica DISABLED
+       quando desligado: assim ele nem entra no FormData e nenhuma data velha viaja junto.
+       Nada é calculado aqui (regra 4): o backend marca a 1ª parcela e devolve a data. ----- */
+    const pagoBtn = root.querySelector('[data-rg-pago]');
+    const pagoFields = root.querySelector('[data-rg-pago-fields]');
+    const dataPagamentoInput = root.querySelector('#rg-data_pagamento');
+
+    function setPago(ligado) {
+        if (!pagoBtn) return;
+        pagoBtn.setAttribute('aria-checked', String(ligado));
+        if (pagoFields) pagoFields.hidden = !ligado;
+        if (!dataPagamentoInput) return;
+        dataPagamentoInput.disabled = !ligado;
+        // Sugere hoje (o caso comum: "acabei de pagar"), sem sobrescrever o que já foi digitado.
+        if (ligado && !dataPagamentoInput.value) dataPagamentoInput.value = dataPagamentoInput.max || '';
+        if (!ligado) esconderErro('data_pagamento');
+    }
+
+    pagoBtn?.addEventListener('click', () => setPago(pagoBtn.getAttribute('aria-checked') !== 'true'));
+    dataPagamentoInput?.addEventListener('input', () => esconderErro('data_pagamento'));
 
     /* ---- Parcelamento × recorrência: mutuamente exclusivos (o backend também barra).
        Com 2+ parcelas o "Repete todo mês?" não faz sentido (dividir ≠ repetir): desliga
@@ -121,7 +167,7 @@ function initGastoForm(root) {
     const recorrenciaBloqueada = root.querySelector('[data-rg-recorrencia-bloqueada]');
 
     function aplicarLimiteRecorrencia() {
-        if (!recorrenciaBtn || recorrenteTravado) return; // travado fica marcado + desabilitado
+        if (!recorrenciaBtn) return;
         const parcelado = Number(parcelasInput?.value || 1) >= 2;
         if (parcelado) setRecorrencia(false); // desmarca se estava ligado
         recorrenciaBtn.disabled = parcelado;
@@ -130,6 +176,7 @@ function initGastoForm(root) {
     }
     parcelasInput?.addEventListener('input', aplicarLimiteRecorrencia);
     aplicarLimiteRecorrencia(); // estado inicial (edição pode vir com 2+ parcelas)
+    atualizarAvisoDeCartao(); // idem para o aviso "no cartão já nasce paga"
 
     /* ---- Categoria: chip único ------------------------------------------ */
     const categoriaBtns = root.querySelectorAll('[data-rg-categoria]');
@@ -255,23 +302,51 @@ function initGastoForm(root) {
 
         root.querySelector('[data-rg-dup]').hidden = !previa.ehDuplicado;
 
+        // Recorrência não tem parcela: a prévia mostra a COBRANÇA do mês. Rotular a linha
+        // como "1/1" prometeria um lançamento parcelado que não vai existir (spec 12).
+        const ehRecorrencia = Boolean(previa.recorrencia);
+        const legenda = root.querySelector('[data-rg-previa-legenda]');
+        if (legenda) {
+            legenda.textContent = ehRecorrencia
+                ? 'Prévia — cobrança do mês (ainda não gravada)'
+                : 'Prévia — calculada pelo sistema (ainda não gravado)';
+        }
+
         const tbody = root.querySelector('[data-rg-parcelas]');
         tbody.innerHTML = '';
         previa.parcelas.forEach((p) => {
             const tr = document.createElement('tr');
             tr.innerHTML =
-                `<td class="py-2">${p.label}</td>` +
+                `<td class="py-2">${ehRecorrencia ? 'Cobrança' : p.label}</td>` +
                 `<td class="py-2 text-right">${p.valor}</td>` +
                 `<td class="py-2 text-right text-outline">vence ${p.vencimento}</td>`;
             tbody.appendChild(tr);
         });
 
-        // Nota de recorrência (quando ligada): o backend diz quando ela começa (mês seguinte).
+        // Nota de "já pago": antes do "sim", o usuário vê que a conta vai nascer quitada
+        // (regra 7). A data vem pronta do backend (regra 4/5) — a tela não formata nada.
+        const notaPago = root.querySelector('[data-rg-pago-nota]');
+        if (notaPago) {
+            if (previa.dataPagamento) {
+                const parcelado = previa.parcelas.length > 1;
+                notaPago.querySelector('span').textContent = parcelado
+                    ? `A 1ª parcela será gravada como paga em ${previa.dataPagamento}; as demais seguem em aberto.`
+                    : `Será gravado como pago em ${previa.dataPagamento}.`;
+                notaPago.hidden = false;
+            } else {
+                notaPago.hidden = true;
+            }
+        }
+
+        // Nota de recorrência (quando ligada): o backend diz em que mês ela começa.
         const nota = root.querySelector('[data-rg-recorrencia-nota]');
         if (nota) {
             if (previa.recorrencia) {
+                // Cobrança mensal, começando no mês que o backend calculou (regra 4). Deixa
+                // explícito que não haverá um gasto avulso além dela (spec 12, R1).
                 nota.querySelector('span').textContent =
-                    `Repete todo mês no dia ${previa.recorrencia.dia} · começa em ${previa.recorrencia.primeiraEm}.`;
+                    `Cobrança todo dia ${previa.recorrencia.dia}, a partir de ${previa.recorrencia.primeiraEm}. `
+                    + 'É a cobrança do mês — nenhum lançamento avulso é criado.';
                 nota.hidden = false;
             } else {
                 nota.hidden = true;

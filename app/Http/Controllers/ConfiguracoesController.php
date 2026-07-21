@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Calendar\RelativeDate;
 use App\Domain\Conta\AlterarSenha;
 use App\Domain\Conta\AtualizarPerfil;
 use App\Domain\Conta\DadosPerfil;
 use App\Domain\Conta\ExcluirConta;
 use App\Domain\Conta\ExportarDadosDoUsuario;
-use App\Domain\Calendar\RelativeDate;
 use App\Http\Requests\Conta\AlterarSenhaRequest;
 use App\Http\Requests\Conta\AtualizarPerfilRequest;
 use App\Http\Requests\Conta\ExcluirContaRequest;

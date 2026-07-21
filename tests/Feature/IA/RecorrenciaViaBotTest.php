@@ -9,6 +9,7 @@ use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\ComandoRecebido;
 use App\Models\PaymentMethod;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -111,10 +112,11 @@ it('grava a recorrência no "sim" e nenhum lançamento (C10)', function () {
         ->and($recorrencia->dia)->toBe(10)
         ->and($recorrencia->status)->toBe(Recurrence::STATUS_ATIVO)
         ->and($recorrencia->payment_method_id)->toBe(PaymentMethod::idFor('pix'))
-        // Hoje é 16/07 e o dia 10 já passou: a próxima ocorrência é 10/08 (OcorrenciaMensal).
-        ->and($recorrencia->proxima_em->format('Y-m-d'))->toBe('2026-08-10')
-        // O lançamento só nasce quando o materializador enfileirar e o usuário confirmar (spec 10).
-        ->and(Transaction::count())->toBe(0);
+        // O ponteiro é o 1º dia do primeiro MÊS ainda não gerado: julho já nasceu (D2).
+        ->and($recorrencia->proxima_em->format('Y-m-d'))->toBe('2026-08-01')
+        // Recorrência NUNCA vira lançamento (spec 12): o mês é uma ocorrência (R15).
+        ->and(Transaction::count())->toBe(0)
+        ->and(RecurrenceOccurrence::sole()->competencia)->toBe('2026-07');
 });
 
 it('descarta a recorrência no "não" (C11)', function () {
@@ -173,6 +175,7 @@ it('segue registrando gasto avulso quando não há recorrência (C13 — regress
     fakeRegistro([
         'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix',
         'categoria' => null, 'data' => 'hoje', 'parcelas' => null, 'recorrencia_dia' => null,
+        'pago' => true,
     ]);
     falarComOBot($user, 'gastei 90 no mercado hoje no pix');
 

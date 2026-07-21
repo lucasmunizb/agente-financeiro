@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\FaturaCartao;
 
 use App\Domain\IA\Consulta\TraceDaConsulta;
+use App\Domain\Recorrencia\ConsultarOcorrencias;
 use App\Domain\Shared\PeriodoMensal;
 use App\Domain\Shared\SqlLike;
 use App\Models\Card;
@@ -28,6 +29,9 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class ConsultarFaturaCartao
 {
+    public function __construct(
+        private readonly ConsultarOcorrencias $ocorrencias = new ConsultarOcorrencias,
+    ) {}
 
     public function para(int $userId, string $cartao, string $competencia): ResultadoConsultaFaturaCartao
     {
@@ -94,7 +98,32 @@ final class ConsultarFaturaCartao
                 'numero' => $parcela->numero,
                 'total' => $parcela->total,
                 'categoria_id' => $parcela->transaction->categoria_id,
+                'recorrente' => false,
             ];
+        }
+
+        // Assinaturas recorrentes no cartão (spec 12, R8): a ocorrência é a cobrança daquela
+        // fatura — entra itemizada e soma no total MESMO já estando `pago`, porque a fatura é
+        // extrato do que foi cobrado (§4.4), não lista do que falta pagar.
+        $recorrentes = $this->ocorrencias->doCartao($userId, (int) $card->id, $competencia);
+
+        foreach ($recorrentes as $ocorrencia) {
+            $total += (int) $ocorrencia->valor_cents;
+
+            $itens[] = [
+                'descricao' => (string) $ocorrencia->descricao,
+                'vencimento' => $ocorrencia->vencimento->toDateString(),
+                'cents' => (int) $ocorrencia->valor_cents,
+                'numero' => 1,
+                'total' => 1,
+                'categoria_id' => $ocorrencia->categoria_id,
+                'recorrente' => true,
+            ];
+        }
+
+        if ($recorrentes->isNotEmpty()) {
+            // As parcelas já vinham ordenadas; reordena só quando entrou recorrência.
+            usort($itens, static fn (array $a, array $b): int => [$a['vencimento'], $a['descricao']] <=> [$b['vencimento'], $b['descricao']]);
         }
 
         return new ResultadoConsultaFaturaCartao(
@@ -105,7 +134,7 @@ final class ConsultarFaturaCartao
             trace: new TraceDaConsulta(
                 ferramenta: 'consultar_fatura_cartao',
                 filtros: ['cartao' => $cartaoLabel, 'competencia' => $competencia],
-                registros: $parcelas->count(),
+                registros: count($itens),
             ),
         );
     }

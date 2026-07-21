@@ -99,3 +99,23 @@ it('não confunde um esclarecimento com uma confirmação confirmável (tipos is
     expect($this->store->recuperar($user->id, $this->agora))->toBeNull()
         ->and(app(ConfirmacoesPendentes::class)->recuperar($user->id, $this->agora))->not->toBeNull();
 });
+
+it('preserva o slot "já foi pago" entre turnos, inclusive quando é false', function () {
+    $user = User::factory()->create();
+    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, false, null);
+
+    $this->store->guardar($user->id, $parcial, $this->agora);
+
+    expect($this->store->recuperar($user->id, $this->agora)->pago)->toBeFalse();
+});
+
+it('preserva a data de pagamento crua entre turnos', function () {
+    $user = User::factory()->create();
+    $parcial = new GastoParcial('mercado', '90', 'pix', null, null, 'hoje', null, null, true, 'ontem');
+
+    $this->store->guardar($user->id, $parcial, $this->agora);
+    $recuperado = $this->store->recuperar($user->id, $this->agora);
+
+    expect($recuperado->pago)->toBeTrue()
+        ->and($recuperado->dataPagamentoTexto)->toBe('ontem');
+});

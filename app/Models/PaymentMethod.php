@@ -12,9 +12,13 @@ use Illuminate\Database\Eloquent\Model;
 class PaymentMethod extends Model
 {
     public const CREDITO = 'credito';
+
     public const DEBITO = 'debito';
+
     public const PIX = 'pix';
+
     public const DINHEIRO = 'dinheiro';
+
     public const BOLETO = 'boleto';
 
     /** @var list<string> Conjunto fixo de tipos (doc 03 §4.6). Boleto é "fora de cartão". */

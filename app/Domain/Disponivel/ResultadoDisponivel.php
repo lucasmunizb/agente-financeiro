@@ -17,6 +17,5 @@ final class ResultadoDisponivel
     public function __construct(
         public readonly Money $disponivel,
         public readonly Money $previstoProximoMes,
-    ) {
-    }
+    ) {}
 }

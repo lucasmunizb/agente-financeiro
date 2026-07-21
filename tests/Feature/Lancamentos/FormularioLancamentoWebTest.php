@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -43,7 +44,6 @@ function criarLancamento(
     string $statusCodigo = StatusPagamento::ABERTO,
     ?Card $card = null,
     ?Category $cat = null,
-    ?Recurrence $recorrencia = null,
 ): Transaction {
     $tx = Transaction::factory()->for($user)->create([
         'valor_total_cents' => $cents,
@@ -52,9 +52,7 @@ function criarLancamento(
         'card_id' => $card?->id,
         'categoria_id' => $cat?->id,
         'data_compra' => $venc,
-        // Vínculo com a recorrência de origem (a VERDADE de "é recorrente") + procedência.
-        'recurrence_id' => $recorrencia?->id,
-        'origem' => $recorrencia ? 'recorrencia' : 'manual',
+        'origem' => 'manual',
     ]);
     Installment::factory()->for($tx, 'transaction')->create([
         'numero' => 1, 'total' => 1, 'vencimento' => $venc,
@@ -114,30 +112,14 @@ it('renderiza a edição já preenchida com os dados do lançamento', function (
         ->assertSee('2026-07-10');                // vencimento no input date
 });
 
-it('a edição de um lançamento recorrente mostra o quadro com o dia e a próxima data', function () {
-    $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create(['dia' => 10, 'proxima_em' => '2026-08-10', 'status' => Recurrence::STATUS_ATIVO]);
-    $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10', recorrencia: $rec);
-
-    $this->actingAs($user)->get(route('lancamentos.edit', $tx))
-        ->assertOk()
-        ->assertSee('Lançamento recorrente')            // quadro de recorrência
-        ->assertSee('no dia 10')                        // dia da regra
-        ->assertSee('10/08/2026')                       // próxima ocorrência (vem do backend)
-        ->assertSee('name="escopo_recorrencia"', false) // escolha de alcance no confirmar
-        ->assertSee('Este e os próximos', false)
-        ->assertDontSee('Repete todo mês?');            // sem o switch (virou quadro)
-});
-
-it('a edição de um lançamento comum mostra o switch e não o quadro de recorrência', function () {
+it('a edição sempre mostra o switch: todo lançamento editável é comum (spec 12)', function () {
     $user = User::factory()->create();
     $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10');
 
     $this->actingAs($user)->get(route('lancamentos.edit', $tx))
         ->assertOk()
-        ->assertSee('Repete todo mês?')                     // switch disponível
-        ->assertDontSee('Lançamento recorrente')            // sem quadro de recorrência
-        ->assertDontSee('name="escopo_recorrencia"', false);
+        ->assertSee('Repete todo mês?')                     // ligar o switch CONVERTE (D5)
+        ->assertDontSee('Lançamento recorrente');           // recorrência não vive em transactions
 });
 
 it('devolve 404 ao editar lançamento de outro usuário (escopo)', function () {
@@ -202,11 +184,11 @@ it('atualiza o lançamento, regenera as parcelas e audita', function () {
         ->where('acao', AuditLog::ACAO_EDITAR)->count())->toBe(1);
 });
 
-/* ------------------------------------- edição + recorrência (spec 10) ------- */
+/* ------------------------------------- edição + recorrência (spec 12) ------- */
 
-it('editar com o switch de recorrência ligado cria a recorrência a partir do mês seguinte', function () {
+it('ligar o switch CONVERTE o lançamento em recorrência + ocorrência do mês (D5)', function () {
     $user = User::factory()->create();
-    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-09 08:00', 'America/Sao_Paulo'));
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-21 08:00', 'America/Sao_Paulo'));
     $tx = criarLancamento($user, cents: 45000, descricao: 'Aluguel', forma: PaymentMethod::PIX, venc: '2026-07-10');
 
     $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
@@ -219,21 +201,25 @@ it('editar com o switch de recorrência ligado cria a recorrência a partir do m
         'dia_recorrencia' => 10,
     ])->assertOk()->assertJsonPath('ok', true);
 
-    // A edição continua funcionando (parcelas regeneradas pelo domínio).
-    expect($tx->fresh()->valor_total_cents)->toBe(45000);
+    // O lançamento foi SUBSTITUÍDO: nada de coexistir com a recorrência (era a dupla contagem).
+    expect(Transaction::count())->toBe(0)
+        ->and(Installment::count())->toBe(0);
 
-    // E nasceu uma recorrência ativa, começando no mês seguinte (agosto) — como no cadastro.
     $rec = Recurrence::sole();
     expect($rec->user_id)->toBe($user->id)
         ->and($rec->status)->toBe(Recurrence::STATUS_ATIVO)
         ->and($rec->valor_cents)->toBe(45000)
-        ->and($rec->payment_method_id)->toBe(PaymentMethod::idFor(PaymentMethod::PIX))
         ->and($rec->dia)->toBe(10)
-        ->and($rec->proxima_em->toDateString())->toBe('2026-08-10');
+        ->and($rec->proxima_em->toDateString())->toBe('2026-08-01');
 
-    // O lançamento passa a ser recorrente: fica vinculado à recorrência recém-criada.
-    expect($tx->fresh()->recurrence_id)->toBe($rec->id)
-        ->and($tx->fresh()->ehRecorrente())->toBeTrue();
+    // Uma única ocorrência, na competência do mês corrente (D2).
+    expect(RecurrenceOccurrence::sole())
+        ->competencia->toBe('2026-07')
+        ->vencimento->toDateString()->toBe('2026-07-10');
+
+    // O rastro da conversão fica na auditoria (a linha física some — LGPD).
+    expect(AuditLog::where('entidade', 'transaction')->where('entidade_id', $tx->id)
+        ->where('acao', AuditLog::ACAO_EXCLUIR)->count())->toBe(1);
 });
 
 it('editar sem o switch não cria recorrência', function () {
@@ -244,12 +230,14 @@ it('editar sem o switch não cria recorrência', function () {
         'descricao' => 'Aluguel', 'valor' => '450,00', 'forma' => 'pix', 'vencimento' => '2026-07-10',
     ])->assertOk();
 
-    expect(Recurrence::count())->toBe(0);
+    expect(Recurrence::count())->toBe(0)
+        ->and(Transaction::count())->toBe(1);
 });
 
-it('editar no crédito ignora recorrência (crédito usa parcelas)', function () {
+it('converte também no crédito, ligando a recorrência ao cartão (D3)', function () {
     $user = User::factory()->create();
-    $card = Card::factory()->for($user)->create();
+    $card = Card::factory()->for($user)->create(['dia_fechamento' => 20, 'dia_vencimento' => 28]);
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-21 08:00', 'America/Sao_Paulo'));
     $tx = criarLancamento($user, forma: PaymentMethod::CREDITO, venc: '2026-07-10', card: $card);
 
     $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
@@ -257,105 +245,12 @@ it('editar no crédito ignora recorrência (crédito usa parcelas)', function ()
         'recorrente' => true, 'periodicidade' => 'mensal', 'dia_recorrencia' => 10,
     ])->assertOk();
 
-    expect(Recurrence::count())->toBe(0);
+    expect(Transaction::count())->toBe(0)
+        ->and(Recurrence::sole()->card_id)->toBe($card->id)
+        ->and(RecurrenceOccurrence::sole()->card_id)->toBe($card->id);
 });
 
-it('edição bloqueada por parcela paga não cria recorrência (atômico)', function () {
-    $user = User::factory()->create();
-    $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10', statusCodigo: StatusPagamento::PAGO);
-
-    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
-        'descricao' => 'Tentativa', 'valor' => '10,00', 'forma' => 'pix', 'vencimento' => '2026-07-15',
-        'recorrente' => true, 'periodicidade' => 'mensal', 'dia_recorrencia' => 15,
-    ])->assertStatus(422);
-
-    expect(Recurrence::count())->toBe(0)
-        ->and($tx->fresh()->descricao)->toBe('Aluguel'); // edição não vazou
-});
-
-it('editar um lançamento que já é recorrente ignora o switch — não cria outra recorrência', function () {
-    $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create(['valor_cents' => 4500, 'dia' => 10, 'proxima_em' => '2026-08-10']);
-    $tx = criarLancamento($user, cents: 45000, descricao: 'Netflix', forma: PaymentMethod::PIX, venc: '2026-07-10', recorrencia: $rec);
-
-    // Switch ligado + campos completos, mas SEM escolher escopo → padrão "só este mês": não cria
-    // outra recorrência (não se recorre de novo o que já é recorrente) nem altera a de origem.
-    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
-        'descricao' => 'Netflix', 'valor' => '55,00', 'forma' => 'pix', 'vencimento' => '2026-07-10',
-        'recorrente' => true, 'periodicidade' => 'mensal', 'dia_recorrencia' => 10,
-    ])->assertOk()->assertJsonPath('ok', true);
-
-    expect(Recurrence::count())->toBe(1)                     // só a de origem (nenhuma nova)
-        ->and($tx->fresh()->valor_total_cents)->toBe(5500)   // edição do mês aplicada
-        ->and($tx->fresh()->recurrence_id)->toBe($rec->id)   // segue vinculado
-        ->and($rec->fresh()->valor_cents)->toBe(4500);       // recorrência intacta
-});
-
-it('editar um lançamento recorrente com o switch desmarcado apenas ignora e mantém o vínculo', function () {
-    $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create(['valor_cents' => 4500]);
-    $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10', recorrencia: $rec);
-
-    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
-        'descricao' => 'Aluguel', 'valor' => '450,00', 'forma' => 'pix', 'vencimento' => '2026-07-10',
-        'recorrente' => false,
-    ])->assertOk();
-
-    expect(Recurrence::count())->toBe(1)
-        ->and($tx->fresh()->recurrence_id)->toBe($rec->id)
-        ->and($rec->fresh()->valor_cents)->toBe(4500);
-});
-
-it('editar recorrente com escopo "este e os próximos" sincroniza a recorrência de origem', function () {
-    $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create([
-        'descricao' => 'Netflix', 'valor_cents' => 4500,
-        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
-        'dia' => 10, 'proxima_em' => '2026-08-10', 'status' => Recurrence::STATUS_ATIVO,
-    ]);
-    $tx = criarLancamento($user, cents: 45000, descricao: 'Netflix', forma: PaymentMethod::PIX, venc: '2026-07-10', recorrencia: $rec);
-
-    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
-        'descricao' => 'Netflix 4K', 'valor' => '55,00', 'forma' => 'pix', 'vencimento' => '2026-07-15',
-        'escopo_recorrencia' => 'este_e_proximos',
-    ])->assertOk();
-
-    // O mês mudou E a regra passou a valer para os próximos (novo valor + novo dia).
-    expect($tx->fresh()->valor_total_cents)->toBe(5500);
-    $rec->refresh();
-    expect($rec->descricao)->toBe('Netflix 4K')
-        ->and($rec->valor_cents)->toBe(5500)
-        ->and($rec->dia)->toBe(15)
-        ->and($rec->proxima_em->format('Y-m-d'))->toBe('2026-08-15');
-});
-
-it('editar recorrente com escopo "só este mês" não altera a recorrência', function () {
-    $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create(['descricao' => 'Netflix', 'valor_cents' => 4500, 'dia' => 10, 'proxima_em' => '2026-08-10']);
-    $tx = criarLancamento($user, cents: 45000, descricao: 'Netflix', forma: PaymentMethod::PIX, venc: '2026-07-10', recorrencia: $rec);
-
-    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
-        'descricao' => 'Netflix caro', 'valor' => '55,00', 'forma' => 'pix', 'vencimento' => '2026-07-10',
-        'escopo_recorrencia' => 'este',
-    ])->assertOk();
-
-    expect($tx->fresh()->valor_total_cents)->toBe(5500)  // mês mudou
-        ->and($rec->fresh()->valor_cents)->toBe(4500)     // recorrência intacta
-        ->and($rec->fresh()->descricao)->toBe('Netflix');
-});
-
-it('rejeita um escopo_recorrencia inválido', function () {
-    $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create();
-    $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10', recorrencia: $rec);
-
-    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
-        'descricao' => 'X', 'valor' => '10,00', 'forma' => 'pix', 'vencimento' => '2026-07-10',
-        'escopo_recorrencia' => 'tudo',
-    ])->assertStatus(422)->assertJsonValidationErrors(['escopo_recorrencia']);
-});
-
-it('recusa a edição que combina parcelamento com recorrência (parcelas ≥ 2 + switch)', function () {
+it('a conversão não acontece quando a validação recusa (parcelado + recorrente)', function () {
     $user = User::factory()->create();
     $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10');
 
@@ -365,7 +260,18 @@ it('recusa a edição que combina parcelamento com recorrência (parcelas ≥ 2 
     ])->assertStatus(422)->assertJsonValidationErrors(['recorrente']);
 
     expect(Recurrence::count())->toBe(0)
-        ->and($tx->fresh()->descricao)->toBe('Aluguel'); // edição não vazou
+        ->and(Transaction::count())->toBe(1)
+        ->and($tx->fresh()->descricao)->toBe('Aluguel');
+});
+
+it('rejeita um escopo_recorrencia inválido', function () {
+    $user = User::factory()->create();
+    $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10');
+
+    $this->actingAs($user)->putJson(route('lancamentos.update', $tx), [
+        'descricao' => 'X', 'valor' => '10,00', 'forma' => 'pix', 'vencimento' => '2026-07-10',
+        'escopo_recorrencia' => 'tudo',
+    ])->assertStatus(422)->assertJsonValidationErrors(['escopo_recorrencia']);
 });
 
 it('devolve 404 ao atualizar lançamento de outro usuário', function () {
@@ -387,4 +293,47 @@ it('bloqueia a edição quando há parcela paga (422)', function () {
         ->assertJsonPath('errors.geral.0', 'Não é possível editar: há parcela já paga.');
 
     expect($tx->fresh()->descricao)->toBe('Aluguel'); // inalterado
+});
+
+/* --------------------------------- F7: switch de recorrência na tela (spec 12) --- */
+
+it('mostra o switch de recorrência também no crédito (D3)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create();
+    $tx = criarLancamento($user, forma: PaymentMethod::CREDITO, venc: '2026-07-10', card: $card);
+
+    $this->actingAs($user)->get(route('lancamentos.edit', $tx))
+        ->assertOk()
+        ->assertSee('Repete todo mês?')
+        ->assertSee('cartão também')
+        // O switch não vive mais dentro do bloco "só à vista": ele é irmão dele.
+        ->assertSee('Dia da cobrança');
+});
+
+it('avisa que ligar o switch SUBSTITUI o lançamento pela recorrência (D5)', function () {
+    $user = User::factory()->create();
+    $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10');
+
+    $this->actingAs($user)->get(route('lancamentos.edit', $tx))
+        ->assertOk()
+        ->assertSee('deixa de existir como gasto avulso');
+});
+
+it('não oferece mais a escolha de escopo da edição recorrente', function () {
+    $user = User::factory()->create();
+    $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10');
+
+    $this->actingAs($user)->get(route('lancamentos.edit', $tx))
+        ->assertOk()
+        ->assertDontSee('name="escopo_recorrencia"', false)
+        ->assertDontSee('Este e os próximos');
+});
+
+it('limita o dia da cobrança à faixa 1..31 já na borda do campo', function () {
+    $user = User::factory()->create();
+    $tx = criarLancamento($user, forma: PaymentMethod::PIX, venc: '2026-07-10');
+
+    $this->actingAs($user)->get(route('lancamentos.edit', $tx))
+        ->assertOk()
+        ->assertSee('data-dia-do-mes', false);
 });

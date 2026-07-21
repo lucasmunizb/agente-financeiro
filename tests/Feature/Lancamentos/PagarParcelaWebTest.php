@@ -9,7 +9,6 @@ use App\Models\PaymentMethod;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\StatusPagamentoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

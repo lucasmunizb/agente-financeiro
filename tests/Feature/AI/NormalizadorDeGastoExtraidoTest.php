@@ -2,6 +2,7 @@
 
 use App\Ai\Agents\SugeridorDeCategoria;
 use App\Domain\Gasto\DadosGastoManual;
+use App\Domain\IA\GastoExtraido;
 use App\Domain\IA\NormalizadorDeGastoExtraido;
 use App\Domain\Recorrencia\DadosRecorrencia;
 use App\Models\Card;
@@ -28,7 +29,7 @@ beforeEach(function () {
     $this->seed([PaymentMethodSeeder::class, StatusPagamentoSeeder::class]);
 });
 
-function normalizar(App\Domain\IA\GastoExtraido $extraido, int $userId, string $hoje = '2026-06-26')
+function normalizar(GastoExtraido $extraido, int $userId, string $hoje = '2026-06-26')
 {
     return app(NormalizadorDeGastoExtraido::class)->normalizar(
         $extraido,
@@ -400,4 +401,75 @@ it('não muda nada no gasto avulso quando não há recorrência (C13 — regress
     expect($r->precisaEsclarecer())->toBeFalse()
         ->and($r->recorrencia)->toBeNull()
         ->and($r->dados)->toBeInstanceOf(DadosGastoManual::class);
+});
+
+/* -------- já foi pago? (decisão 2026-07-21) -------- */
+
+it('sem data dita, o pagamento assume a DATA DA COMPRA (não "hoje")', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake(['dataTexto' => 'ontem', 'pago' => true]), $user->id, '2026-06-26');
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->dados->dataPagamento?->toDateString())->toBe('2026-06-25')
+        ->and($r->dados->dataCompra->toDateString())->toBe('2026-06-25');
+});
+
+it('resolve a data de pagamento dita, no fuso de São Paulo (a IA não resolve datas)', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(
+        gastoExtraidoFake(['dataTexto' => '10/06', 'pago' => true, 'dataPagamentoTexto' => 'ontem']),
+        $user->id,
+        '2026-06-26',
+    );
+
+    expect($r->dados->dataPagamento?->toDateString())->toBe('2026-06-25')
+        ->and($r->dados->dataPagamento?->timezone->getName())->toBe('America/Sao_Paulo');
+});
+
+it('não marca pagamento quando o usuário disse que ainda não pagou', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(gastoExtraidoFake(['pago' => false, 'dataPagamentoTexto' => null]), $user->id);
+
+    expect($r->dados->dataPagamento)->toBeNull();
+});
+
+it('ignora o "já paguei" em compra no crédito — cartão quita pela fatura', function () {
+    $user = User::factory()->create();
+    Card::factory()->for($user)->create(['descricao' => 'Cartão Pai', 'dia_fechamento' => 20, 'dia_vencimento' => 5]);
+
+    $r = normalizar(
+        gastoExtraidoFake(['formaPagamento' => 'credito', 'cartao' => 'cartão pai', 'pago' => true]),
+        $user->id,
+    );
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->dados->dataPagamento)->toBeNull();
+});
+
+it('pede esclarecimento quando a data de pagamento dita é incompreensível', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(
+        gastoExtraidoFake(['pago' => true, 'dataPagamentoTexto' => 'sei lá quando']),
+        $user->id,
+    );
+
+    expect($r->precisaEsclarecer())->toBeTrue()
+        ->and($r->dados)->toBeNull()
+        ->and($r->esclarecimentos)->toContain('data_pagamento');
+});
+
+it('recorrência ignora o pagamento (é molde mensal, não lançamento)', function () {
+    $user = User::factory()->create();
+
+    $r = normalizar(
+        gastoExtraidoFake(['recorrenciaDiaTexto' => '10', 'dataTexto' => null, 'pago' => true]),
+        $user->id,
+    );
+
+    expect($r->precisaEsclarecer())->toBeFalse()
+        ->and($r->recorrencia)->toBeInstanceOf(DadosRecorrencia::class);
 });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Gasto\CancelarGastoManual;
 use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Gasto\PagamentoNaoPermitidoException;
 use App\Domain\Gasto\RegistrarGastoManual;
@@ -46,7 +47,7 @@ it('recusa pagar parcela de lançamento cancelado (auditoria P2-2)', function ()
     $user = User::factory()->create();
     $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
     $tx = gastoPixParcelado($user, $hoje);
-    (new \App\Domain\Gasto\CancelarGastoManual)->confirmar($tx->id, $user->id);
+    (new CancelarGastoManual)->confirmar($tx->id, $user->id);
     $parcela = $tx->installments()->where('numero', 1)->first();
 
     // Pagar uma parcela cancelada a devolveria ao Disponível/Consumo (dinheiro 2×).

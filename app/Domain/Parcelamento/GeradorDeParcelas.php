@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Parcelamento;
 
+use App\Domain\Calendar\RelativeDate;
 use App\Domain\Shared\Money;
 use Carbon\CarbonImmutable;
 
@@ -21,7 +22,7 @@ use Carbon\CarbonImmutable;
  * - A parcela vigente é SEMPRE calculada ({@see self::parcelaVigente()}), nunca fixada.
  *
  * As datas são tratadas no fuso base America/Sao_Paulo; espera-se que os
- * vencimentos de entrada já estejam localizados (ver {@see \App\Domain\Calendar\RelativeDate}).
+ * vencimentos de entrada já estejam localizados (ver {@see RelativeDate}).
  */
 final class GeradorDeParcelas
 {

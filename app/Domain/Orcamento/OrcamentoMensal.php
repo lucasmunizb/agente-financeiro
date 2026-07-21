@@ -15,9 +15,7 @@ use App\Models\Budget;
  */
 final class OrcamentoMensal
 {
-    public function __construct(private readonly ConsumoDoMes $consumoDoMes)
-    {
-    }
+    public function __construct(private readonly ConsumoDoMes $consumoDoMes) {}
 
     public function para(int $userId, string $mes): ResultadoOrcamento
     {

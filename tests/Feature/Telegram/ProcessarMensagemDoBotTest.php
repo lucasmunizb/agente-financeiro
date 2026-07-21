@@ -81,7 +81,7 @@ it('registro (slash forçado): extrai pelos argumentos, gera a confirmação e e
     $user = User::factory()->create();
 
     Ai::fakeAgent(ExtratorDeGasto::class, [[
-        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje', 'pago' => true,
     ]]);
 
     processar($user->id, Comando::REGISTRAR, '90 no mercado pix', '/registrar 90 no mercado pix', Intencao::REGISTRAR);
@@ -146,7 +146,7 @@ it('texto livre classificado como registrar: classifica pelo texto íntegro e se
 
     Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'registrar']]);
     Ai::fakeAgent(ExtratorDeGasto::class, [[
-        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje', 'pago' => true,
     ]]);
 
     processar($user->id, Comando::DESCONHECIDO, '', 'gastei 90 no mercado no pix hoje', null);
@@ -201,7 +201,7 @@ it('registro confirmável: guarda a confirmação como pendente para o "sim" seg
     $user = User::factory()->create();
 
     Ai::fakeAgent(ExtratorDeGasto::class, [[
-        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje', 'pago' => true,
     ]]);
 
     processar($user->id, Comando::REGISTRAR, '90 no mercado pix', '/registrar 90 no mercado pix', Intencao::REGISTRAR);
@@ -266,7 +266,7 @@ it('esclarecimento multi-turno: mescla a resposta seguinte e NÃO repergunta o q
     // Turno 1 já trazia valor + forma + data + categoria; só faltou a descrição.
     // Turno 2 o usuário responde só a descrição — o extrator, isolado, devolve o resto nulo.
     Ai::fakeAgent(ExtratorDeGasto::class, [
-        ['descricao' => null, 'valor' => '263,52', 'forma_pagamento' => 'pix', 'data' => 'amanhã', 'categoria' => 'viagem'],
+        ['descricao' => null, 'valor' => '263,52', 'forma_pagamento' => 'pix', 'data' => 'amanhã', 'categoria' => 'viagem', 'pago' => false],
         ['descricao' => 'airbnb mauricio', 'valor' => null, 'forma_pagamento' => null, 'data' => null, 'categoria' => null],
     ]);
 
@@ -300,7 +300,7 @@ it('aguardando esclarecimento: a próxima mensagem preenche o slot, não vira co
 
     Ai::fakeAgent(ExtratorDeGasto::class, [
         ['descricao' => 'uber', 'valor' => null, 'forma_pagamento' => null],
-        ['descricao' => null, 'valor' => '30', 'forma_pagamento' => 'pix'],
+        ['descricao' => null, 'valor' => '30', 'forma_pagamento' => 'pix', 'pago' => true],
     ]);
 
     processar($user->id, Comando::DESCONHECIDO, '', 'paguei o uber', Intencao::REGISTRAR);

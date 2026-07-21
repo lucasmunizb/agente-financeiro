@@ -8,10 +8,10 @@ use App\Ai\Agents\ExtratorDeGasto;
 use App\Domain\IA\Consulta\ColetorDeConsultas;
 use App\Listeners\LogarFailoverDeIA;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Events\AgentFailedOver;
 use Laravel\Ai\Exceptions\FailoverableException;
-use Illuminate\Support\Facades\Log;
 
 /*
  * Failover de provedores (doc 02 §3.6 / regra inviolável 8): a indisponibilidade de um

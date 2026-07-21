@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Vencimento;
 
+use App\Domain\Parcelamento\GeradorDeParcelas;
 use Carbon\CarbonImmutable;
 
 /**
@@ -16,7 +17,7 @@ use Carbon\CarbonImmutable;
  *   fechamento) e vence no dia de vencimento do cartão.
  *
  * O valor retornado é o "primeiro vencimento" (parcela 1) que alimenta o
- * {@see \App\Domain\Parcelamento\GeradorDeParcelas}. As datas seguem o fuso base
+ * {@see GeradorDeParcelas}. As datas seguem o fuso base
  * America/Sao_Paulo; espera-se a entrada já localizada.
  */
 final class CalculadoraDeVencimento

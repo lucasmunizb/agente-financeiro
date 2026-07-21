@@ -4,6 +4,7 @@ use App\Domain\Telegram\Saida\ClienteTelegram;
 use App\Domain\Telegram\Saida\ClienteTelegramFake;
 use App\Domain\Telegram\Saida\ClienteTelegramHttp;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 
 /*
@@ -56,7 +57,7 @@ it('lança quando a Bot API responde com erro', function () {
     Http::fake(['*' => Http::response(['ok' => false, 'description' => 'ruim'], 400)]);
 
     (new ClienteTelegramHttp('TOKEN123'))->enviarMensagem(555, 'x');
-})->throws(Illuminate\Http\Client\RequestException::class);
+})->throws(RequestException::class);
 
 it('sinaliza "digitando…" via sendChatAction', function () {
     Http::fake(['*' => Http::response(['ok' => true])]);

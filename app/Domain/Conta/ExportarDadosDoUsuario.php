@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\Budget;
 use App\Models\Card;
 use App\Models\Category;
+use App\Models\ChatMessage;
 use App\Models\Income;
 use App\Models\Recurrence;
 use App\Models\TelegramLink;
@@ -53,7 +54,7 @@ final class ExportarDadosDoUsuario
                 ->get(['id', 'descricao', 'valor_cents', 'payment_method_id', 'categoria_id', 'periodicidade', 'dia', 'status', 'proxima_em'])->toArray(),
             // Histórico do chat também é dado do titular (portabilidade completa,
             // auditoria P2-10) — o expurgo de 60 dias limita a janela retida.
-            'chat' => \App\Models\ChatMessage::where('user_id', $userId)
+            'chat' => ChatMessage::where('user_id', $userId)
                 ->orderBy('created_at')
                 ->get(['id', 'role', 'body', 'aprovado', 'tem_anexo', 'created_at'])->toArray(),
             'telegram' => $this->telegram($userId),

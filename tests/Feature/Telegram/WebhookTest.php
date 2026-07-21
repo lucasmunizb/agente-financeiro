@@ -28,9 +28,12 @@ beforeEach(function () {
 /** Espião do roteador: captura o que o webhook despacharia. */
 function espiaoRoteador(): object
 {
-    $espiao = new class implements RoteadorDeMensagem {
+    $espiao = new class implements RoteadorDeMensagem
+    {
         public ?int $autenticadoComoUserId = null;
+
         public ?int $naoVinculadoTelegramId = null;
+
         public int $chamadas = 0;
 
         public function autenticado(User $user, array $update): void

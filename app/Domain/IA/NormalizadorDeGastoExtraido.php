@@ -76,8 +76,23 @@ final class NormalizadorDeGastoExtraido
             }
         }
 
+        // Pagamento já feito (decisão 2026-07-21): SÓ fora de cartão — crédito quita pela
+        // fatura (§4.3), então um "já paguei" no crédito é ignorado em silêncio. Sem data
+        // dita, o pagamento é na DATA DA COMPRA (à vista fora de cartão é o caso comum);
+        // data dita e ilegível vira PERGUNTA, nunca chute (§3.4).
         if ($esclarecimentos !== []) {
             return new ResultadoDaNormalizacao(null, $esclarecimentos);
+        }
+
+        $dataPagamento = null;
+        if ($extraido->pago === true && $forma !== PaymentMethod::CREDITO) {
+            $dataPagamento = $extraido->dataPagamentoTexto === null
+                ? $dataCompra
+                : $this->resolverData($extraido->dataPagamentoTexto, $agora);
+
+            if ($dataPagamento === null) {
+                return new ResultadoDaNormalizacao(null, ['data_pagamento']);
+            }
         }
 
         $categoria = $this->categoria->para($userId, $extraido->descricao);
@@ -93,6 +108,7 @@ final class NormalizadorDeGastoExtraido
             accountId: null,
             categoriaId: $categoria->categoriaId,
             categoriaSugeridaPorIa: $categoria->sugeridaPorIa,
+            dataPagamento: $dataPagamento,
         );
 
         return new ResultadoDaNormalizacao($dados, []);
@@ -125,8 +141,10 @@ final class NormalizadorDeGastoExtraido
             $esclarecimentos[] = 'recorrencia_dia';
         }
 
-        // Recorrência é SÓ fora de cartão (spec 10 §2: crédito usa parcelas). Barramos aqui,
-        // como esclarecimento, para o usuário nunca ver a exceção do RegistrarRecorrencia.
+        // Recorrência em cartão passou a ser permitida (spec 12, D3), mas exige SABER QUAL
+        // cartão — e o bot não tem como resolver isso a partir de texto livre sem chutar (e a
+        // competência da ocorrência depende do ciclo daquele cartão). Então pelo canal do chat
+        // a recorrência segue fora de cartão: pedimos esclarecimento em vez de adivinhar.
         $forma = Normalizador::texto($extraido->formaPagamento);
         $paymentMethodId = PaymentMethod::idFor($extraido->formaPagamento);
 

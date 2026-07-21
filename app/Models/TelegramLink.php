@@ -13,7 +13,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TelegramLink extends Model
 {
     public const PENDENTE = 'pendente';
+
     public const ATIVO = 'ativo';
+
     public const REVOGADO = 'revogado';
 
     /** @var list<string> */

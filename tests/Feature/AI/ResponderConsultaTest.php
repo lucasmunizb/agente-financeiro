@@ -15,6 +15,7 @@ use App\Models\User;
 use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\StatusPagamentoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Ai\Tools\Request;
@@ -187,8 +188,8 @@ it('cai no fallback seguro quando o provedor lança exceção em todas as tentat
 
     // Todos os provedores indisponíveis: o failover da SDK esgota e a exceção escapa.
     Ai::fakeAgent(AssistenteDeConsulta::class, [
-        fn () => throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: timeout'),
-        fn () => throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: timeout'),
+        fn () => throw new ConnectionException('cURL error 28: timeout'),
+        fn () => throw new ConnectionException('cURL error 28: timeout'),
     ]);
 
     $resposta = app(ResponderConsulta::class)->responder($user, 'quanto gastei?');

@@ -15,12 +15,11 @@ namespace App\Domain\Categoria;
 final class RegrasDeCategoria
 {
     /**
-     * @param  array<string, int>  $aliases        alias normalizado => categoria_id
+     * @param  array<string, int>  $aliases  alias normalizado => categoria_id
      * @param  array<int, array{palavra: string, categoria_id: int}>  $keywords  palavra normalizada => categoria_id
      */
     public function __construct(
         public readonly array $aliases,
         public readonly array $keywords,
-    ) {
-    }
+    ) {}
 }

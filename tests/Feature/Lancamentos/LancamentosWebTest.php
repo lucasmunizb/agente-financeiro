@@ -2,15 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Domain\Confirmacao\EnfileirarConfirmacao;
-use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Shared\OpaqueId;
 use App\Models\Card;
-use App\Models\PendingConfirmation;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -72,7 +70,7 @@ it('no mês FUTURO lista as recorrências previstas com o selo "Previsto" (spec 
     $user = User::factory()->create();
     Recurrence::factory()->for($user)->create([
         'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 5,
-        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-05',
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-01',
     ]);
 
     // hoje = 2026-06-15; agosto é estritamente futuro.
@@ -83,43 +81,43 @@ it('no mês FUTURO lista as recorrências previstas com o selo "Previsto" (spec 
         ->assertSee('R$ 55,90');
 });
 
-function pendenteRecorrenciaWeb(User $user, string $dataCompra = '2026-06-10'): PendingConfirmation
+/** A OCORRÊNCIA real de uma recorrência fora de cartão, no mês corrente (spec 12). */
+function ocorrenciaWeb(User $user, string $vencimento = '2026-06-10'): RecurrenceOccurrence
 {
     $rec = Recurrence::factory()->for($user)->create([
-        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-05',
+        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 10,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-01',
         'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
     ]);
 
-    return (new EnfileirarConfirmacao)->enfileirar(
-        new DadosGastoManual(
-            userId: $user->id, descricao: 'Netflix', valorTotalCents: 5590,
-            dataCompra: CarbonImmutable::parse($dataCompra, 'America/Sao_Paulo'),
-            paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX), parcelas: 1,
-            origem: 'recorrencia', recurrenceId: $rec->id,
-        ),
-        PendingConfirmation::ORIGEM_RECORRENCIA,
-    );
+    return RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id,
+        'competencia' => substr($vencimento, 0, 7),
+        'descricao' => 'Netflix', 'valor_cents' => 5590,
+        'data_cobranca' => $vencimento, 'vencimento' => $vencimento,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+    ]);
 }
 
-it('marca a recorrência da fila como paga: cria o lançamento pago e resolve o pendente', function () {
+it('marca a ocorrência como paga pela rota do extrato (R11)', function () {
     $user = User::factory()->create();
-    $pendente = pendenteRecorrenciaWeb($user);
+    $ocorrencia = ocorrenciaWeb($user);
 
     $this->actingAs($user)
-        ->post(route('lancamentos.recorrencia.pagar', $pendente->opaqueId()))
+        ->post(route('lancamentos.recorrencia.pagar', $ocorrencia->getRouteKey()))
         ->assertRedirect()
         ->assertSessionHas('sucesso');
 
-    $tx = Transaction::where('recurrence_id', $pendente->recurrence_id)->first();
-    expect($tx)->not->toBeNull()
-        ->and($tx->status_id)->toBe(StatusPagamento::idFor(StatusPagamento::PAGO))
-        ->and($pendente->fresh()->status)->toBe(PendingConfirmation::STATUS_CONFIRMADO);
+    expect($ocorrencia->fresh()->status_id)->toBe(StatusPagamento::idFor(StatusPagamento::PAGO))
+        // Pagar NÃO materializa lançamento: a ocorrência já era a cobrança (spec 12).
+        ->and(Transaction::count())->toBe(0);
 });
 
-it('mostra a ocorrência de recorrência da fila no extrato como ATRASO com botão "marcar como pago"', function () {
+it('mostra a ocorrência no extrato como ATRASO com botão "marcar como pago"', function () {
     $user = User::factory()->create();
-    // hoje = 2026-06-15; ocorrência venceu 10/06 e não foi paga ⇒ atraso.
-    pendenteRecorrenciaWeb($user, '2026-06-10');
+    // hoje = 2026-06-15; a ocorrência venceu 10/06 e não foi paga ⇒ atraso.
+    ocorrenciaWeb($user, '2026-06-10');
 
     $html = $this->actingAs($user)->get('/lancamentos')
         ->assertOk()
@@ -132,23 +130,23 @@ it('mostra a ocorrência de recorrência da fila no extrato como ATRASO com bot�
         ->and($html)->toContain('/pagar');
 });
 
-it('não paga a ocorrência pendente de outro usuário (404)', function () {
+it('não paga a ocorrência de outro usuário (404)', function () {
     $user = User::factory()->create();
     $outro = User::factory()->create();
-    $pendente = pendenteRecorrenciaWeb($outro);
+    $ocorrencia = ocorrenciaWeb($outro);
 
     $this->actingAs($user)
-        ->post(route('lancamentos.recorrencia.pagar', $pendente->opaqueId()))
+        ->post(route('lancamentos.recorrencia.pagar', $ocorrencia->getRouteKey()))
         ->assertNotFound();
 
-    expect(Transaction::count())->toBe(0);
+    expect($ocorrencia->fresh()->status_id)->toBe(StatusPagamento::idFor(StatusPagamento::ABERTO));
 });
 
 it('no mês CORRENTE mostra a recorrência cujo dia ainda não chegou, com selo Previsto', function () {
     $user = User::factory()->create();
     Recurrence::factory()->for($user)->create([
         'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 20,
-        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-06-20',
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-06-01',
     ]);
 
     $this->actingAs($user)->get('/lancamentos')
@@ -157,16 +155,18 @@ it('no mês CORRENTE mostra a recorrência cujo dia ainda não chegou, com selo 
         ->assertSee('Previsto');
 });
 
-it('no mês CORRENTE não mostra a recorrência já materializada pelo molde — o ponteiro avançado a exclui', function () {
+it('no mês CORRENTE mostra a ocorrência real UMA vez, sem o selo Previsto (R2/R4)', function () {
     $user = User::factory()->create();
-    Recurrence::factory()->for($user)->create([
-        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 20,
-        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-20',
-    ]);
+    // A competência de junho já foi gerada: a projeção a exclui por NOT EXISTS.
+    ocorrenciaWeb($user, '2026-06-20');
 
-    $this->actingAs($user)->get('/lancamentos')
+    $html = $this->actingAs($user)->get('/lancamentos')
         ->assertOk()
-        ->assertDontSee('Netflix');
+        ->assertSee('Netflix')
+        ->getContent();
+
+    // O botão "marcar como paga" aparece uma vez — uma linha pagável, não duas.
+    expect(substr_count($html, '/lancamentos/recorrencia/'))->toBe(1);
 });
 
 it('mostra o estado vazio quando o usuário não tem lançamentos', function () {
@@ -322,4 +322,51 @@ it('é isolado por usuário', function () {
         ->assertSee('Meu gasto')
         ->assertDontSee('Gasto alheio')
         ->assertDontSee('R$ 9.999,00');
+});
+
+/* ------------------------------ F7: selo e botão da ocorrência no extrato (spec 12) --- */
+
+it('a ocorrência de CARTÃO aparece paga e sem botão de marcar como paga (D3)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create([
+        'descricao' => 'Nubank', 'final_4' => '1234',
+        'dia_fechamento' => 20, 'dia_vencimento' => 28,
+    ]);
+    $rec = Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'valor_cents' => 5590, 'dia' => 5,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::CREDITO),
+        'card_id' => $card->id, 'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-01',
+    ]);
+    RecurrenceOccurrence::factory()->pago()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-06',
+        'descricao' => 'Netflix', 'valor_cents' => 5590,
+        'data_cobranca' => '2026-06-05', 'vencimento' => '2026-06-28',
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::CREDITO),
+        'card_id' => $card->id,
+    ]);
+
+    $html = $this->actingAs($user)->get('/lancamentos')
+        ->assertOk()
+        ->assertSee('Netflix')
+        ->assertSee('Pago')
+        ->getContent();
+
+    // Cartão liquida sozinho: nenhum alvo de "marcar como paga" para esta linha.
+    expect($html)->not->toContain('/lancamentos/recorrencia/');
+});
+
+it('a ocorrência cancelada não aparece no extrato', function () {
+    $user = User::factory()->create();
+    $rec = Recurrence::factory()->for($user)->create([
+        'descricao' => 'Netflix', 'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-01',
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+    ]);
+    RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-06',
+        'descricao' => 'Netflix', 'valor_cents' => 5590,
+        'data_cobranca' => '2026-06-10', 'vencimento' => '2026-06-10',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::CANCELADO),
+    ]);
+
+    $this->actingAs($user)->get('/lancamentos')->assertOk()->assertDontSee('Netflix');
 });

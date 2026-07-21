@@ -14,10 +14,11 @@ Schedule::command('ai:expurgar-conversas')->dailyAt('03:30')
     ->onOneServer()
     ->withoutOverlapping();
 
-// Materialização diária das recorrências mensais vencíveis: enfileira 1 confirmação por
-// recorrência no seu dia (spec 10, regra 7 — nada grava sozinho). Diário porque cada
-// recorrência tem seu próprio dia-do-mês; o ponteiro `proxima_em` torna a operação idempotente.
-Schedule::command('recorrencia:materializar')->dailyAt('06:00')
+// Geração diária das ocorrências mensais das recorrências + liquidação das cobranças de
+// cartão já debitadas (spec 12). Diário porque cada recorrência tem seu próprio dia-do-mês e
+// cada cartão a sua data de cobrança; a UNIQUE (recurrence_id, competencia) torna a geração
+// idempotente, então rodar de novo no mesmo dia não duplica nada.
+Schedule::command('recorrencia:gerar')->dailyAt('06:00')
     ->onOneServer()
     ->withoutOverlapping();
 

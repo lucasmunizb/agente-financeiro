@@ -16,11 +16,14 @@ it('extrai um gasto completo em DTO cru, sem normalizar valor nem data', functio
         'valor' => '35 conto',
         'forma_pagamento' => 'pix',
         'data' => 'hoje',
+        // Fora de cartão, o "já pagou?" é slot obrigatório: sem ele o gasto fica incompleto.
+        'pago' => true,
     ]]);
 
     $resultado = app(ExtratorDeGasto::class)->extrair('gastei 35 conto no mercado hoje no pix');
 
     expect($resultado->precisaEsclarecer())->toBeFalse()
+        ->and($resultado->gasto->pago)->toBeTrue()
         ->and($resultado->gasto->descricao)->toBe('mercado')
         ->and($resultado->gasto->valorTexto)->toBe('35 conto')
         ->and($resultado->gasto->dataTexto)->toBe('hoje')

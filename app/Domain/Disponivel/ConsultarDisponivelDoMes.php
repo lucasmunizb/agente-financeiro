@@ -7,6 +7,7 @@ namespace App\Domain\Disponivel;
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\Orcamento\ConsumoDoMes;
 use App\Domain\Receita\ReceitasDoMes;
+use App\Domain\Recorrencia\ConsultarOcorrencias;
 use App\Domain\Shared\PeriodoMensal;
 use App\Models\Income;
 use App\Models\Installment;
@@ -24,21 +25,26 @@ use App\Models\StatusPagamento;
  */
 final class ConsultarDisponivelDoMes
 {
-
     public function __construct(
         private readonly ReceitasDoMes $receitas,
         private readonly ConsumoDoMes $consumo,
-    ) {
-    }
+        private readonly ConsultarOcorrencias $ocorrencias = new ConsultarOcorrencias,
+    ) {}
 
     public function para(int $userId, string $mes): ResultadoConsultaDisponivel
     {
         $periodo = PeriodoMensal::fromString($mes);
         $proximoMes = $periodo->inicio->addMonth()->format('Y-m');
 
+        // Recorrência não vive mais em `installments` (spec 12): a conta fixa do mês é uma
+        // ocorrência, e ela pesa no disponível como qualquer outro gasto vencendo no mês. O
+        // recorte é por COMPETÊNCIA — no cartão, é a fatura que define o mês (§4.5). Agregação
+        // pura: não deriva status por data, então nenhum relógio é lido aqui (regra 4).
         $receitasCents = $this->receitas->para($userId, $mes);
-        $gastosDoMesCents = $this->consumo->para($userId, $mes)->totalCents;
-        $previstoCents = $this->consumo->para($userId, $proximoMes)->totalCents;
+        $gastosDoMesCents = $this->consumo->para($userId, $mes)->totalCents
+            + $this->ocorrencias->totalDoMes($userId, $mes);
+        $previstoCents = $this->consumo->para($userId, $proximoMes)->totalCents
+            + $this->ocorrencias->totalDoMes($userId, $proximoMes);
 
         // O total já agrega cartão + fora de cartão (ambos atribuídos por vencimento);
         // a fórmula subtrai o conjunto, então entra como gasto único do mês.

@@ -57,9 +57,9 @@ final class ConsultarProximasContas
                 'descricao' => $parcela->transaction->descricao ?? 'Conta',
                 'vencimento' => $parcela->vencimento->toDateString(),
                 'cents' => $cents,
-                // "Verdade" de recorrente = transactions.recurrence_id (spec 10). Marca a
-                // conta materializada para o selo/ícone no dashboard (etapa de frontend).
-                'recorrente' => $parcela->transaction->recurrence_id !== null,
+                // Recorrência não vive mais em `transactions` (spec 12): toda parcela aqui é
+                // lançamento comum. As contas fixas entram pelas ocorrências, no ResumoDoMes.
+                'recorrente' => false,
             ];
         }
 

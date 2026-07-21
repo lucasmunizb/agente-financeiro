@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Gasto\CancelarGastoManual;
 use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Gasto\EdicaoBloqueadaException;
 use App\Domain\Gasto\EditarGastoManual;
@@ -14,6 +15,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\StatusPagamentoSeeder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 /*
@@ -144,7 +146,7 @@ it('bloqueia edição de lançamento cancelado (parcelas-zumbi, auditoria P2-2)'
     $user = User::factory()->create();
     $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
     $tx = gastoExistente($user, $hoje);
-    (new \App\Domain\Gasto\CancelarGastoManual)->confirmar($tx->id, $user->id);
+    (new CancelarGastoManual)->confirmar($tx->id, $user->id);
 
     // Regenerar as parcelas de um cancelado as recriaria "abertas" — o gasto
     // voltaria a contar no Disponível/Consumo com a transação cancelada.
@@ -163,4 +165,4 @@ it('não edita transaction de outro usuário', function () {
     $tx = gastoExistente($user, $hoje);
 
     (new EditarGastoManual)->confirmar($tx->id, dadosEdit($outro), $hoje);
-})->throws(Illuminate\Database\Eloquent\ModelNotFoundException::class);
+})->throws(ModelNotFoundException::class);

@@ -57,7 +57,7 @@ function chamarGastosNoChat(string $id, string $periodo = '2026-06'): ToolCall
 }
 
 /** Guarda uma confirmação de gasto pendente (Mercado, PIX, R$ 90,00) para o "sim" seguinte. */
-function pendenteNoChat(User $user): void
+function pendenteNoChat(User $user, ?CarbonImmutable $dataPagamento = null): void
 {
     $dados = new DadosGastoManual(
         userId: $user->id,
@@ -66,6 +66,7 @@ function pendenteNoChat(User $user): void
         dataCompra: CarbonImmutable::parse('2026-06-26', 'America/Sao_Paulo'),
         paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
         parcelas: 1,
+        dataPagamento: $dataPagamento,
     );
     $agora = CarbonImmutable::now('America/Sao_Paulo');
     $previa = (new RegistrarGastoManual)->preview($dados, $agora);
@@ -115,7 +116,7 @@ it('registrar: monta a prévia com "sim/não" e deixa a confirmação pendente (
 
     Ai::fakeAgent(ClassificadorDeIntencao::class, [['intencao' => 'registrar']]);
     Ai::fakeAgent(ExtratorDeGasto::class, [[
-        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje',
+        'descricao' => 'mercado', 'valor' => '90', 'forma_pagamento' => 'pix', 'data' => 'hoje', 'pago' => true,
     ]]);
 
     $assistente = app(ResponderNoChat::class)->perguntar($user, 'gastei 90 no mercado no pix hoje');
@@ -198,4 +199,17 @@ it('anexo de fatura: grava a mensagem com tem_anexo e um aviso honesto, SEM cham
     expect($assistente->role)->toBe('assistant')
         ->and($assistente->body)->toBe(ResponderNoChat::RESPOSTA_ANEXO)
         ->and($assistente->aprovado)->toBeTrue();
+});
+
+it('confirmar "sim" de um gasto já pago: grava a parcela paga e diz isso na resposta', function () {
+    $user = User::factory()->create();
+    pendenteNoChat($user, CarbonImmutable::parse('2026-06-26', 'America/Sao_Paulo'));
+
+    $assistente = app(ResponderNoChat::class)->perguntar($user, 'sim');
+
+    $transacao = Transaction::where('user_id', $user->id)->sole();
+
+    expect($transacao->installments()->first()->data_pagamento->toDateString())->toBe('2026-06-26')
+        ->and($assistente->body)->toContain('registrei')
+        ->and($assistente->body)->toContain('já pago');
 });

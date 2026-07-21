@@ -48,7 +48,7 @@ return new class extends Migration
 
         if (DB::getDriverName() === 'pgsql') {
             DB::statement(
-                "ALTER TABLE telegram_links ADD CONSTRAINT telegram_links_status_check ".
+                'ALTER TABLE telegram_links ADD CONSTRAINT telegram_links_status_check '.
                 "CHECK (status IN ('pendente', 'ativo', 'revogado'))"
             );
         }

@@ -6,9 +6,8 @@ use App\Domain\IA\Guard\PayloadDeResposta;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
-use App\Models\PaymentMethod;
-use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -408,21 +407,16 @@ it('isola as recorrências previstas por usuário', function () {
     expect($r->totalCents)->toBe(180000);
 });
 
-it('inclui a ocorrência de recorrência da FILA (pendente) do mês corrente no total e por categoria', function () {
+it('inclui a OCORRÊNCIA real do mês corrente no total e por categoria (spec 12)', function () {
     $user = User::factory()->create();
     $moradia = Category::factory()->for($user)->create(['nome' => 'Moradia']);
+    $rec = recorrenciaAtiva($user, 180000, 20, '2026-08-01', $moradia);
 
-    // Mês corrente (2026-07): molde não projeta (guard); a ocorrência vive na fila (pendente).
-    (new App\Domain\Confirmacao\EnfileirarConfirmacao)->enfileirar(
-        new App\Domain\Gasto\DadosGastoManual(
-            userId: $user->id, descricao: 'Aluguel', valorTotalCents: 180000,
-            dataCompra: CarbonImmutable::parse('2026-07-20', 'America/Sao_Paulo'),
-            paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX), parcelas: 1,
-            categoriaId: $moradia->id, origem: 'recorrencia',
-            recurrenceId: Recurrence::factory()->for($user)->create()->id,
-        ),
-        PendingConfirmation::ORIGEM_RECORRENCIA,
-    );
+    RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-07',
+        'descricao' => 'Aluguel', 'valor_cents' => 180000, 'categoria_id' => $moradia->id,
+        'vencimento' => '2026-07-20', 'data_cobranca' => '2026-07-20',
+    ]);
 
     $r = app(ConsultarGastos::class)->para($user->id, '2026-07', agora: gastosAgora());
 
@@ -430,21 +424,29 @@ it('inclui a ocorrência de recorrência da FILA (pendente) do mês corrente no 
         ->and(centsDaCategoria($r, 'Moradia'))->toBe(180000);
 });
 
-it('não conta a ocorrência pendente já confirmada (o lançamento real assume)', function () {
+it('não conta em dobro a competência já materializada: a projeção a exclui (R2)', function () {
     $user = User::factory()->create();
-
-    $pendente = (new App\Domain\Confirmacao\EnfileirarConfirmacao)->enfileirar(
-        new App\Domain\Gasto\DadosGastoManual(
-            userId: $user->id, descricao: 'Aluguel', valorTotalCents: 180000,
-            dataCompra: CarbonImmutable::parse('2026-07-20', 'America/Sao_Paulo'),
-            paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX), parcelas: 1,
-            origem: 'recorrencia', recurrenceId: Recurrence::factory()->for($user)->create()->id,
-        ),
-        PendingConfirmation::ORIGEM_RECORRENCIA,
-    );
-    $pendente->update(['status' => PendingConfirmation::STATUS_CONFIRMADO]);
+    // Molde ativo com a competência de julho JÁ gerada: uma única linha, nunca duas.
+    $rec = recorrenciaAtiva($user, 180000, 20, '2026-08-01');
+    RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-07',
+        'descricao' => 'Aluguel', 'valor_cents' => 180000,
+        'vencimento' => '2026-07-20', 'data_cobranca' => '2026-07-20',
+    ]);
 
     $r = app(ConsultarGastos::class)->para($user->id, '2026-07', agora: gastosAgora());
 
-    expect($r->totalCents)->toBe(0);
+    expect($r->totalCents)->toBe(180000);
+});
+
+it('não conta a ocorrência CANCELADA (não é cobrança, §4.4)', function () {
+    $user = User::factory()->create();
+    $rec = recorrenciaAtiva($user, 180000, 20, '2026-08-01');
+    RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id, 'recurrence_id' => $rec->id, 'competencia' => '2026-07',
+        'valor_cents' => 180000, 'vencimento' => '2026-07-20', 'data_cobranca' => '2026-07-20',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::CANCELADO),
+    ]);
+
+    expect(app(ConsultarGastos::class)->para($user->id, '2026-07', agora: gastosAgora())->totalCents)->toBe(0);
 });

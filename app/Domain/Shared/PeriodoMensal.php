@@ -20,8 +20,7 @@ final class PeriodoMensal
         public readonly string $mes,
         public readonly CarbonImmutable $inicio,
         public readonly CarbonImmutable $fim,
-    ) {
-    }
+    ) {}
 
     public static function fromString(string $mes): self
     {

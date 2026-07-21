@@ -21,9 +21,22 @@ use App\Domain\Shared\Normalizador;
  * significa "isto repete todo mês no dia X" (vira recorrência em vez de gasto avulso). Ele
  * precisa sobreviver ao multi-turno: o usuário diz "todo dia 10" no 1º turno e completa
  * valor/forma no 2º, quando o extrator já não repete o dia.
+ *
+ * `pago`/`dataPagamentoTexto` (decisão 2026-07-21) respondem "isto já foi pago?". Fora de
+ * cartão o slot é OBRIGATÓRIO — sem ele o bot PERGUNTA em vez de assumir "não pago", que
+ * deixaria a conta aberta e poluiria as contas em atraso. `false` é resposta legítima e
+ * NÃO pode ser confundido com ausente (por isso `?bool`, e a mescla usa `??`). A data segue
+ * como TEXTO cru: quem a resolve no fuso SP é o normalizador (regra 4).
  */
 final readonly class GastoParcial
 {
+    /**
+     * Formas em que o pagamento é do próprio usuário (há parcela a quitar na hora). Forma
+     * ainda desconhecida ou não suportada NÃO entra: a pergunta "já pagou?" só faz sentido
+     * depois de sabermos que não é cartão.
+     */
+    private const FORMAS_FORA_DE_CARTAO = ['debito', 'pix', 'dinheiro', 'boleto'];
+
     public function __construct(
         public ?string $descricao,
         public ?string $valorTexto,
@@ -33,6 +46,8 @@ final readonly class GastoParcial
         public ?string $dataTexto,
         public ?int $parcelas,
         public ?string $recorrenciaDiaTexto = null,
+        public ?bool $pago = null,
+        public ?string $dataPagamentoTexto = null,
     ) {}
 
     /**
@@ -49,6 +64,8 @@ final readonly class GastoParcial
             dataTexto: $novo->dataTexto ?? $this->dataTexto,
             parcelas: $novo->parcelas ?? $this->parcelas,
             recorrenciaDiaTexto: $novo->recorrenciaDiaTexto ?? $this->recorrenciaDiaTexto,
+            pago: $novo->pago ?? $this->pago,
+            dataPagamentoTexto: $novo->dataPagamentoTexto ?? $this->dataPagamentoTexto,
         );
     }
 
@@ -81,7 +98,27 @@ final readonly class GastoParcial
             $faltantes[] = 'cartao';
         }
 
+        if ($this->faltaSaberSePagou()) {
+            $faltantes[] = 'pago';
+        }
+
         return $faltantes;
+    }
+
+    /**
+     * "Já foi pago?" só é pergunta quando há uma PARCELA para pagar agora e o pagamento é
+     * do próprio usuário: fora de cartão. Crédito quita pela fatura (§4.3) e recorrência é
+     * MOLDE — o lançamento nasce depois, no dia. Enquanto a forma for desconhecida não dá
+     * para saber em qual caso estamos: não perguntamos junto, senão o bot pediria "já pagou?"
+     * de uma compra que pode ser no cartão.
+     */
+    private function faltaSaberSePagou(): bool
+    {
+        if ($this->pago !== null || $this->recorrenciaDiaTexto !== null) {
+            return false;
+        }
+
+        return in_array(Normalizador::texto((string) $this->formaPagamento), self::FORMAS_FORA_DE_CARTAO, true);
     }
 
     public function completo(): bool
@@ -103,6 +140,8 @@ final readonly class GastoParcial
             dataTexto: $this->dataTexto,
             parcelas: $this->parcelas,
             recorrenciaDiaTexto: $this->recorrenciaDiaTexto,
+            pago: $this->pago,
+            dataPagamentoTexto: $this->dataPagamentoTexto,
         );
     }
 }

@@ -30,12 +30,12 @@
                     <div class="flex gap-4">
                         <div class="flex flex-col gap-2">
                             <label for="c-fech" class="font-body-sm text-body-sm text-on-surface-variant">Fecha dia</label>
-                            <input id="c-fech" name="dia_fechamento" type="number" inputmode="numeric" min="1" max="31" value="{{ old('dia_fechamento') }}"
+                            <input id="c-fech" name="dia_fechamento" type="number" inputmode="numeric" min="1" max="31" data-dia-do-mes value="{{ old('dia_fechamento') }}"
                                 @class(['input-field h-12 w-24 rounded-lg px-4 font-value-label text-value-label text-on-surface', 'border-argila' => $errors->has('dia_fechamento')]) />
                         </div>
                         <div class="flex flex-col gap-2">
                             <label for="c-venc" class="font-body-sm text-body-sm text-on-surface-variant">Vence dia</label>
-                            <input id="c-venc" name="dia_vencimento" type="number" inputmode="numeric" min="1" max="31" value="{{ old('dia_vencimento') }}"
+                            <input id="c-venc" name="dia_vencimento" type="number" inputmode="numeric" min="1" max="31" data-dia-do-mes value="{{ old('dia_vencimento') }}"
                                 @class(['input-field h-12 w-24 rounded-lg px-4 font-value-label text-value-label text-on-surface', 'border-argila' => $errors->has('dia_vencimento')]) />
                         </div>
                     </div>
@@ -158,12 +158,12 @@
                         <div class="flex gap-4">
                             <div class="flex flex-col gap-2">
                                 <label for="e-fech" class="font-body-sm text-body-sm text-on-surface-variant">Fecha dia</label>
-                                <input id="e-fech" name="dia_fechamento" type="number" inputmode="numeric" min="1" max="31" value="{{ old('dia_fechamento', $selecionadoDados['diaFechamento']) }}"
+                                <input id="e-fech" name="dia_fechamento" type="number" inputmode="numeric" min="1" max="31" data-dia-do-mes value="{{ old('dia_fechamento', $selecionadoDados['diaFechamento']) }}"
                                     @class(['input-field h-12 w-24 rounded-lg px-4 font-value-label text-value-label text-on-surface', 'border-argila' => $bagEditar->has('dia_fechamento')]) />
                             </div>
                             <div class="flex flex-col gap-2">
                                 <label for="e-venc" class="font-body-sm text-body-sm text-on-surface-variant">Vence dia</label>
-                                <input id="e-venc" name="dia_vencimento" type="number" inputmode="numeric" min="1" max="31" value="{{ old('dia_vencimento', $selecionadoDados['diaVencimento']) }}"
+                                <input id="e-venc" name="dia_vencimento" type="number" inputmode="numeric" min="1" max="31" data-dia-do-mes value="{{ old('dia_vencimento', $selecionadoDados['diaVencimento']) }}"
                                     @class(['input-field h-12 w-24 rounded-lg px-4 font-value-label text-value-label text-on-surface', 'border-argila' => $bagEditar->has('dia_vencimento')]) />
                             </div>
                         </div>

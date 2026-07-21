@@ -22,8 +22,7 @@ final class ResultadoConsultaDisponivel
         public readonly int $gastosDoMesCents,
         public readonly ResultadoDisponivel $disponivel,
         public readonly TraceDaConsulta $trace,
-    ) {
-    }
+    ) {}
 
     /**
      * Conjunto de valores que a resposta da IA pode citar (barreira 4, doc 02 §3.3).

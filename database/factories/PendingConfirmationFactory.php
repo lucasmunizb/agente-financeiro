@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\PaymentMethod;
 use App\Models\PendingConfirmation;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -50,11 +51,11 @@ class PendingConfirmationFactory extends Factory
         return $this->state(fn () => ['status' => PendingConfirmation::STATUS_REJEITADO, 'resolvido_em' => now()]);
     }
 
-    public function expirado(?\Carbon\CarbonImmutable $referencia = null): static
+    public function expirado(?CarbonImmutable $referencia = null): static
     {
         // Relativo ao "agora" DO TESTE (não ao relógio real — senão o teste apodrece)
         // e convertido a UTC antes de gravar (timestamptz).
-        $ref = $referencia ?? \Carbon\CarbonImmutable::now('America/Sao_Paulo');
+        $ref = $referencia ?? CarbonImmutable::now('America/Sao_Paulo');
 
         return $this->state(fn () => ['expira_em' => $ref->subDay()->setTimezone('UTC')]);
     }

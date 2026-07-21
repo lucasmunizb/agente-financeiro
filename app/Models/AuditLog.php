@@ -17,13 +17,21 @@ class AuditLog extends Model
     use HasFactory;
 
     public const ACAO_CRIAR = 'criar';
+
     public const ACAO_EDITAR = 'editar';
+
     public const ACAO_CANCELAR = 'cancelar';
+
     public const ACAO_PAGAR = 'pagar';
+
     public const ACAO_EXCLUIR = 'excluir';
+
     public const ACAO_IMPORTAR = 'importar';
+
     public const ACAO_CONFIRMAR = 'confirmar';
+
     public const ACAO_REJEITAR = 'rejeitar';
+
     public const ACAO_EXPORTAR = 'exportar';
 
     protected $table = 'audit_log';

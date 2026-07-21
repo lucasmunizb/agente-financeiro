@@ -3,10 +3,11 @@
 namespace Database\Factories;
 
 use App\Models\Category;
+use App\Models\CategoryKeyword;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\CategoryKeyword>
+ * @extends Factory<CategoryKeyword>
  */
 class CategoryKeywordFactory extends Factory
 {

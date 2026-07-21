@@ -122,6 +122,9 @@ Laravel AI SDK, com a IA interpretando e o sistema fazendo a aritmética.
 - `ExtratorDeGasto::extrair(string $texto): ResultadoDaExtracao` — *structured output*
   (descricao, valor, forma_pagamento, cartao, categoria, data, parcelas, todos **texto/cru**);
   monta `camposFaltantes` (inclui `cartao` quando forma = `credito`).
+  **Ampliado depois:** `recorrencia_dia` ([[spec-10c-recorrencia-via-bot]]) e
+  `pago`/`data_pagamento` ([[spec-04b-confirmacao-gasto-bot]] §11 — "já foi pago?", slot
+  obrigatório fora de cartão).
 - `RedatorDeResposta::redigir(string $payload): string` — formata payload já calculado.
 - trait `UsaFailoverDeProvedores::provider(): array` → `config('ai.failover')` (vive em
   `app/Ai/Concerns/`, usado pelos 3 agentes acima).
@@ -130,7 +133,7 @@ Laravel AI SDK, com a IA interpretando e o sistema fazendo a aritmética.
 - enum `Intencao` (`registrar|consultar|editar|cancelar|importar|desconhecido`) —
   `tentar(?string): self`, `valores(): list<string>`.
 - `GastoExtraido` (VO readonly): `descricao, valorTexto, formaPagamento, cartao?, categoria?,
-  dataTexto?, parcelas?` — **cru**.
+  dataTexto?, parcelas?, recorrenciaDiaTexto?, pago?, dataPagamentoTexto?` — **cru**.
 - `ResultadoDaExtracao(?GastoExtraido $gasto, array $camposFaltantes)` —
   `precisaEsclarecer(): bool`.
 - `NormalizadorDeGastoExtraido::normalizar(GastoExtraido $e, int $userId,

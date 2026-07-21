@@ -47,9 +47,9 @@ class RegistrarGastoRequest extends FormRequest
     {
         $userId = $this->user()->id;
         $ehCredito = $this->input('forma') === PaymentMethod::CREDITO;
-        // Recorrência só existe fora de cartão (crédito usa parcelas); os campos do switch
-        // ("Repete todo mês?") só são exigidos quando ligado nessa condição.
-        $ehRecorrente = $this->boolean('recorrente') && ! $ehCredito;
+        // Recorrência vale em qualquer forma, inclusive crédito (spec 12, D3 — assinatura no
+        // cartão é o caso comum). Os campos do switch só são exigidos quando ele está ligado.
+        $ehRecorrente = $this->boolean('recorrente');
 
         return [
             'descricao' => ['required', 'string', 'max:255'],
@@ -73,6 +73,15 @@ class RegistrarGastoRequest extends FormRequest
             // vencidas (doc 03 §4.1). Omitida ⇒ hoje. Ignorada fora de cartão (usa `vencimento`).
             'data_compra' => ['nullable', 'date'],
 
+            // Gasto que o usuário já pagou antes de cadastrar (decisão 2026-07-21): a data em
+            // que pagou. Só FORA de cartão (no crédito quem se quita é a fatura, §4.3) e nunca
+            // no futuro — é um pagamento JÁ feito, não um agendamento. O domínio marca só a 1ª
+            // parcela; as demais seguem abertas.
+            'data_pagamento' => [
+                'nullable', 'date',
+                'before_or_equal:'.CarbonImmutable::now(RelativeDate::TIMEZONE)->toDateString(),
+            ],
+
             'categoria_id' => [
                 'nullable', 'integer',
                 // Closure: o boolean `arquivada` precisa do query builder real —
@@ -85,8 +94,8 @@ class RegistrarGastoRequest extends FormRequest
                 }),
             ],
 
-            // Recorrência (§7.7, spec 10) — só fora de cartão. `dia_recorrencia` é o dia-do-mês
-            // (clampado na borda do mês pelo motor); `periodicidade` é só "mensal" no MVP.
+            // Recorrência (§7.7, spec 10/12) — permitida também em cartão. `dia_recorrencia` é
+            // o dia-do-mês (clampado na borda do mês pelo motor); `periodicidade` só "mensal".
             'recorrente' => ['nullable', 'boolean'],
             'periodicidade' => [Rule::requiredIf($ehRecorrente), 'nullable', Rule::in([Recurrence::PERIODICIDADE_MENSAL])],
             'dia_recorrencia' => [Rule::requiredIf($ehRecorrente), 'nullable', 'integer', 'min:1', 'max:31'],
@@ -109,6 +118,22 @@ class RegistrarGastoRequest extends FormRequest
             if ($this->ehRecorrente() && (int) $this->input('parcelas', 1) >= 2) {
                 $validator->errors()->add('recorrente', 'Um lançamento parcelado não pode repetir todo mês — escolha parcelas ou recorrência.');
             }
+
+            // "Já paguei" não combina com cartão nem com recorrência. No crédito, o que se
+            // paga é a FATURA (§4.3) — marcar a compra como paga mentiria sobre o fluxo de
+            // caixa. Na recorrência, a cobrança do mês tem o seu próprio "marcar como pago"
+            // (spec 12). Recusar é mais honesto que ignorar em silêncio o que o usuário pediu.
+            if (! $this->filled('data_pagamento')) {
+                return;
+            }
+
+            if ($this->input('forma') === PaymentMethod::CREDITO) {
+                $validator->errors()->add('data_pagamento', 'Compra no cartão não se marca como paga aqui — quem se paga é a fatura.');
+            }
+
+            if ($this->ehRecorrente()) {
+                $validator->errors()->add('data_pagamento', 'Numa conta que repete todo mês, marque o pagamento na cobrança do mês.');
+            }
         });
     }
 
@@ -128,6 +153,8 @@ class RegistrarGastoRequest extends FormRequest
             'parcelas.min' => 'As parcelas vão de 1 a 24.',
             'parcelas.max' => 'As parcelas vão de 1 a 24.',
             'vencimento.required' => 'Informe a data de vencimento.',
+            'data_pagamento.date' => 'Informe uma data de pagamento válida.',
+            'data_pagamento.before_or_equal' => 'A data do pagamento não pode ser no futuro.',
             'dia_recorrencia.required' => 'Informe o dia da recorrência.',
             'dia_recorrencia.min' => 'O dia da recorrência vai de 1 a 31.',
             'dia_recorrencia.max' => 'O dia da recorrência vai de 1 a 31.',
@@ -135,12 +162,13 @@ class RegistrarGastoRequest extends FormRequest
     }
 
     /**
-     * Este cadastro também cria uma recorrência? Só fora de cartão e com o switch ligado
-     * (crédito usa parcelas — o switch nem aparece no form nessa forma).
+     * Este cadastro é uma recorrência? Basta o switch ligado — crédito passou a ser permitido
+     * (spec 12, D3). Quando ligado, NENHUM lançamento é criado: nasce o molde e a ocorrência
+     * do mês (R1).
      */
     public function ehRecorrente(): bool
     {
-        return $this->boolean('recorrente') && $this->input('forma') !== PaymentMethod::CREDITO;
+        return $this->boolean('recorrente');
     }
 
     /**
@@ -160,6 +188,8 @@ class RegistrarGastoRequest extends FormRequest
             paymentMethodId: PaymentMethod::idFor((string) $this->input('forma')),
             dia: (int) $this->input('dia_recorrencia'),
             categoriaId: $this->filled('categoria_id') ? (int) $this->input('categoria_id') : null,
+            // Crédito exige cartão (validado acima); fora dele o domínio ignora o campo.
+            cardId: $this->filled('card_id') ? (int) $this->input('card_id') : null,
             periodicidade: (string) $this->input('periodicidade', Recurrence::PERIODICIDADE_MENSAL),
         );
     }
@@ -228,6 +258,11 @@ class RegistrarGastoRequest extends FormRequest
             accountId: null,
             categoriaId: $this->filled('categoria_id') ? (int) $this->input('categoria_id') : null,
             origem: 'manual',
+            // Gasto já pago no ato do cadastro: o domínio marca só a 1ª parcela nesta data
+            // (decisão 2026-07-21). Validado acima como fora de cartão e não-futura.
+            dataPagamento: $this->filled('data_pagamento')
+                ? CarbonImmutable::parse((string) $this->input('data_pagamento'), RelativeDate::TIMEZONE)
+                : null,
         );
     }
 }

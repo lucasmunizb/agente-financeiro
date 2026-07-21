@@ -73,6 +73,8 @@ final class EsclarecimentosPendentes
             'data' => $parcial->dataTexto,
             'parcelas' => $parcial->parcelas,
             'recorrencia_dia' => $parcial->recorrenciaDiaTexto,
+            'pago' => $parcial->pago,
+            'data_pagamento' => $parcial->dataPagamentoTexto,
         ];
     }
 
@@ -90,6 +92,10 @@ final class EsclarecimentosPendentes
             dataTexto: $payload['data'] ?? null,
             parcelas: isset($payload['parcelas']) ? (int) $payload['parcelas'] : null,
             recorrenciaDiaTexto: $payload['recorrencia_dia'] ?? null,
+            // `false` é resposta legítima ("ainda não paguei"): não pode virar "ausente" no
+            // round-trip, senão o bot repergunta no turno seguinte.
+            pago: isset($payload['pago']) ? (bool) $payload['pago'] : null,
+            dataPagamentoTexto: $payload['data_pagamento'] ?? null,
         );
     }
 }

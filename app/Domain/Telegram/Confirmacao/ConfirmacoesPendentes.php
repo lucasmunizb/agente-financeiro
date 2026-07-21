@@ -152,6 +152,8 @@ final class ConfirmacoesPendentes
             'accountId' => $dados->accountId,
             'categoriaId' => $dados->categoriaId,
             'categoriaSugeridaPorIa' => $dados->categoriaSugeridaPorIa,
+            // Data de calendário (não instante): serializa como Y-m-d e reidrata no fuso SP.
+            'dataPagamento' => $dados->dataPagamento?->format('Y-m-d'),
         ];
     }
 
@@ -171,6 +173,9 @@ final class ConfirmacoesPendentes
             accountId: isset($payload['accountId']) ? (int) $payload['accountId'] : null,
             categoriaId: isset($payload['categoriaId']) ? (int) $payload['categoriaId'] : null,
             categoriaSugeridaPorIa: (bool) ($payload['categoriaSugeridaPorIa'] ?? false),
+            dataPagamento: isset($payload['dataPagamento'])
+                ? CarbonImmutable::parse((string) $payload['dataPagamento'], self::TZ)
+                : null,
         );
     }
 }

@@ -1,16 +1,14 @@
 <?php
 
-use App\Domain\Confirmacao\EnfileirarConfirmacao;
-use App\Domain\Gasto\DadosGastoManual;
-use App\Domain\Shared\OpaqueId;
 use App\Domain\Lancamentos\ConsultarLancamentos;
 use App\Domain\Lancamentos\ResultadoConsultaLancamentos;
+use App\Domain\Shared\OpaqueId;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
-use App\Models\PendingConfirmation;
 use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Models\User;
@@ -19,24 +17,30 @@ use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\StatusPagamentoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-/** Enfileira uma ocorrência de recorrência na fila (o que o agendador faz), fora de cartão. */
-function pendenteRecorrenciaExtrato(User $user, int $cents, string $dataCompra, string $descricao = 'Netflix', ?Category $categoria = null): PendingConfirmation
+/** Cria a OCORRÊNCIA real de uma recorrência num mês (o que o agendador gera), fora de cartão. */
+function ocorrenciaExtrato(User $user, int $cents, string $vencimento, string $descricao = 'Netflix', ?Category $categoria = null, ?string $status = null): RecurrenceOccurrence
 {
-    return (new EnfileirarConfirmacao)->enfileirar(
-        new DadosGastoManual(
-            userId: $user->id,
-            descricao: $descricao,
-            valorTotalCents: $cents,
-            dataCompra: CarbonImmutable::parse($dataCompra, 'America/Sao_Paulo'),
-            paymentMethodId: PaymentMethod::idFor(PaymentMethod::PIX),
-            parcelas: 1,
-            categoriaId: $categoria?->id,
-            origem: 'recorrencia',
-            recurrenceId: Recurrence::factory()->for($user)->create(['status' => Recurrence::STATUS_ATIVO])->id,
-        ),
-        PendingConfirmation::ORIGEM_RECORRENCIA,
-        expiraEm: null,
-    );
+    $rec = Recurrence::factory()->for($user)->create([
+        'descricao' => $descricao,
+        'valor_cents' => $cents,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'categoria_id' => $categoria?->id,
+        'status' => Recurrence::STATUS_ATIVO,
+        'proxima_em' => null,
+    ]);
+
+    return RecurrenceOccurrence::factory()->create([
+        'user_id' => $user->id,
+        'recurrence_id' => $rec->id,
+        'competencia' => substr($vencimento, 0, 7),
+        'descricao' => $descricao,
+        'valor_cents' => $cents,
+        'data_cobranca' => $vencimento,
+        'vencimento' => $vencimento,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'categoria_id' => $categoria?->id,
+        'status_id' => StatusPagamento::idFor($status ?? StatusPagamento::ABERTO),
+    ]);
 }
 
 /** Busca um item (por descrição) em qualquer grupo do resultado. */
@@ -283,19 +287,19 @@ it('é isolado por usuário', function () {
  * (mês corrente/passado ⇒ nada projetado, servido pela materialização just-in-time).
  */
 
-it('marca o lançamento materializado como recorrente (e os demais como não)', function () {
+it('marca a OCORRÊNCIA como recorrente e o lançamento comum como não (spec 12)', function () {
     $user = User::factory()->create();
-    $rec = Recurrence::factory()->for($user)->create();
 
-    $tx = lancamentoExtrato($user, 5000, '2026-06-10', descricao: 'Netflix');
-    $tx->update(['recurrence_id' => $rec->id]);
+    ocorrenciaExtrato($user, 5000, '2026-06-10', 'Netflix');
     lancamentoExtrato($user, 3000, '2026-06-11', descricao: 'Padaria');
 
     $itens = collect(itensDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato())))
         ->keyBy('descricao');
 
     expect($itens['Netflix']['recorrente'])->toBeTrue()
+        // A ocorrência É real (existe no banco): o selo "Previsto" é só da projeção.
         ->and($itens['Netflix']['prevista'])->toBeFalse()
+        ->and($itens['Netflix']['transactionId'])->toBeNull()
         ->and($itens['Padaria']['recorrente'])->toBeFalse();
 });
 
@@ -423,52 +427,64 @@ it('isola as previstas por usuário', function () {
         ->and(itensDoExtrato($r)[0]['descricao'])->toBe('Minha');
 });
 
-// ---- Ocorrências de recorrência na FILA (confirmação pendente) no extrato (fila↔extrato) ----
+// ---- Ocorrências REAIS de recorrência no extrato (spec 12, fonte única por competência) ----
 
-it('mostra a ocorrência de recorrência da fila como item PREVISTO, com o id do pendente e no total', function () {
+it('mostra a ocorrência como item real PREVISTO, com o id opaco para pagar e no total (R2)', function () {
     $user = User::factory()->create();
 
-    // hoje = 2026-06-15; ocorrência vence 20/06 (ainda não venceu) ⇒ previsto.
-    $pendente = pendenteRecorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix');
+    // hoje = 2026-06-15; a ocorrência vence 20/06 (ainda não venceu) ⇒ previsto.
+    $ocorrencia = ocorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix');
 
     $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
     $item = itemDoExtrato($r, 'Netflix');
 
     expect($item)->not->toBeNull()
         ->and($item['recorrente'])->toBeTrue()
-        ->and($item['prevista'])->toBeTrue()
+        ->and($item['prevista'])->toBeFalse()
         ->and($item['status'])->toBe('previsto')
         ->and($item['cents'])->toBe(5590)
         ->and($item['transactionId'])->toBeNull()
-        ->and(OpaqueId::decode($item['pendenteId']))->toBe($pendente->id)
+        ->and(OpaqueId::decode($item['ocorrenciaId']))->toBe($ocorrencia->id)
         ->and($r->totalExibidoCents)->toBe(5590);
 });
 
-it('marca como ATRASO a ocorrência pendente cujo dia já passou', function () {
+it('mostra a conta fixa UMA única vez no mês, com status atraso (R2)', function () {
     $user = User::factory()->create();
 
-    // hoje = 2026-06-15; ocorrência venceu 10/06 e não foi paga ⇒ atraso.
-    pendenteRecorrenciaExtrato($user, 5590, '2026-06-10', 'Netflix');
+    // hoje = 2026-06-15; a ocorrência venceu 10/06 e não foi paga ⇒ atraso, e só uma linha.
+    ocorrenciaExtrato($user, 5590, '2026-06-10', 'Netflix');
 
     $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
 
-    expect(itemDoExtrato($r, 'Netflix')['status'])->toBe('atraso');
+    expect(itemDoExtrato($r, 'Netflix')['status'])->toBe('atraso')
+        ->and($r->registros)->toBe(1)
+        ->and($r->totalExibidoCents)->toBe(5590);
 });
 
-it('não mostra a ocorrência pendente já confirmada (o lançamento real assume)', function () {
+it('mostra a ocorrência já paga com selo pago e sem alvo de pagamento', function () {
     $user = User::factory()->create();
-    $pendente = pendenteRecorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix');
-    $pendente->update(['status' => PendingConfirmation::STATUS_CONFIRMADO]);
+    ocorrenciaExtrato($user, 5590, '2026-06-10', 'Netflix', status: StatusPagamento::PAGO);
+
+    $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato()), 'Netflix');
+
+    expect($item['status'])->toBe('pago')
+        ->and($item['ocorrenciaId'])->toBeNull();
+});
+
+it('não mostra a ocorrência cancelada (não é cobrança, §4.4)', function () {
+    $user = User::factory()->create();
+    ocorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix', status: StatusPagamento::CANCELADO);
 
     $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
 
-    expect(itemDoExtrato($r, 'Netflix'))->toBeNull();
+    expect(itemDoExtrato($r, 'Netflix'))->toBeNull()
+        ->and($r->totalExibidoCents)->toBe(0);
 });
 
-it('isola as ocorrências pendentes por usuário', function () {
+it('isola as ocorrências por usuário', function () {
     $user = User::factory()->create();
     $outro = User::factory()->create();
-    pendenteRecorrenciaExtrato($outro, 999900, '2026-06-20', 'Alheia');
+    ocorrenciaExtrato($outro, 999900, '2026-06-20', 'Alheia');
 
     $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato());
 
@@ -476,10 +492,10 @@ it('isola as ocorrências pendentes por usuário', function () {
         ->and($r->totalExibidoCents)->toBe(0);
 });
 
-it('exclui a ocorrência pendente ao filtrar por cartão (recorrência é fora de cartão)', function () {
+it('exclui a ocorrência fora de cartão ao filtrar por um cartão', function () {
     $user = User::factory()->create();
     $cartao = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
-    pendenteRecorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix');
+    ocorrenciaExtrato($user, 5590, '2026-06-20', 'Netflix');
 
     $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato(), cartaoId: $cartao->id);
 

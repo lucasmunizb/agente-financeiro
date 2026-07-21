@@ -20,7 +20,14 @@ function schemaExtrator(): array
 
 it('declara os campos de um gasto', function () {
     expect(array_keys(schemaExtrator()))
-        ->toEqualCanonicalizing(['descricao', 'valor', 'forma_pagamento', 'cartao', 'categoria', 'data', 'parcelas', 'recorrencia_dia']);
+        ->toEqualCanonicalizing([
+            'descricao', 'valor', 'forma_pagamento', 'cartao', 'categoria', 'data', 'parcelas',
+            'recorrencia_dia', 'pago', 'data_pagamento',
+        ]);
+});
+
+it('mantém a data de pagamento como TEXTO cru — quem resolve o fuso é o domínio', function () {
+    expect(schemaExtrator()['data_pagamento'])->toBeInstanceOf(StringType::class);
 });
 
 it('mantém o dia da recorrência como TEXTO cru — a IA não calcula data (spec 10c C1)', function () {

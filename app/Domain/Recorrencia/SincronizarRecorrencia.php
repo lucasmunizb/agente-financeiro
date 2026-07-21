@@ -6,21 +6,23 @@ namespace App\Domain\Recorrencia;
 
 use App\Domain\Gasto\DadosGastoManual;
 use App\Models\AuditLog;
-use App\Models\PaymentMethod;
 use App\Models\Recurrence;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Propaga a edição de um lançamento recorrente para o MOLDE da recorrência de origem — a
- * escolha "este e os próximos" (spec 10). Os meses ainda não materializados passam a usar os
- * novos valores: descrição, valor (centavos, regra 5), categoria, forma e o `dia` (derivado do
- * novo vencimento), recalculando `proxima_em` para o novo dia DENTRO do mês da próxima
- * ocorrência (mesmo mês, dia novo — reusa {@see OcorrenciaMensal}, com clamp de fim de mês).
+ * Propaga uma edição para o MOLDE da recorrência — a escolha "este e os próximos" (spec 10,
+ * revista pela spec 12). As competências ainda não geradas passam a usar os novos valores:
+ * descrição, valor (centavos, regra 5), categoria, forma e o `dia` (derivado do novo
+ * vencimento, com clamp de fim de mês via {@see OcorrenciaMensal}).
  *
- * No-op seguro (devolve `false`, sem tocar a regra) quando a recorrência não está ATIVA
- * (cancelada não tem futuro a alterar) ou quando a forma virou cartão de crédito (recorrência
- * é sempre fora de cartão) — nesses casos só o lançamento do mês muda. Determinístico (regra 4);
- * registra auditoria antes/depois.
+ * Não recusa mais cartão de crédito (spec 12, D3 — recorrência em cartão é permitida). Não
+ * mexe no ponteiro `proxima_em`: ele passou a ser o 1º dia do primeiro MÊS de origem não
+ * gerado, então trocar o dia-do-mês não move o mês. Também não reescreve as ocorrências já
+ * geradas — elas são snapshots auto-contidos, e mudar "só este mês" é
+ * {@see EditarOcorrencia}.
+ *
+ * No-op seguro (devolve `false`) quando a recorrência não está ATIVA — cancelada não tem
+ * futuro a alterar. Determinístico (regra 4); registra auditoria antes/depois.
  */
 final class SincronizarRecorrencia
 {
@@ -30,16 +32,10 @@ final class SincronizarRecorrencia
             return false;
         }
 
-        // Recorrência não vive em cartão de crédito (crédito usa parcelas). Se a edição mudou a
-        // forma para crédito, não há molde recorrente coerente a sincronizar — só o mês muda.
-        if (PaymentMethod::whereKey($novos->paymentMethodId)->value('tipo') === PaymentMethod::CREDITO) {
-            return false;
-        }
-
         return DB::transaction(function () use ($rec, $novos): bool {
             // O dia do molde só muda quando o usuário escolheu DE FATO outro dia. Se o dia
             // da ocorrência editada é exatamente o clamp do dia do molde naquele mês (regra
-            // "dia 31" materializada em 28/fev), a data não foi alterada pelo usuário — o
+            // "dia 31" resolvida em 28/fev), a data não foi alterada pelo usuário — o
             // molde continua "todo dia 31" (auditoria P2-1).
             $diaClampadoDoMolde = OcorrenciaMensal::aPartirDe(
                 $rec->dia,
@@ -55,22 +51,17 @@ final class SincronizarRecorrencia
                 'valor_cents' => $rec->valor_cents,
                 'categoria_id' => $rec->categoria_id,
                 'payment_method_id' => $rec->payment_method_id,
+                'card_id' => $rec->card_id,
                 'dia' => $rec->dia,
-                'proxima_em' => $rec->proxima_em?->format('Y-m-d'),
             ];
-
-            // Mantém o mês da próxima ocorrência, só troca o dia (clampado ao fim do mês).
-            $proximaEm = $rec->proxima_em !== null
-                ? OcorrenciaMensal::aPartirDe($dia, $rec->proxima_em->startOfMonth())->format('Y-m-d')
-                : null;
 
             $rec->update([
                 'descricao' => $novos->descricao,
                 'valor_cents' => $novos->valorTotalCents,
                 'categoria_id' => $novos->categoriaId,
                 'payment_method_id' => $novos->paymentMethodId,
+                'card_id' => $novos->cardId,
                 'dia' => $dia,
-                'proxima_em' => $proximaEm,
             ]);
 
             AuditLog::create([
@@ -84,8 +75,8 @@ final class SincronizarRecorrencia
                     'valor_cents' => $rec->valor_cents,
                     'categoria_id' => $rec->categoria_id,
                     'payment_method_id' => $rec->payment_method_id,
+                    'card_id' => $rec->card_id,
                     'dia' => $rec->dia,
-                    'proxima_em' => $proximaEm,
                 ],
                 'origem' => 'recorrencia',
             ]);

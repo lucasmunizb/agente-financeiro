@@ -32,7 +32,10 @@
             :prev-url="isset($mesAnterior) ? route('home', ['mes' => $mesAnterior]) : null"
             :next-url="isset($mesSeguinte) ? route('home', ['mes' => $mesSeguinte]) : null" />
     @else
-    <div class="w-full space-y-gutter">
+    {{-- `pb-28` reserva a faixa do FAB "Registrar gasto" (fixo, canto inferior direito):
+         sem isso ele fica POR CIMA do último card no fim da rolagem, escondendo conteúdo
+         que o usuário não tem como revelar (não há mais para onde rolar). --}}
+    <div class="w-full space-y-gutter pb-28">
         {{-- Elemento-assinatura: a régua do mês. --}}
         <x-dashboard.month-ruler
             :month-label="$vm['mesLabel']"
@@ -43,8 +46,15 @@
             :prev-url="route('home', ['mes' => $vm['mesAnterior']])"
             :next-url="route('home', ['mes' => $vm['mesSeguinte']])" />
 
-        {{-- Cards de resumo (bento). Valores em mono, alinhados à direita. --}}
-        <div class="grid animate-enter animate-enter--delay-1 grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
+        {{-- Cards de resumo (bento). Valores em mono, alinhados à direita.
+
+             As colunas quebram pela LARGURA DESTA COLUNA (`@container`), não pela do viewport:
+             o canvas perde 256px de aside e 380px de chat, então `lg:grid-cols-4` dava 4 cards
+             de ~140px num viewport de 1280 — rótulo empilhado em 4 linhas e valor transbordando.
+             Com container query, 4 colunas só quando o espaço REAL comporta: `@5xl` (1024px)
+             dá ≥256px por card, que é o mínimo para o valor caber em `text-value-display`. --}}
+        <div class="@container">
+        <div class="grid animate-enter animate-enter--delay-1 grid-cols-1 gap-gutter @lg:grid-cols-2 @5xl:grid-cols-4">
             <x-dashboard.summary-card label="Disponível do mês" :value="$vm['disponivel']"
                 :tone="$vm['disponivelPositivo'] ? 'primary' : 'default'" />
 
@@ -77,15 +87,17 @@
                 <x-dashboard.summary-card label="Fatura do cartão" value="—" sub="Nenhum cartão cadastrado" />
             @endif
         </div>
+        </div>
 
         {{-- Meio: gastos por categoria (donut) + próximas contas. O quadro de contas aparece
              no mês atual e também em mês FUTURO quando há contas/recorrências previstas
              (spec 10b) — os valores já vêm mesclados e conferidos do backend (regra 4). --}}
         @php $mostrarContas = $vm['ehMesAtual'] || ($vm['ehFuturo'] && count($vm['proximasContas']) > 0); @endphp
-        <div class="grid animate-enter animate-enter--delay-2 grid-cols-1 gap-gutter lg:grid-cols-3">
+        <div class="@container">
+        <div class="grid animate-enter animate-enter--delay-2 grid-cols-1 gap-gutter @3xl:grid-cols-3">
             {{-- Donut "gastos por categoria" (mensal — aparece em qualquer competência). Ocupa
                  a largura toda quando o quadro de contas some (mês histórico sem previstas). --}}
-            <div class="notebook-card flex flex-col items-center rounded-card p-8 {{ $mostrarContas ? 'lg:col-span-1' : 'lg:col-span-3' }}">
+            <div class="notebook-card flex flex-col items-center rounded-card p-8 {{ $mostrarContas ? '@3xl:col-span-1' : '@3xl:col-span-3' }}">
                 <h3 class="mb-8 w-full font-headline-md text-headline-md text-on-surface">Gastos por categoria</h3>
 
                 @if (count($vm['donut']['segmentos']) === 0)
@@ -124,7 +136,7 @@
                  "Em atraso" é relativo ao HOJE real → só no mês atual (regra "mesmomês");
                  "A vencer" aparece também em mês futuro, com as recorrências previstas. --}}
             @if ($mostrarContas)
-            <div class="notebook-card rounded-card p-8 lg:col-span-2">
+            <div class="notebook-card rounded-card p-8 @3xl:col-span-2">
                 <div class="mb-2 flex items-center justify-between">
                     <h3 class="font-headline-md text-headline-md text-on-surface">Contas</h3>
                 </div>
@@ -183,6 +195,7 @@
                 @endif
             </div>
             @endif
+        </div>
         </div>
     </div>
 

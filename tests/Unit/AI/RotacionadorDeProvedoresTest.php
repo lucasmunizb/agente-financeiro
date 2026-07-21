@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Tests\TestCase;
 
 /*
  * Rotação de provedores (spec 04c): fila LRU + cooldown, estado no cache compartilhado
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Log;
  * NUNCA chama provedor real — só reordena a lista que a SDK consome (regra 8).
  */
 
-uses(Tests\TestCase::class);
+uses(TestCase::class);
 
 /** Constrói o rotacionador amarrado ao store 'array', com o pool/cooldown do teste. */
 function rotacionador(array $overrides = []): RotacionadorDeProvedores

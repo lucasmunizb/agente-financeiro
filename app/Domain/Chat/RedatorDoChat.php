@@ -12,6 +12,7 @@ use App\Domain\Shared\Money;
 use App\Domain\Telegram\Resposta\ResultadoDaInteracao;
 use App\Domain\Telegram\Resposta\TipoDeInteracao;
 use App\Models\Recurrence;
+use App\Models\StatusPagamento;
 use App\Models\Transaction;
 use App\Support\TextoDoChat;
 
@@ -36,6 +37,10 @@ final class RedatorDoChat
         'cartao' => 'o cartão',
         'parcelas' => 'as parcelas',
         'recorrencia_dia' => 'o dia do mês em que repete',
+        // Fora de cartão o "já pagou?" é obrigatório: a pergunta é de sim/não, por isso o
+        // rótulo entra como oração ("me diga também se você já pagou"), não como substantivo.
+        'pago' => 'se você já pagou',
+        'data_pagamento' => 'a data do pagamento',
     ];
 
     public function redigir(ResultadoDaInteracao $resultado): RespostaDoChat
@@ -109,9 +114,10 @@ final class RedatorDoChat
         }
 
         $categoria = $this->linhaCategoria($previa);
+        $pagamento = $this->linhaPagamento($previa);
         $duplicado = $previa->ehDuplicado ? "\nAtenção: parece um lançamento repetido." : '';
 
-        return "Confirme o gasto:\n{$linha}.{$categoria}{$duplicado}\nResponda \"sim\" para gravar ou \"não\" para cancelar.";
+        return "Confirme o gasto:\n{$linha}.{$categoria}{$pagamento}{$duplicado}\nResponda \"sim\" para gravar ou \"não\" para cancelar.";
     }
 
     /**
@@ -131,6 +137,24 @@ final class RedatorDoChat
     }
 
     /**
+     * Aviso de que o "sim" já grava o gasto como PAGO. No parcelado, diz explicitamente que
+     * só a 1ª parcela entra paga (as demais seguem abertas) — o usuário precisa ver isso
+     * ANTES de confirmar, senão descobre depois no extrato. A data vem pronta do domínio.
+     */
+    private function linhaPagamento(PreviaGastoManual $previa): string
+    {
+        if ($previa->dataPagamento === null) {
+            return '';
+        }
+
+        $data = $previa->dataPagamento->format('d/m/Y');
+
+        return count($previa->parcelas) > 1
+            ? "\nMarco a 1ª parcela como paga em {$data}; as demais ficam em aberto."
+            : "\nJá pago em {$data}.";
+    }
+
+    /**
      * @param  list<string>  $campos
      */
     private function esclarecimentos(array $campos): string
@@ -140,11 +164,22 @@ final class RedatorDoChat
         return 'Para registrar, me diga também '.$this->lista($faltam).'.';
     }
 
+    /**
+     * Confirmação do que foi gravado. Quando o gasto entrou já quitado, o texto DIZ isso —
+     * o usuário não deve precisar abrir o extrato para saber se o "já paguei" pegou. O
+     * status vem derivado do domínio (regra 4): a redação só transcreve.
+     */
     private function gravado(Transaction $transacao): string
     {
         $valor = Money::fromCents((int) $transacao->valor_total_cents)->formatBRL();
 
-        return "Pronto, registrei: {$transacao->descricao} — {$valor}.";
+        $pagamento = match ($transacao->status_id) {
+            StatusPagamento::idFor(StatusPagamento::PAGO) => ' — já pago.',
+            StatusPagamento::idFor(StatusPagamento::PAGO_PARCIAL) => ' — 1ª parcela já paga.',
+            default => '.',
+        };
+
+        return "Pronto, registrei: {$transacao->descricao} — {$valor}{$pagamento}";
     }
 
     /**

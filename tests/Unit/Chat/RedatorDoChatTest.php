@@ -175,3 +175,57 @@ it('esclarecimento: pede o dia da recorrência em pt-BR, não o código do schem
     expect($texto)->toContain('o dia do mês')
         ->and($texto)->not->toContain('recorrencia_dia');
 });
+
+/*
+ * "Já foi pago?" (decisão 2026-07-21). Fora de cartão o slot é obrigatório, então a
+ * pergunta precisa sair em pt-BR — e a prévia tem de DIZER que vai marcar como pago antes
+ * do "sim", senão o usuário confirma sem saber o que será gravado (regra 7).
+ */
+
+it('esclarecimento: pergunta se já pagou em pt-BR, não o código do schema', function () {
+    $confirmacao = new ConfirmacaoDeGasto(null, null, ['pago']);
+
+    $texto = (new RedatorDoChat)->redigir(ResultadoDaInteracao::registro($confirmacao))->texto;
+
+    expect($texto)->toContain('se você já pagou')
+        ->and($texto)->not->toContain('pago]');
+});
+
+it('esclarecimento: pede a data do pagamento em pt-BR', function () {
+    $confirmacao = new ConfirmacaoDeGasto(null, null, ['data_pagamento']);
+
+    $texto = (new RedatorDoChat)->redigir(ResultadoDaInteracao::registro($confirmacao))->texto;
+
+    expect($texto)->toContain('a data do pagamento')
+        ->and($texto)->not->toContain('data_pagamento');
+});
+
+function previaPaga(?CarbonImmutable $dataPagamento, int $parcelas = 1): string
+{
+    $previa = new PreviaGastoManual(
+        descricao: 'mercado',
+        valorTotal: Money::fromCents(9000),
+        origem: 'manual',
+        ehDuplicado: false,
+        parcelas: array_map(
+            fn (int $n) => new ParcelaPrevia($n, $parcelas, CarbonImmutable::parse('2026-07-10'), Money::fromCents(9000 / $parcelas), 'aberto'),
+            range(1, $parcelas),
+        ),
+        dataPagamento: $dataPagamento,
+    );
+
+    return (new RedatorDoChat)->redigir(ResultadoDaInteracao::registro(new ConfirmacaoDeGasto($previa, null, [])))->texto;
+}
+
+it('prévia avisa que o gasto já está pago, com a data em pt-BR', function () {
+    expect(previaPaga(CarbonImmutable::parse('2026-07-10')))->toContain('Já pago em 10/07/2026.');
+});
+
+it('prévia de parcelado deixa claro que só a 1ª parcela entra como paga', function () {
+    expect(previaPaga(CarbonImmutable::parse('2026-07-10'), parcelas: 3))
+        ->toContain('1ª parcela como paga em 10/07/2026');
+});
+
+it('prévia não fala de pagamento quando o gasto não foi pago', function () {
+    expect(previaPaga(null))->not->toContain('pago');
+});

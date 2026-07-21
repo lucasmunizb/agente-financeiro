@@ -19,6 +19,5 @@ final class ParcelaPrevia
         public readonly CarbonImmutable $vencimento,
         public readonly Money $valor,
         public readonly string $statusCodigo,
-    ) {
-    }
+    ) {}
 }

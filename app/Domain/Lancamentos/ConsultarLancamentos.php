@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Domain\Lancamentos;
 
 use App\Domain\Gastos\ConsultarGastos;
+use App\Domain\Recorrencia\ConsultarOcorrencias;
 use App\Domain\Recorrencia\ProjetarRecorrencias;
-use App\Domain\Recorrencia\ProjetarRecorrenciasPendentes;
+use App\Domain\Shared\SqlLike;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
 use App\Models\StatusPagamento;
@@ -44,7 +45,7 @@ final class ConsultarLancamentos
 
     public function __construct(
         private readonly ProjetarRecorrencias $projetarRecorrencias = new ProjetarRecorrencias,
-        private readonly ProjetarRecorrenciasPendentes $projetarPendentes = new ProjetarRecorrenciasPendentes,
+        private readonly ConsultarOcorrencias $ocorrencias = new ConsultarOcorrencias,
     ) {}
 
     public function para(
@@ -86,7 +87,7 @@ final class ConsultarLancamentos
                 if ($busca !== null) {
                     // Escapa curingas do texto do usuário (auditoria P3-3); os "%"
                     // externos (busca parcial) são intencionais.
-                    $q->where('descricao', 'ilike', '%'.\App\Domain\Shared\SqlLike::escapar($busca).'%');
+                    $q->where('descricao', 'ilike', '%'.SqlLike::escapar($busca).'%');
                 }
             })
             ->with(['transaction.categoria', 'transaction.card', 'transaction.paymentMethod', 'status'])
@@ -130,16 +131,17 @@ final class ConsultarLancamentos
                 'parcela' => $parcela->total > 1 ? "{$parcela->numero}/{$parcela->total}" : null,
                 'status' => $statusExibicao,
                 'vencimento' => $parcela->vencimento,
-                // "Verdade" de recorrente = transactions.recurrence_id (spec 10).
-                'recorrente' => $tx->recurrence_id !== null,
+                // Recorrência não vive mais em `transactions` (spec 12): toda linha real aqui
+                // é um lançamento comum. As recorrentes vêm das duas fontes abaixo.
+                'recorrente' => false,
                 'prevista' => false,
-                'pendenteId' => null,
+                'ocorrenciaId' => null,
             ];
         }
 
-        // Recorrências PREVISTAS de um mês FUTURO (spec 10b): mescladas na listagem como itens
-        // `prevista=true`. Mesmo guard anti-dupla-contagem do dashboard — mês corrente/passado
-        // ⇒ projeção vazia (servido pela materialização just-in-time). Não grava nada (regra 7).
+        // Recorrências PREVISTAS: competências AINDA NÃO GERADAS (spec 12) — tipicamente meses
+        // futuros. A separação é o `NOT EXISTS` sobre `recurrence_occurrences`, então uma
+        // competência já materializada nunca aparece aqui e ali. Não grava nada (regra 7).
         $previsao = $this->projetarRecorrencias->para($userId, $periodo, $hoje);
         foreach ($previsao->ocorrencias as $ocorrencia) {
             if (! $this->previstaCasaFiltros($ocorrencia, $status, $cartaoId, $categoriaId, $forma, $busca)) {
@@ -160,21 +162,22 @@ final class ConsultarLancamentos
                 'cents' => $cents,
                 'categoria' => $ocorrencia['categoria'] ?? null,
                 'forma' => $ocorrencia['forma'] ?? null,
-                'cartaoDescricao' => null,
+                'cartaoDescricao' => $ocorrencia['cartaoDescricao'] ?? null,
                 'parcela' => null,
                 'status' => self::STATUS_A_VENCER,
                 'vencimento' => $venc,
                 'recorrente' => true,
                 'prevista' => true,
-                'pendenteId' => null,
+                'ocorrenciaId' => null,
             ];
         }
 
-        // Ocorrências de recorrência que estão na FILA (confirmação pendente, spec 10): a ponte
-        // fila↔extrato. Status de exibição por data (previsto/atraso) e o id OPACO do pendente
-        // para o botão "marcar como pago". Read-only; sem lançamento real (transactionId null).
-        foreach ($this->projetarPendentes->para($userId, $periodo, $hoje) as $ocorrencia) {
-            if (! $this->pendenteCasaFiltros($ocorrencia, $status, $cartaoId, $categoriaId, $forma, $busca)) {
+        // Ocorrências REAIS da competência (spec 12): a conta fixa já materializada. Status de
+        // exibição por data (pago/previsto/atraso) e o id OPACO da ocorrência para o botão
+        // "marcar como paga" — que só existe fora de cartão (`pagavel`, D3). Sem lançamento
+        // real por trás: recorrência não escreve em `transactions` (transactionId null).
+        foreach ($this->ocorrencias->paraMes($userId, $periodo, $hoje) as $ocorrencia) {
+            if (! $this->ocorrenciaCasaFiltros($ocorrencia, $status, $cartaoId, $categoriaId, $forma, $busca)) {
                 continue;
             }
 
@@ -191,14 +194,15 @@ final class ConsultarLancamentos
                 'cents' => $cents,
                 'categoria' => $ocorrencia['categoria'] ?? null,
                 'forma' => $ocorrencia['forma'] ?? null,
-                'cartaoDescricao' => null,
+                'cartaoDescricao' => $ocorrencia['cartaoDescricao'] ?? null,
                 'parcela' => null,
-                'status' => (string) $ocorrencia['status'], // previsto | atraso
+                'status' => (string) $ocorrencia['status'], // pago | previsto | atraso
                 'vencimento' => $venc,
                 'recorrente' => true,
-                'prevista' => true,
-                // Alvo do "marcar como pago" (id opaco do pendente); as demais linhas não têm.
-                'pendenteId' => $ocorrencia['pendenteId'],
+                // A ocorrência É real (existe no banco) — o selo "Previsto" fica só na projeção.
+                'prevista' => false,
+                // Alvo do "marcar como paga"; null quando é de cartão (liquida sozinha, D3).
+                'ocorrenciaId' => $ocorrencia['pagavel'] === true ? $ocorrencia['ocorrenciaId'] : null,
             ];
         }
 
@@ -213,10 +217,10 @@ final class ConsultarLancamentos
     }
 
     /**
-     * Aplica os filtros ativos do extrato a uma ocorrência PREVISTA. Recorrência é sempre fora
-     * de cartão e a_vencer (mês estritamente futuro): filtro de cartão — ou de status ≠ a_vencer
-     * — a descarta. Categoria/forma/busca casam pelos próprios campos da recorrência (busca é
-     * parcial, case-insensitive, espelhando o `ilike` das reais).
+     * Aplica os filtros ativos do extrato a uma ocorrência PREVISTA (competência ainda não
+     * gerada). Previsão é sempre "a vencer": um filtro de status diferente disso a descarta.
+     * Cartão/categoria/forma/busca casam pelos próprios campos da recorrência — recorrência em
+     * cartão passou a existir (spec 12, D3), então o filtro de cartão compara o id, não elimina.
      *
      * @param  array<string, mixed>  $ocorrencia
      */
@@ -232,34 +236,21 @@ final class ConsultarLancamentos
             return false;
         }
 
-        if ($cartaoId !== null) {
+        if ($cartaoId !== null && ($ocorrencia['cartaoId'] ?? null) !== $cartaoId) {
             return false;
         }
 
-        if ($categoriaId !== null && ($ocorrencia['categoriaId'] ?? null) !== $categoriaId) {
-            return false;
-        }
-
-        if ($forma !== null && ($ocorrencia['forma'] ?? null) !== $forma) {
-            return false;
-        }
-
-        if ($busca !== null && stripos((string) $ocorrencia['descricao'], $busca) === false) {
-            return false;
-        }
-
-        return true;
+        return $this->camposCasam($ocorrencia, $categoriaId, $forma, $busca);
     }
 
     /**
-     * Aplica os filtros ativos a uma ocorrência de recorrência PENDENTE (fila↔extrato). Recorrência
-     * é fora de cartão (filtro de cartão a descarta); o filtro de status casa pelo bucket de
-     * exibição da ocorrência (previsto→a_vencer, atraso→atraso); categoria/forma/busca pelos
-     * próprios campos.
+     * Aplica os filtros ativos a uma ocorrência REAL de recorrência (spec 12). O filtro de
+     * status casa pelo bucket de exibição (previsto→a_vencer, atraso→atraso, pago→pago);
+     * cartão/categoria/forma/busca pelos próprios campos do snapshot da ocorrência.
      *
      * @param  array<string, mixed>  $ocorrencia
      */
-    private function pendenteCasaFiltros(
+    private function ocorrenciaCasaFiltros(
         array $ocorrencia,
         ?string $status,
         ?int $cartaoId,
@@ -267,18 +258,33 @@ final class ConsultarLancamentos
         ?string $forma,
         ?string $busca,
     ): bool {
-        if ($cartaoId !== null) {
+        if ($cartaoId !== null && ($ocorrencia['cartaoId'] ?? null) !== $cartaoId) {
             return false;
         }
 
         if ($status !== null) {
-            $bucket = $ocorrencia['status'] === self::STATUS_ATRASO ? self::STATUS_ATRASO : self::STATUS_A_VENCER;
+            $bucket = match ($ocorrencia['status']) {
+                self::STATUS_PAGO => self::STATUS_PAGO,
+                self::STATUS_ATRASO => self::STATUS_ATRASO,
+                default => self::STATUS_A_VENCER,
+            };
 
             if ($status !== $bucket && $status !== $ocorrencia['status']) {
                 return false;
             }
         }
 
+        return $this->camposCasam($ocorrencia, $categoriaId, $forma, $busca);
+    }
+
+    /**
+     * Filtros comuns às duas fontes de recorrência (busca parcial e case-insensitive,
+     * espelhando o `ilike` das linhas reais).
+     *
+     * @param  array<string, mixed>  $ocorrencia
+     */
+    private function camposCasam(array $ocorrencia, ?int $categoriaId, ?string $forma, ?string $busca): bool
+    {
         if ($categoriaId !== null && ($ocorrencia['categoriaId'] ?? null) !== $categoriaId) {
             return false;
         }

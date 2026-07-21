@@ -28,6 +28,9 @@ trait SerializaPreviaDeGasto
             'descricao' => $previa->descricao,
             'valorTotal' => $previa->valorTotal->formatBRL(),
             'ehDuplicado' => $previa->ehDuplicado,
+            // Data em que a 1ª parcela nascerá PAGA (null quando não é o caso). A confirmação
+            // precisa dizer isso ANTES do "sim" (regra 7); formatação pt-BR só aqui (regra 5).
+            'dataPagamento' => $previa->dataPagamento?->format('d/m/Y'),
             'parcelas' => array_map(
                 fn (ParcelaPrevia $p): array => [
                     'numero' => $p->numero,

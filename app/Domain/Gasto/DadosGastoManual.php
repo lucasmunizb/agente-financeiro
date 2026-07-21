@@ -17,14 +17,15 @@ use Carbon\CarbonImmutable;
  * via bot; `pdf` na importação de fatura). Não altera o cálculo — só a auditoria
  * e a procedência gravada na transaction.
  *
- * `recurrenceId` liga o lançamento à recorrência que o gerou (só os produtores de
- * recorrência preenchem; ausente ⇒ lançamento avulso). É o elo que viaja com o dado
- * até a transaction — a VERDADE de "este lançamento é recorrente" (spec 10).
- *
  * `categoriaSugeridaPorIa` marca que a `categoriaId` foi PRÉ-SELECIONADA pela IA (fallback
  * quando o lookup determinístico não classificou), não por uma regra aprendida. É só um
  * sinal de procedência para a apresentação exibir a dica ("sugestão da IA — confira") e para
  * medir acurácia rumo ao auto-save; não altera cálculo. A confirmação continua obrigatória.
+ *
+ * `dataPagamento` presente ⇒ o usuário afirmou que o gasto JÁ foi pago (decisão 2026-07-21):
+ * o cadastro marca a PRIMEIRA parcela como paga nessa data (pagamento é por parcela — as
+ * demais seguem abertas). Só vale FORA de cartão: em compra no cartão é ignorada, porque a
+ * quitação é da fatura (§4.3).
  */
 final class DadosGastoManual
 {
@@ -39,7 +40,7 @@ final class DadosGastoManual
         public readonly ?int $accountId = null,
         public readonly ?int $categoriaId = null,
         public readonly string $origem = 'manual',
-        public readonly ?int $recurrenceId = null,
         public readonly bool $categoriaSugeridaPorIa = false,
+        public readonly ?CarbonImmutable $dataPagamento = null,
     ) {}
 }

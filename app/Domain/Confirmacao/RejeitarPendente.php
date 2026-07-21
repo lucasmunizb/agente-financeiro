@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domain\Confirmacao;
 
-use App\Events\PendenteRecorrenteRejeitado;
 use App\Models\AuditLog;
 use App\Models\PendingConfirmation;
 use Carbon\CarbonImmutable;
@@ -16,8 +15,9 @@ use Illuminate\Support\Facades\DB;
  * marca `rejeitado` (mantém a linha para auditoria/histórico — nada é apagado) e registra a
  * trilha. Devolve false quando já estava resolvido (nada a fazer).
  *
- * Se o pendente veio de uma recorrência, dispara {@see PendenteRecorrenteRejeitado} na MESMA
- * transação — o listener cancela a recorrência (spec 10, C7), atomicamente com o "não".
+ * A cascata "rejeitar → cancela a recorrência" (spec 10, C7) foi REMOVIDA pela spec 12 (D1):
+ * recorrência não passa mais pela fila — ela gera a ocorrência do mês direto, e a regra 7 é
+ * honrada uma única vez, no cadastro do molde.
  */
 final class RejeitarPendente
 {
@@ -48,10 +48,6 @@ final class RejeitarPendente
                 'depois' => ['status' => PendingConfirmation::STATUS_REJEITADO],
                 'origem' => $pendente->origem,
             ]);
-
-            if ($pendente->recurrence_id !== null) {
-                PendenteRecorrenteRejeitado::dispatch($pendente, $agora);
-            }
 
             return true;
         });

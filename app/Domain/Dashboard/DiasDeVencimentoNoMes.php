@@ -20,7 +20,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class DiasDeVencimentoNoMes
 {
-
     /**
      * @return list<int> dias (1..31) com vencimento, únicos e em ordem crescente
      */

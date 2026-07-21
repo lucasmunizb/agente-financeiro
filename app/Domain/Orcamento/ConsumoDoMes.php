@@ -18,7 +18,6 @@ use App\Models\StatusPagamento;
  */
 final class ConsumoDoMes
 {
-
     public function para(int $userId, string $mes): ConsumoMensal
     {
         $periodo = PeriodoMensal::fromString($mes);

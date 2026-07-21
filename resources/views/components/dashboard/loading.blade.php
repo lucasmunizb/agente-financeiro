@@ -21,7 +21,7 @@
     </div>
 
     {{-- Cards de resumo (skeleton) --}}
-    <div class="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
+    <div class="@container"><div class="grid grid-cols-1 gap-gutter @lg:grid-cols-2 @5xl:grid-cols-4">
         @for ($i = 0; $i < 4; $i++)
             <div class="notebook-card flex h-32 flex-col justify-between rounded-card p-6">
                 <div class="flex items-start justify-between">
@@ -31,11 +31,11 @@
                 <div class="skeleton ml-auto h-8 w-32"></div>
             </div>
         @endfor
-    </div>
+    </div></div>
 
     {{-- Donut + próximas contas (skeleton) --}}
-    <div class="grid grid-cols-1 gap-gutter lg:grid-cols-3">
-        <div class="notebook-card flex flex-col items-center rounded-card p-8 lg:col-span-1">
+    <div class="@container"><div class="grid grid-cols-1 gap-gutter @3xl:grid-cols-3">
+        <div class="notebook-card flex flex-col items-center rounded-card p-8 @3xl:col-span-1">
             <div class="mb-8 w-full">
                 <div class="skeleton h-6 w-32"></div>
             </div>
@@ -55,7 +55,7 @@
             </div>
         </div>
 
-        <div class="notebook-card rounded-card p-8 lg:col-span-2">
+        <div class="notebook-card rounded-card p-8 @3xl:col-span-2">
             <div class="mb-6 flex items-center justify-between">
                 <div class="skeleton h-6 w-40"></div>
                 <div class="skeleton h-8 w-24 rounded-lg"></div>
@@ -78,5 +78,5 @@
                 @endfor
             </div>
         </div>
-    </div>
+    </div></div>
 </div>

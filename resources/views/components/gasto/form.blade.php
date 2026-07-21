@@ -27,14 +27,6 @@
     $valVencimento = $dados['vencimento'] ?? '';
     $valCardId = $dados['card_id'] ?? null;
     $valCategoria = $dados['categoria_id'] ?? null;
-    // Lançamento que já é recorrente (vinculado a uma recorrência): a tela mostra um QUADRO com
-    // os dados da regra (dia + próxima), sem o switch — não se recorre de novo o que já é
-    // recorrente. `$recData` (dia/proximaEm/ativa) vem pronto do backend (regra 4). O hidden
-    // `recorrente` segue "0" (o backend ignora o switch), então não caímos no requiredIf.
-    $recData = $dados['recorrencia'] ?? null;
-    $recorrenteTravado = ($dados['recorrente'] ?? false) === true;
-    $recAtiva = (bool) ($recData['ativa'] ?? false);
-
     $labelRevisar = 'Revisar e confirmar';
     $labelGravar = $mode === 'edit' ? 'Confirmar alterações' : 'Confirmar e gravar';
     $toastOk = $mode === 'edit' ? 'Lançamento atualizado' : 'Gasto registrado';
@@ -177,75 +169,101 @@
                         class="input-field h-12 w-full rounded-lg px-4 font-body-md text-body-md text-on-surface-variant" />
                 </div>
 
-                {{-- Recorrência (§7.7 · spec 10): só fora de cartão. --}}
-                @if ($recorrenteTravado)
-                    {{-- Lançamento JÁ recorrente: quadro informativo com os dados da regra (dia +
-                         próxima ocorrência), calculados pelo backend (regra 4). Sem switch — não se
-                         recorre de novo o que já é recorrente; o alcance da edição é escolhido no
-                         painel de confirmação ("só este mês" × "este e os próximos"). --}}
-                    <input type="hidden" name="recorrente" value="0" data-rg-recorrente-input>
-                    <div data-rg-recorrencia-quadro class="flex items-start gap-3 rounded-lg border border-cedula/30 bg-cedula/5 p-4">
-                        <x-icon name="refresh-cw" class="mt-0.5 h-5 w-5 shrink-0 text-cedula" />
-                        <div class="flex flex-col gap-1">
-                            <p class="font-body-md text-body-md font-medium text-on-surface">Lançamento recorrente</p>
-                            @if ($recAtiva)
-                                <p class="font-body-sm text-body-sm text-on-surface-variant">
-                                    Repete todo mês no dia {{ $recData['dia'] }}@if ($recData['proximaEm']) · próxima em {{ $recData['proximaEm'] }}@endif.
-                                </p>
-                            @else
-                                <p class="font-body-sm text-body-sm text-on-surface-variant">
-                                    A recorrência foi encerrada — este lançamento nasceu dela.
-                                </p>
-                            @endif
-                            <a href="{{ route('recorrencias') }}" class="w-fit font-label-sm text-label-sm font-medium text-cedula hover:underline">
-                                Gerenciar recorrências
-                            </a>
-                        </div>
-                    </div>
-                @else
-                    {{-- Lançamento comum: ligar o switch cria uma recorrência mensal a partir do MÊS
-                         SEGUINTE — este mês já é lançado como o gasto acima (sem contar em dobro). --}}
+                {{-- Gasto que o usuário JÁ pagou antes de cadastrar (decisão 2026-07-21). Só
+                     fora de cartão — no crédito quem se quita é a fatura (§4.3), e por isso o
+                     campo vive dentro deste grupo. Progressive disclosure: a data só aparece
+                     depois do "sim", para não pesar o caminho comum (gasto ainda em aberto).
+                     A data máxima é hoje (pagamento JÁ feito); a borda é a fonte da verdade. --}}
+                @if ($mode === 'create')
                     <div class="space-y-4">
-                        <input type="hidden" name="recorrente" value="0" data-rg-recorrente-input>
-                        <div class="flex items-center justify-between">
-                            <span class="font-body-md text-body-md text-on-surface">Repete todo mês?</span>
-                            <button type="button" data-rg-recorrencia role="switch"
-                                data-rg-recorrente-lock="0" aria-checked="false"
-                                aria-label="Repete todo mês?" class="rg-switch relative h-6 w-12 rounded-full transition-opacity disabled:cursor-not-allowed disabled:opacity-40">
+                        <div class="flex items-center justify-between gap-4">
+                            <span id="rg-pago-label" class="font-body-md text-body-md text-on-surface">Já foi pago?</span>
+                            <button type="button" data-rg-pago role="switch" aria-checked="false"
+                                aria-labelledby="rg-pago-label"
+                                class="rg-switch relative h-6 w-12 rounded-full transition-opacity">
                                 <span class="rg-switch__knob absolute left-1 top-1 h-4 w-4 rounded-full bg-white"></span>
                             </button>
                         </div>
-                        <p class="-mt-2 font-label-sm text-label-sm text-outline">assinaturas e contas fixas</p>
-                        {{-- Parcelamento e recorrência não combinam: com 2+ parcelas o switch é
-                             desligado e desabilitado pelo JS (o backend também recusa). --}}
-                        <p data-rg-recorrencia-bloqueada hidden class="-mt-2 flex items-center gap-1.5 font-label-sm text-label-sm text-outline">
-                            <x-icon name="alert" class="h-4 w-4 shrink-0" />
-                            <span>Um lançamento parcelado não repete todo mês. Deixe em 1 parcela para ativar.</span>
-                        </p>
+                        <p class="-mt-2 font-label-sm text-label-sm text-outline">para lançar uma conta que você já quitou</p>
 
-                        {{-- Revelado quando ligado: periodicidade (só mensal no MVP) + dia do mês. --}}
-                        <div data-rg-recorrencia-fields hidden class="grid grid-cols-2 gap-4">
-                            <div class="flex flex-col gap-2">
-                                <label for="rg-periodicidade" class="font-body-sm text-body-sm text-on-surface-variant">Periodicidade</label>
-                                <div class="relative">
-                                    <select id="rg-periodicidade" name="periodicidade"
-                                        class="input-field h-12 w-full cursor-pointer appearance-none rounded-lg px-4 font-body-md text-body-md text-on-surface">
-                                        <option value="mensal">mensal</option>
-                                    </select>
-                                    <x-icon name="chevron-down" class="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-outline" />
-                                </div>
-                            </div>
-                            <div class="flex flex-col gap-2">
-                                <label for="rg-dia_recorrencia" class="font-body-sm text-body-sm text-on-surface-variant">Dia</label>
-                                <input id="rg-dia_recorrencia" name="dia_recorrencia" type="number" inputmode="numeric" min="1" max="31" placeholder="5"
-                                    class="input-field h-12 w-full rounded-lg px-4 font-value-label text-value-label text-on-surface" />
-                                <p data-rg-error="dia_recorrencia" id="rg-error-dia_recorrencia" role="alert" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
-                                    <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
-                                </p>
-                            </div>
+                        <div data-rg-pago-fields hidden class="flex flex-col gap-2">
+                            <label for="rg-data_pagamento" class="font-body-sm text-body-sm text-on-surface-variant">Data do pagamento</label>
+                            <input id="rg-data_pagamento" name="data_pagamento" type="date" disabled
+                                max="{{ \Carbon\CarbonImmutable::now(\App\Domain\Calendar\RelativeDate::TIMEZONE)->toDateString() }}"
+                                class="input-field h-12 w-full rounded-lg px-4 font-body-md text-body-md text-on-surface-variant" />
+                            <p class="font-label-sm text-label-sm text-outline">Em várias parcelas, só a primeira entra como paga.</p>
+                            <p data-rg-error="data_pagamento" id="rg-error-data_pagamento" role="alert" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
+                                <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
+                            </p>
                         </div>
                     </div>
                 @endif
+            </div>
+
+            {{-- ===== Recorrência (§7.7 · spec 12) — vale em QUALQUER forma, cartão inclusive ===== --}}
+            <div class="space-y-4 border-t border-linha pt-6">
+                <input type="hidden" name="recorrente" value="0" data-rg-recorrente-input>
+                <div class="flex items-center justify-between">
+                    <span class="font-body-md text-body-md text-on-surface">Repete todo mês?</span>
+                    <button type="button" data-rg-recorrencia role="switch" aria-checked="false"
+                        aria-label="Repete todo mês?" class="rg-switch relative h-6 w-12 rounded-full transition-opacity disabled:cursor-not-allowed disabled:opacity-40">
+                        <span class="rg-switch__knob absolute left-1 top-1 h-4 w-4 rounded-full bg-white"></span>
+                    </button>
+                </div>
+                <p class="-mt-2 font-label-sm text-label-sm text-outline">assinaturas e contas fixas — no cartão também</p>
+
+                {{-- Parcelamento e recorrência não combinam: com 2+ parcelas o switch é desligado
+                     e desabilitado pelo JS (o backend também recusa). --}}
+                <p data-rg-recorrencia-bloqueada hidden class="-mt-2 flex items-center gap-1.5 font-label-sm text-label-sm text-outline">
+                    <x-icon name="alert" class="h-4 w-4 shrink-0" />
+                    <span>Um lançamento parcelado não repete todo mês. Deixe em 1 parcela para ativar.</span>
+                </p>
+
+                {{-- Revelado quando ligado: periodicidade (só mensal no MVP) + dia da cobrança. --}}
+                <div data-rg-recorrencia-fields hidden class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-2">
+                            <label for="rg-periodicidade" class="font-body-sm text-body-sm text-on-surface-variant">Periodicidade</label>
+                            <div class="relative">
+                                <select id="rg-periodicidade" name="periodicidade"
+                                    class="input-field h-12 w-full cursor-pointer appearance-none rounded-lg px-4 font-body-md text-body-md text-on-surface">
+                                    <option value="mensal">mensal</option>
+                                </select>
+                                <x-icon name="chevron-down" class="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-outline" />
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label for="rg-dia_recorrencia" class="font-body-sm text-body-sm text-on-surface-variant">Dia da cobrança</label>
+                            <input id="rg-dia_recorrencia" name="dia_recorrencia" type="number" inputmode="numeric" min="1" max="31" data-dia-do-mes placeholder="5"
+                                class="input-field h-12 w-full rounded-lg px-4 font-value-label text-value-label text-on-surface" />
+                            <p data-rg-error="dia_recorrencia" id="rg-error-dia_recorrencia" role="alert" hidden class="flex items-center gap-1.5 font-label-sm text-label-sm text-argila">
+                                <x-icon name="alert" class="h-4 w-4 shrink-0" /><span></span>
+                            </p>
+                        </div>
+                    </div>
+
+                    {{-- O que muda ao ligar o switch (spec 12): a conta fixa não é um gasto avulso
+                         que também repete — ela É a cobrança do mês, uma por mês. Ao editar, o
+                         lançamento atual é SUBSTITUÍDO por ela (D5). Dizer isto aqui evita a
+                         surpresa de o lançamento sumir da lista depois de confirmar. --}}
+                    <p class="flex items-start gap-2 rounded-lg border border-cedula/30 bg-cedula/5 p-4 font-label-sm text-label-sm text-on-surface-variant">
+                        <x-icon name="refresh-cw" class="mt-0.5 h-4 w-4 shrink-0 text-cedula" />
+                        <span>
+                            @if ($mode === 'edit')
+                                Este lançamento vira uma recorrência: deixa de existir como gasto avulso e passa
+                                a ser a cobrança do mês, repetida daqui em diante.
+                            @else
+                                Vira uma cobrança por mês, começando neste. Nenhum gasto avulso é lançado.
+                            @endif
+                        </span>
+                    </p>
+                    {{-- Só no crédito: a cobrança é debitada no dia e entra na fatura em que cai,
+                         então já nasce paga — não aparece com botão de "marcar como paga" (D3). --}}
+                    <p data-rg-recorrencia-cartao hidden class="flex items-start gap-2 font-label-sm text-label-sm text-outline">
+                        <x-icon name="alert" class="h-4 w-4 shrink-0" />
+                        <span>No cartão, a cobrança entra na fatura correspondente e já nasce paga.</span>
+                    </p>
+                </div>
             </div>
 
             {{-- Categoria (opcional; chips reais do usuário) --}}
@@ -334,44 +352,26 @@
 
             {{-- Prévia de parcelas (mono) — preenchida pelo backend --}}
             <div class="space-y-3 rounded-lg border border-linha bg-surface-container-lowest p-4">
-                <p class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Prévia — calculada pelo sistema (ainda não gravado)</p>
+                <p data-rg-previa-legenda class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Prévia — calculada pelo sistema (ainda não gravado)</p>
                 <table class="w-full font-value-label text-value-label">
                     <tbody class="divide-y divide-linha text-on-surface-variant" data-rg-parcelas></tbody>
                 </table>
             </div>
 
-            {{-- Nota de recorrência (quando o switch está ligado): quando a repetição começa.
-                 O mês é calculado pelo backend (regra 4); a tela só exibe. --}}
+            {{-- Nota de "já pago": o usuário precisa VER que a conta vai nascer quitada antes
+                 de confirmar (regra 7). A data vem formatada do backend (regra 5). --}}
+            <p data-rg-pago-nota hidden
+                class="flex items-start gap-2 rounded-lg border border-cedula/30 bg-cedula/5 p-4 font-body-sm text-body-sm text-on-surface-variant">
+                <x-icon name="check" class="mt-0.5 h-5 w-5 shrink-0 text-cedula" /><span></span>
+            </p>
+
+            {{-- Nota de recorrência (quando o switch está ligado): em que mês a cobrança
+                 começa. O mês é calculado pelo backend (regra 4); a tela só exibe. --}}
             <p data-rg-recorrencia-nota hidden
                 class="flex items-start gap-2 rounded-lg border border-cedula/30 bg-cedula/5 p-4 font-body-sm text-body-sm text-on-surface-variant">
                 <x-icon name="refresh-cw" class="mt-0.5 h-5 w-5 shrink-0 text-cedula" /><span></span>
             </p>
 
-            {{-- Editar um lançamento recorrente: até onde a mudança vale (spec 10, "perguntar na
-                 hora"). Os radios ficam FORA do <form> mas ligados a ele por form="rg-form", então
-                 entram no FormData sem JS. Padrão "só este mês" (não reescreve a regra sem pedir).
-                 O backend ignora este campo em lançamentos não recorrentes. --}}
-            @if ($recorrenteTravado && $recAtiva)
-                <fieldset class="space-y-3 rounded-lg border border-linha bg-surface-container-lowest p-4">
-                    <legend class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
-                        <x-icon name="refresh-cw" class="h-4 w-4 text-cedula" /> Aplicar a
-                    </legend>
-                    <label class="flex cursor-pointer items-start gap-3">
-                        <input type="radio" name="escopo_recorrencia" value="este" form="rg-form" checked
-                            class="mt-0.5 h-4 w-4 accent-cedula" />
-                        <span class="font-body-sm text-body-sm text-on-surface">Só este mês
-                            <span class="block font-label-sm text-label-sm text-outline">altera apenas este lançamento</span>
-                        </span>
-                    </label>
-                    <label class="flex cursor-pointer items-start gap-3">
-                        <input type="radio" name="escopo_recorrencia" value="este_e_proximos" form="rg-form"
-                            class="mt-0.5 h-4 w-4 accent-cedula" />
-                        <span class="font-body-sm text-body-sm text-on-surface">Este e os próximos
-                            <span class="block font-label-sm text-label-sm text-outline">atualiza a recorrência (valor, dia, descrição) para os meses futuros</span>
-                        </span>
-                    </label>
-                </fieldset>
-            @endif
         </div>
 
         <footer class="flex flex-col gap-3 border-t border-linha bg-surface-container-low p-gutter md:flex-row-reverse">

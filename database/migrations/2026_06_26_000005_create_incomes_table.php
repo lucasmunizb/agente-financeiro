@@ -29,7 +29,7 @@ return new class extends Migration
 
         if (DB::getDriverName() === 'pgsql') {
             DB::statement(
-                "ALTER TABLE incomes ADD CONSTRAINT incomes_tipo_check ".
+                'ALTER TABLE incomes ADD CONSTRAINT incomes_tipo_check '.
                 "CHECK (tipo IN ('fixa', 'variavel'))"
             );
             DB::statement('ALTER TABLE incomes ADD CONSTRAINT incomes_valor_cents_check CHECK (valor_cents >= 0)');

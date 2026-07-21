@@ -6,6 +6,7 @@ use App\Domain\Conta\ExcluirConta;
 use App\Models\AuditLog;
 use App\Models\ChatMessage;
 use App\Models\Income;
+use App\Models\TelegramLink;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,11 +45,11 @@ it('faz soft delete do usuário e preserva a auditoria sem PII em claro', functi
 
 it('anonimiza a PII do titular na exclusão (nome, e-mail, telefone — auditoria P2-10)', function () {
     $user = User::factory()->create(['name' => 'Lucas', 'email' => 'lucas@exemplo.com']);
-    \App\Models\TelegramLink::create([
+    TelegramLink::create([
         'user_id' => $user->id,
         'telegram_user_id' => 999002,
         'telefone' => '+5511988887777',
-        'status' => \App\Models\TelegramLink::ATIVO,
+        'status' => TelegramLink::ATIVO,
         'vinculado_em' => now(),
     ]);
 
@@ -59,10 +60,10 @@ it('anonimiza a PII do titular na exclusão (nome, e-mail, telefone — auditori
     expect($anon->name)->toBeNull()
         ->and($anon->email)->not->toBe('lucas@exemplo.com');
 
-    $link = \App\Models\TelegramLink::where('user_id', $user->id)->first();
+    $link = TelegramLink::where('user_id', $user->id)->first();
     expect($link->telefone)->toBeNull()
         ->and($link->telegram_user_id)->toBeNull()
-        ->and($link->status)->toBe(\App\Models\TelegramLink::REVOGADO);
+        ->and($link->status)->toBe(TelegramLink::REVOGADO);
 });
 
 it('apaga a conversa de chat e redige as descrições livres do titular (pentest M3)', function () {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domain\Categoria\Concerns\SincronizaRegras;
 use App\Domain\Categoria\DadosCategoria;
 use App\Domain\Categoria\PaletaDeCategoria;
 use Illuminate\Foundation\Http\FormRequest;
@@ -70,7 +71,7 @@ class CriarCategoriaRequest extends FormRequest
 
     /**
      * Quebra o texto de tags (separado por vírgula ou nova linha) em uma lista. A normalização
-     * e a deduplicação ficam no domínio ({@see \App\Domain\Categoria\Concerns\SincronizaRegras}).
+     * e a deduplicação ficam no domínio ({@see SincronizaRegras}).
      *
      * @return list<string>
      */

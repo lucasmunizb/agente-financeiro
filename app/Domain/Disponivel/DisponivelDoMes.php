@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Disponivel;
 
 use App\Domain\Shared\Money;
+use App\Domain\Vencimento\CalculadoraDeVencimento;
 
 /**
  * Cálculo determinístico do "disponível do mês" (doc 03 §4.5).
@@ -15,7 +16,7 @@ use App\Domain\Shared\Money;
  *              − Gastos fora de cartão do mês (PIX/débito).
  *
  * O componente de cartão é atribuído pelo MÊS DE VENCIMENTO de cada gasto
- * (calculado em §4.2 por {@see \App\Domain\Vencimento\CalculadoraDeVencimento}),
+ * (calculado em §4.2 por {@see CalculadoraDeVencimento}),
  * independente de a fatura já ter fechado — uma fatura aberta cujo vencimento cai
  * no mês corrente já entra. Gastos com vencimento no mês seguinte não entram no
  * mês corrente; compõem o "previsto do próximo mês". Cada gasto pertence a um

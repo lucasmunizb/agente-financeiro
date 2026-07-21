@@ -11,12 +11,19 @@ use Illuminate\Database\Eloquent\Model;
 class StatusPagamento extends Model
 {
     public const ABERTO = 'aberto';
+
     public const PAGO = 'pago';
+
     public const PAGO_PARCIAL = 'pago_parcial';
+
     public const VENCIDO = 'vencido';
+
     public const CANCELADO = 'cancelado';
+
     public const ESTORNADO = 'estornado';
+
     public const PENDENTE_REVISAO = 'pendente_revisao';
+
     public const AGENDADO = 'agendado';
 
     /**

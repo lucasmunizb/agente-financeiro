@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\Recorrencia\CancelarRecorrencia;
 use App\Domain\Recorrencia\DadosRecorrencia;
 use App\Domain\Recorrencia\RegistrarRecorrencia;
+use App\Models\Card;
 use App\Models\PaymentMethod;
 use App\Models\Recurrence;
 use App\Models\User;
@@ -39,6 +40,7 @@ function novaRecorrencia(User $user, array $over = []): Recurrence
         valorCents: $over['valorCents'] ?? 5590,
         paymentMethodId: PaymentMethod::idFor($over['forma'] ?? PaymentMethod::PIX),
         dia: $over['dia'] ?? 5,
+        cardId: $over['cardId'] ?? null,
     ), CarbonImmutable::now('America/Sao_Paulo'));
 }
 
@@ -125,4 +127,48 @@ it('recusa o id REAL no path — só token opaco', function () {
         ->assertNotFound();
 
     expect($rec->fresh()->status)->toBe(Recurrence::STATUS_ATIVO);
+});
+
+// ---- Spec 12 (F7): a tela fala de COBRANÇAS, não de fila de confirmação -------------------
+
+it('mostra a próxima COBRANÇA no dia do molde, não o 1º dia do mês do ponteiro', function () {
+    $user = User::factory()->create();
+    // "hoje" = 09/07: julho já foi gerado, então o ponteiro está em 01/08 — mas a cobrança
+    // que o usuário espera ver é 05/08. Exibir o ponteiro cru diria "01/08" (spec 12).
+    novaRecorrencia($user, ['dia' => 5]);
+
+    $this->actingAs($user)->get(route('recorrencias'))
+        ->assertOk()
+        ->assertSee('próxima cobrança em 05/08/2026')
+        ->assertDontSee('01/08/2026');
+});
+
+it('identifica a recorrência em cartão pelo cartão, e mostra o vencimento da fatura (D3)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create([
+        'descricao' => 'Nubank', 'final_4' => '1234',
+        'dia_fechamento' => 20, 'dia_vencimento' => 28,
+    ]);
+    novaRecorrencia($user, [
+        'descricao' => 'Spotify', 'dia' => 25,
+        'forma' => PaymentMethod::CREDITO, 'cardId' => $card->id,
+    ]);
+
+    $this->actingAs($user)->get(route('recorrencias'))
+        ->assertOk()
+        ->assertSee('Spotify')
+        // A linha identifica o cartão em vez de dizer só "Crédito".
+        ->assertSee('Nubank •••• 1234')
+        // Cobrança em 25/08 é posterior ao fechamento (20) ⇒ fatura que vence em 28/09.
+        ->assertSee('próxima cobrança em 28/09/2026');
+});
+
+it('não promete mais fila de confirmação: a cobrança do mês é gerada sozinha', function () {
+    $user = User::factory()->create();
+    novaRecorrencia($user);
+
+    $this->actingAs($user)->get(route('recorrencias'))
+        ->assertOk()
+        ->assertSee('cobrança por mês')
+        ->assertDontSee('fila de confirmações');
 });

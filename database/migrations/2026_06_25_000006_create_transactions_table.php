@@ -39,7 +39,7 @@ return new class extends Migration
 
         if (DB::getDriverName() === 'pgsql') {
             DB::statement(
-                "ALTER TABLE transactions ADD CONSTRAINT transactions_origem_check ".
+                'ALTER TABLE transactions ADD CONSTRAINT transactions_origem_check '.
                 "CHECK (origem IN ('manual', 'telegram', 'pdf'))"
             );
         }

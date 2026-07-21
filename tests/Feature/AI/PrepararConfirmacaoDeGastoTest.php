@@ -4,6 +4,7 @@ use App\Domain\Gasto\DadosGastoManual;
 use App\Domain\Gasto\PreviaGastoManual;
 use App\Domain\Gasto\RegistrarGastoManual;
 use App\Domain\IA\ConfirmacaoDeGasto;
+use App\Domain\IA\GastoExtraido;
 use App\Domain\IA\PrepararConfirmacaoDeGasto;
 use App\Models\Installment;
 use App\Models\Transaction;
@@ -26,7 +27,7 @@ beforeEach(function () {
     $this->seed([PaymentMethodSeeder::class, StatusPagamentoSeeder::class]);
 });
 
-function preparar(App\Domain\IA\GastoExtraido $extraido, int $userId, string $hoje = '2026-06-26'): ConfirmacaoDeGasto
+function preparar(GastoExtraido $extraido, int $userId, string $hoje = '2026-06-26'): ConfirmacaoDeGasto
 {
     return app(PrepararConfirmacaoDeGasto::class)->preparar(
         $extraido,

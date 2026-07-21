@@ -21,7 +21,7 @@ return new class extends Migration
 
         if (DB::getDriverName() === 'pgsql') {
             DB::statement(
-                "ALTER TABLE payment_methods ADD CONSTRAINT payment_methods_tipo_check ".
+                'ALTER TABLE payment_methods ADD CONSTRAINT payment_methods_tipo_check '.
                 "CHECK (tipo IN ('credito', 'debito', 'pix', 'dinheiro'))"
             );
         }

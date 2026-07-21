@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Conta\ExportarDadosDoUsuario;
 use App\Models\AuditLog;
+use App\Models\ChatMessage;
 use App\Models\Income;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,7 +44,7 @@ it('exporta os dados estruturados do próprio usuário e audita', function () {
 
 it('inclui o histórico de chat do titular (portabilidade completa — auditoria P2-10)', function () {
     $user = User::factory()->create();
-    \App\Models\ChatMessage::factory()->for($user)->create(['body' => 'quanto gastei em junho?']);
+    ChatMessage::factory()->for($user)->create(['body' => 'quanto gastei em junho?']);
 
     $export = (new ExportarDadosDoUsuario)->exportar($user->id);
 
@@ -54,7 +55,7 @@ it('inclui o histórico de chat do titular (portabilidade completa — auditoria
 it('nunca inclui chat de outro usuário', function () {
     $user = User::factory()->create();
     $outro = User::factory()->create();
-    \App\Models\ChatMessage::factory()->for($outro)->create(['body' => 'mensagem alheia sigilosa']);
+    ChatMessage::factory()->for($outro)->create(['body' => 'mensagem alheia sigilosa']);
 
     $json = json_encode((new ExportarDadosDoUsuario)->exportar($user->id), JSON_UNESCAPED_UNICODE);
 
