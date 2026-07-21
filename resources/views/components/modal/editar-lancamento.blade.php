@@ -19,7 +19,7 @@
     data-rg-initial=""
     @unless ($open) hidden @endunless>
 
-    <div class="modal-card-enter notebook-card flex max-h-[92vh] w-full max-w-[640px] flex-col overflow-hidden rounded-card"
+    <div class="modal-card-enter notebook-card flex max-h-[92dvh] w-full max-w-[640px] flex-col overflow-hidden rounded-card"
         role="dialog" aria-modal="true" aria-labelledby="rg-title">
 
         <header class="flex items-center justify-between border-b border-linha px-gutter py-4">

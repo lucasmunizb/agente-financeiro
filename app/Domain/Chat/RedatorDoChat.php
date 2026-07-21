@@ -7,6 +7,7 @@ namespace App\Domain\Chat;
 use App\Domain\Gasto\PreviaGastoManual;
 use App\Domain\IA\ConfirmacaoDeGasto;
 use App\Domain\IA\Consulta\TraceDaConsulta;
+use App\Domain\Pagamento\ContaPagavel;
 use App\Domain\Recorrencia\PreviaRecorrencia;
 use App\Domain\Shared\Money;
 use App\Domain\Telegram\Resposta\ResultadoDaInteracao;
@@ -62,6 +63,20 @@ final class RedatorDoChat
                 'Não entendi sua resposta. Responda "sim" para gravar ou "não" para cancelar.', null, [],
             ),
             TipoDeInteracao::NADA_PARA_CONFIRMAR => new RespostaDoChat('Não há nada pendente para confirmar agora.', null, []),
+            // "Paguei a luz" (2026-07-21). Os números citados aqui vêm do BANCO, via
+            // ContaPagavel — a redação só transcreve (regra 4).
+            TipoDeInteracao::PAGAMENTO_A_CONFIRMAR => new RespostaDoChat(
+                $this->pagamentoAConfirmar($resultado->contaAPagar), null, [],
+            ),
+            TipoDeInteracao::PAGAMENTO_AMBIGUO => new RespostaDoChat(
+                $this->pagamentoAmbiguo($resultado->contasCandidatas), null, [],
+            ),
+            TipoDeInteracao::PAGAMENTO_REGISTRADO => new RespostaDoChat(
+                $this->pagamentoRegistrado($resultado->contaAPagar), null, [],
+            ),
+            TipoDeInteracao::CONTA_A_PAGAR_NAO_ENCONTRADA => new RespostaDoChat(
+                $this->contaNaoEncontrada($resultado->termoBuscado), null, [],
+            ),
             default => new RespostaDoChat(self::NAO_ENTENDI, null, []),
         };
     }
@@ -180,6 +195,50 @@ final class RedatorDoChat
         };
 
         return "Pronto, registrei: {$transacao->descricao} — {$valor}{$pagamento}";
+    }
+
+    /** Prévia do que será quitado — o "sim" é que grava (regra 7). */
+    private function pagamentoAConfirmar(ContaPagavel $conta): string
+    {
+        $valor = Money::fromCents($conta->cents)->formatBRL();
+        $venc = $conta->vencimento->format('d/m');
+
+        return "Marcar {$conta->descricao} — {$valor}, vence {$venc} — como paga? Responda \"sim\" para confirmar ou \"não\" para cancelar.";
+    }
+
+    /**
+     * Mais de uma conta casa: lista numerada para o usuário desempatar. Escolher por ele
+     * arriscaria quitar a conta errada.
+     *
+     * @param  list<ContaPagavel>  $candidatos
+     */
+    private function pagamentoAmbiguo(array $candidatos): string
+    {
+        $linhas = [];
+
+        foreach ($candidatos as $i => $conta) {
+            $valor = Money::fromCents($conta->cents)->formatBRL();
+            $linhas[] = ($i + 1).". {$conta->descricao} — {$valor}, vence ".$conta->vencimento->format('d/m');
+        }
+
+        return "Achei mais de uma conta com esse nome. Qual delas você pagou?\n".implode("\n", $linhas)
+            ."\nResponda com o número.";
+    }
+
+    private function pagamentoRegistrado(ContaPagavel $conta): string
+    {
+        $valor = Money::fromCents($conta->cents)->formatBRL();
+
+        return "Pronto, marquei {$conta->descricao} — {$valor} — como paga.";
+    }
+
+    private function contaNaoEncontrada(?string $termo): string
+    {
+        if ($termo === null) {
+            return 'Qual conta você pagou? Me diga o nome dela (ex.: "paguei a luz").';
+        }
+
+        return "Não achei nenhuma conta em aberto com \"{$termo}\". Confira o nome — cobrança de cartão não entra aqui, porque ela é quitada no pagamento da fatura.";
     }
 
     /**

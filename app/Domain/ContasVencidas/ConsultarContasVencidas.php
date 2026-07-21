@@ -6,6 +6,7 @@ namespace App\Domain\ContasVencidas;
 
 use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\ProximasContas\ConsultarProximasContas;
+use App\Domain\Shared\OpaqueId;
 use App\Models\Installment;
 use App\Models\StatusPagamento;
 use Carbon\CarbonImmutable;
@@ -50,7 +51,9 @@ final class ConsultarContasVencidas
             ->when($de !== null, fn (Builder $q) => $q->where('vencimento', '>=', $de->toDateString()))
             ->whereNotIn('status_id', $excluidos)
             ->whereHas('transaction', fn (Builder $q) => $q->where('user_id', $userId))
-            ->with('transaction')
+            // `transaction.card` alimenta o agrupamento por fatura no quadro do dashboard
+            // ({@see \App\Domain\Dashboard\AgruparContasDeCartao}) — sem N+1.
+            ->with('transaction.card')
             ->orderBy('vencimento')
             ->get();
 
@@ -61,6 +64,11 @@ final class ConsultarContasVencidas
             $cents = $parcela->valor()->cents();
             $total += $cents;
 
+            // Alvos das ações da linha (decisão do usuário 2026-07-21): o quadro deixou de
+            // ser só leitura — dá para marcar pago e editar sem sair do dashboard. Ids sempre
+            // OPACOS. Cartão fica sem alvo de pagamento: a fatura é quem quita (§4.3).
+            $ehCartao = $parcela->transaction?->card_id !== null;
+
             $contas[] = [
                 'descricao' => $parcela->transaction->descricao ?? 'Conta',
                 'vencimento' => $parcela->vencimento->toDateString(),
@@ -68,6 +76,13 @@ final class ConsultarContasVencidas
                 // Recorrência não vive mais em `transactions` (spec 12): toda parcela aqui é
                 // lançamento comum. As contas fixas entram pelas ocorrências, no ResumoDoMes.
                 'recorrente' => false,
+                // Em cartão o `vencimento` acima JÁ é o da fatura: quem consome pode somar as
+                // cobranças do mesmo cartão numa linha só (o usuário paga a fatura, não a compra).
+                'cartaoId' => $parcela->transaction?->card_id,
+                'cartaoDescricao' => $parcela->transaction?->card?->descricao,
+                'parcelaId' => $ehCartao ? null : OpaqueId::encode((int) $parcela->id),
+                'transactionId' => OpaqueId::encode((int) $parcela->transaction_id),
+                'pagavel' => ! $ehCartao,
             ];
         }
 

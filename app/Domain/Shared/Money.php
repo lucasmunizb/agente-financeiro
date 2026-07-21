@@ -134,4 +134,14 @@ final class Money
 
         return sprintf('%sR$ %s,%02d', $sign, $reaisFormatted, $decimal);
     }
+
+    /**
+     * Número pt-BR SEM o símbolo ("1.234,56") — para preencher campo de formulário, onde
+     * "R$" seria ruído que o usuário teria de apagar. O que volta daqui é aceito de novo por
+     * {@see self::fromHuman()}, fechando o ciclo editar → salvar sem perder centavos.
+     */
+    public function formatPtBr(): string
+    {
+        return trim(str_replace('R$', '', $this->formatBRL()));
+    }
 }

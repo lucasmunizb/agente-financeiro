@@ -9,7 +9,11 @@
 #   printf '%s' "$TELEGRAM_TOKEN"   | docker secret create telegram_bot_token -
 #   printf '%s' "$WEBHOOK_SECRET"   | docker secret create telegram_webhook_secret -
 #   docker build -f docker/Dockerfile --target prod -t financeiro-app:prod .
+#   export APP_TAG=<sha> APP_RUNTIME_TAG=$APP_TAG   # ver comentário no serviço `app`
 #   docker stack deploy -c docker-stack.yml financeiro
+#
+# O CI (.github/workflows/deploy.yml) NÃO usa essa forma de um passo só: ele faz
+# o deploy em 3 fases (migration → espera → app/worker) manipulando APP_RUNTIME_TAG.
 #
 # Antes do deploy: trocar "seu-dominio.example" pelo domínio real (proxy + APP_URL).
 # Variáveis NÃO sensíveis ficam aqui; segredos NUNCA vão para imagem/log/git.
@@ -98,11 +102,31 @@ services:
     deploy:
       mode: replicated-job
       replicas: 1
+      # max_attempts LIMITA o retry: sem ele, `on-failure` re-tenta indefinidamente
+      # e o passo "aguardar migrate" do CI (deploy.yml) nunca vê um estado terminal,
+      # ficando preso até o timeout. Com 2 tentativas, uma falha transitória (o
+      # Postgres ainda subindo) se recupera, mas uma migration quebrada termina
+      # rápido e derruba o deploy.
       restart_policy:
         condition: on-failure
+        max_attempts: 2
+        delay: 10s
 
+  # APP_RUNTIME_TAG (e não APP_TAG) é o que ordena o deploy em fases: o CI faz
+  # DOIS `stack deploy`. Na fase 1 exporta APP_RUNTIME_TAG = tag JÁ EM PRODUÇÃO,
+  # então o spec de app/worker sai idêntico ao que está rodando e o Swarm não
+  # toca neles — só a `migrate` (que usa APP_TAG) muda e roda. Na fase 3, depois
+  # da migration ter concluído, exporta APP_RUNTIME_TAG = APP_TAG e aí sim o
+  # rolling update acontece.
+  #
+  # É OBRIGATÓRIA (`:?`) de propósito: um default silencioso (`:-latest`) faria
+  # um deploy manual mandar app/worker para `latest` enquanto a `migrate` iria
+  # para o SHA — duas versões divergentes em produção sem ninguém perceber.
+  # Melhor abortar. E interpolação aninhada (`${A:-${B}}`) NÃO funciona no
+  # docker CLI 28.1 (renderiza `valor}`, com a chave sobrando) — daí as duas
+  # variáveis separadas em vez de uma com fallback.
   app:
-    image: ${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_TAG:-latest}
+    image: "${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_RUNTIME_TAG:?exporte APP_RUNTIME_TAG — veja o comentario acima}"
     environment:
       <<: *app-environment
     secrets: *app-secrets
@@ -139,9 +163,24 @@ services:
         delay: 5s
       update_config:
         order: start-first
+        # Uma réplica por vez: com 2 réplicas, sempre sobra a versão antiga
+        # atendendo enquanto a nova é validada.
+        parallelism: 1
+        # AUTO-ROLLBACK: se a task nova não sobreviver ao `monitor`, o Swarm
+        # volta sozinho para a imagem anterior. É o que impede um deploy ruim de
+        # ficar de pé — o CI então lê UpdateStatus=rollback_* e falha o workflow
+        # com a produção já restaurada. `monitor` > start_period (30s) do
+        # healthcheck, senão a task seria dada como boa antes do 1º check valer.
+        monitor: 60s
+        failure_action: rollback
+        max_failure_ratio: 0
+      rollback_config:
+        parallelism: 1
+        order: start-first
 
+  # Mesma variável do app (ver comentário lá): worker também só troca na fase 3.
   worker:
-    image: ${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_TAG:-latest}
+    image: "${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_RUNTIME_TAG:?exporte APP_RUNTIME_TAG — veja o comentario acima}"
     command: sh -c "php artisan schedule:work & exec php artisan queue:work --tries=3 --timeout=120 --sleep=2"
     environment:
       <<: *app-environment
@@ -157,6 +196,16 @@ services:
       replicas: 2
       restart_policy:
         condition: on-failure
+      # Sem healthcheck aqui (o worker não serve HTTP), então o `monitor` só pega
+      # o caso "container novo morre sozinho" — que é justamente o de imagem/boot
+      # quebrado. Suficiente para o auto-rollback valer a pena.
+      update_config:
+        parallelism: 1
+        monitor: 30s
+        failure_action: rollback
+        max_failure_ratio: 0
+      rollback_config:
+        parallelism: 1
 
   postgres:
     image: postgres:16-alpine

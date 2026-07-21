@@ -9,6 +9,7 @@ use App\Domain\IA\Consulta\TraceDaConsulta;
 use App\Domain\Orcamento\ConsumoMensal;
 use App\Domain\Recorrencia\ConsultarOcorrencias;
 use App\Domain\Recorrencia\ProjetarRecorrencias;
+use App\Domain\Shared\MesDeCaixa;
 use App\Domain\Shared\PeriodoMensal;
 use App\Domain\Shared\SqlLike;
 use App\Models\Card;
@@ -22,8 +23,9 @@ use Illuminate\Database\Eloquent\Builder;
  * Camada de consulta `consultar_gastos` (doc 02 §3.2) — varredura determinística do
  * banco que soma os gastos do usuário num período, com filtros opcionais.
  *
- * Base = parcelas vencendo no período (mesma base do "disponível"/{@see ConsumoMensal}:
- * cada gasto pertence a um único mês de VENCIMENTO). Filtros: categoria (nome), cartão
+ * Base = parcelas cujo MÊS DE CAIXA cai no período ({@see MesDeCaixa}, mesma base do
+ * "disponível"/{@see ConsumoMensal}: cada gasto pertence a um único mês — o do PAGAMENTO
+ * quando já foi pago fora de cartão, o do vencimento nos demais casos). Filtros: categoria (nome), cartão
  * (descrição ou 4 dígitos) e status. Sem filtro de status, exclui os status que não
  * entram no cálculo (§4.4); COM filtro, mostra exatamente o status pedido — o usuário
  * pediu. Escopo ESTRITO por usuário. A IA não participa — só redige sobre estes números.
@@ -53,8 +55,7 @@ final class ConsultarGastos
         $categoriaId = $categoria !== null ? $this->resolverCategoria($userId, $categoria) : null;
         $cardId = $cartao !== null ? $this->resolverCartao($userId, $cartao) : null;
 
-        $parcelas = Installment::query()
-            ->whereBetween('vencimento', [$p->inicio->toDateString(), $p->fim->toDateString()])
+        $parcelas = MesDeCaixa::parcelasNoMes(Installment::query(), $p)
             ->whereHas('transaction', function (Builder $q) use ($userId, $categoriaId, $cardId) {
                 $q->where('user_id', $userId);
 

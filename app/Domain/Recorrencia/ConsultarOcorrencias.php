@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Recorrencia;
 
 use App\Domain\Calendar\RelativeDate;
+use App\Domain\Shared\MesDeCaixa;
 use App\Models\RecurrenceOccurrence;
 use App\Models\StatusPagamento;
 use Carbon\CarbonImmutable;
@@ -28,30 +29,32 @@ use Illuminate\Support\Collection;
 final class ConsultarOcorrencias
 {
     /**
-     * Ocorrências da COMPETÊNCIA pedida (YYYY-MM).
+     * Ocorrências do MÊS DE CAIXA pedido (YYYY-MM): a competência gravada, exceto quando a
+     * conta já foi paga fora de cartão — aí vale o mês do pagamento ({@see MesDeCaixa}).
      *
      * @return list<array<string, mixed>> ordenadas por vencimento asc
      */
     public function paraMes(int $userId, string $mes, CarbonImmutable $agora): array
     {
         return $this->normalizar(
-            $this->base($userId)->where('competencia', $mes)->get(),
+            MesDeCaixa::ocorrenciasNoMes($this->base($userId), $mes)->get(),
             $agora,
         );
     }
 
     /**
-     * Soma (centavos) das ocorrências da competência — o que a conta fixa pesa no mês. Não
+     * Soma (centavos) das ocorrências do MÊS DE CAIXA — o que a conta fixa pesa no mês. Não
      * precisa de "agora" porque não deriva status de exibição: é agregação pura, para o
      * disponível/consumo. Canceladas ficam de fora (§4.4); pagas entram (foram cobradas).
      */
     public function totalDoMes(int $userId, string $mes): int
     {
-        return (int) RecurrenceOccurrence::query()
-            ->where('user_id', $userId)
-            ->where('competencia', $mes)
-            ->where('status_id', '!=', StatusPagamento::idFor(StatusPagamento::CANCELADO))
-            ->sum('valor_cents');
+        return (int) MesDeCaixa::ocorrenciasNoMes(
+            RecurrenceOccurrence::query()
+                ->where('user_id', $userId)
+                ->where('status_id', '!=', StatusPagamento::idFor(StatusPagamento::CANCELADO)),
+            $mes,
+        )->sum('valor_cents');
     }
 
     /**
@@ -123,6 +126,9 @@ final class ConsultarOcorrencias
                 'descricao' => (string) $oc->descricao,
                 'vencimento' => $oc->vencimento->toDateString(),
                 'dataCobranca' => $oc->data_cobranca->toDateString(),
+                // Data civil (SP) em que o dinheiro saiu — é ela que define o mês de caixa
+                // fora de cartão ({@see MesDeCaixa}); null enquanto a conta não foi paga.
+                'dataPagamento' => $oc->data_pagamento?->setTimezone(RelativeDate::TIMEZONE)->toDateString(),
                 'cents' => (int) $oc->valor_cents,
                 'competencia' => (string) $oc->competencia,
                 'categoriaId' => $oc->categoria_id,

@@ -139,7 +139,9 @@
                         <label for="rg-card" class="font-body-sm text-body-sm text-on-surface-variant">Cartão *</label>
                         <div class="relative">
                             <select id="rg-card" name="card_id"
-                                class="input-field h-12 w-full cursor-pointer appearance-none rounded-lg px-4 font-value-label text-value-label text-on-surface">
+                                {{-- pr-11: reserva a faixa do chevron. Sem isso o texto do cartão
+                                     passa POR BAIXO do ícone no celular (visto no iPhone). --}}
+                                class="input-field h-12 w-full cursor-pointer appearance-none truncate rounded-lg py-0 pl-4 pr-11 font-value-label text-value-label text-on-surface">
                                 @foreach ($cartoes as $card)
                                     <option value="{{ $card->id }}" @selected($valCardId === $card->id)>{{ $card->descricao }} •••• {{ $card->final_4 }} — fecha dia {{ $card->dia_fechamento }}</option>
                                 @endforeach

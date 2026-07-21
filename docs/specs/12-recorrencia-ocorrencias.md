@@ -63,6 +63,13 @@ própria (`recurrence_occurrences`), com chave única `(recurrence_id, competenc
   resto. `data_pagamento` recebe a própria `data_cobranca` (verdade histórica, não "hoje").
   Fora de cartão, `data_cobranca == vencimento` (o dia do molde) e a liquidação **nunca** é
   automática: depende do **"marcar como paga"** do usuário.
+  - **Corolário (o outro lado da mesma regra): "marcar como paga" SÓ existe fora de cartão.**
+    Os dois caminhos são mutuamente exclusivos — o que o agendador liquida, o usuário não
+    marca; o que o usuário marca, o agendador não toca. Oferecer o botão no cartão pagaria a
+    conta duas vezes (a cobrança já entra na fatura, doc 03 §4.3) e entraria em vaivém com
+    `LiquidarOcorrenciasDeCartao`. A recusa vale em **toda superfície** e é do domínio
+    (`PagarOcorrencia`/`ReverterPagamentoOcorrencia` lançam
+    `PagamentoNaoPermitidoException::ehCartao()`), não da tela — ver R10/R10b e spec 13 §4.1.
   - Vale **inclusive no cadastro**: criar "todo dia 5" no cartão em 21/07 nasce **já `pago`**.
     Criar "todo dia 25" em 21/07 nasce `aberto` e é liquidado sozinho quando o dia 25 chegar.
 - **D4 — Histórico legado é convertido.** Migration de dados: cada `transaction` com
@@ -201,7 +208,13 @@ competência) · `GastoController::store` · `LancamentoFormController::update` 
   "hoje" = 21/07, **Quando** ela é cadastrada e o comando agendado roda, **Então** a ocorrência
   continua `aberto` (exibida em `atraso`) — só o usuário a marca como paga.
 - **R10 — Dado** uma ocorrência de **cartão**, **Quando** o usuário tenta "marcar como paga",
-  **Então** a operação é **recusada** (cartão liquida sozinho).
+  **Então** a operação é **recusada** (cartão liquida sozinho) — **em qualquer superfície**:
+  extrato, quadros do dashboard, bot. A linha nem sequer oferece o botão, e a recusa é do
+  domínio (`PagarOcorrencia`), não da tela.
+- **R10b — Dado** uma recorrência de **cartão** cuja competência ainda é só **previsão**
+  (`ProjetarRecorrencias`, sem ocorrência gerada), **Quando** se tenta materializá-la sob
+  demanda para pagá-la, **Então** a operação é **recusada e nada é criado** — a cobrança em
+  cartão nasce e liquida pelo agendador (D3), nunca por clique do usuário.
 
 **Fora de cartão (marcar paga)**
 - **R11 — Dado** uma ocorrência PIX `aberto` vencida, **Quando** o usuário marca como paga,

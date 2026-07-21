@@ -461,14 +461,17 @@ it('mostra a conta fixa UMA única vez no mês, com status atraso (R2)', functio
         ->and($r->totalExibidoCents)->toBe(5590);
 });
 
-it('mostra a ocorrência já paga com selo pago e sem alvo de pagamento', function () {
+it('mostra a ocorrência já paga com selo pago e sem "marcar pago"', function () {
+    // O id NÃO some ao pagar (mudança de 2026-07-21): ele é o alvo do "desmarcar".
+    // Quem indica que o botão de pagar não cabe mais é a flag `pagavel`.
     $user = User::factory()->create();
-    ocorrenciaExtrato($user, 5590, '2026-06-10', 'Netflix', status: StatusPagamento::PAGO);
+    $oc = ocorrenciaExtrato($user, 5590, '2026-06-10', 'Netflix', status: StatusPagamento::PAGO);
 
     $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato()), 'Netflix');
 
     expect($item['status'])->toBe('pago')
-        ->and($item['ocorrenciaId'])->toBeNull();
+        ->and($item['pagavel'])->toBeFalse()
+        ->and(OpaqueId::decode($item['ocorrenciaId']))->toBe($oc->id);
 });
 
 it('não mostra a ocorrência cancelada (não é cobrança, §4.4)', function () {
@@ -500,4 +503,153 @@ it('exclui a ocorrência fora de cartão ao filtrar por um cartão', function ()
     $r = app(ConsultarLancamentos::class)->para($user->id, '2026-06', hojeExtrato(), cartaoId: $cartao->id);
 
     expect(itemDoExtrato($r, 'Netflix'))->toBeNull();
+});
+
+/*
+ * ── Alvos de ação por linha (decisão do usuário 2026-07-21) ────────────────────────────
+ *
+ * Toda linha do extrato passa a carregar o alvo das DUAS ações da tela — "marcar pago /
+ * desmarcar" e "editar" —, em vez de só uma. O domínio devolve id OPACO + flags; quem
+ * decide qual botão desenhar é a borda. Cartão nunca é pagável na linha: a fatura é quem
+ * quita (§4.3 / D3).
+ */
+
+it('expõe a parcela fora de cartão como pagável, com id opaco', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-15', 'America/Sao_Paulo');
+    $tx = Transaction::factory()->for($user)->create([
+        'descricao' => 'Internet',
+        'valor_total_cents' => 12000,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'card_id' => null,
+    ]);
+    $parcela = Installment::factory()->for($tx, 'transaction')->create([
+        'numero' => 1, 'total' => 1, 'vencimento' => '2026-06-20',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+    ]);
+
+    $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', $hoje), 'Internet');
+
+    expect($item['pagavel'])->toBeTrue()
+        ->and($item['pago'])->toBeFalse()
+        ->and(OpaqueId::decode($item['parcelaId']))->toBe($parcela->id);
+});
+
+it('marca a parcela já paga como pagavel=false e pago=true (alvo do desmarcar)', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
+    $tx = Transaction::factory()->for($user)->create([
+        'descricao' => 'Internet',
+        'valor_total_cents' => 12000,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'card_id' => null,
+    ]);
+    $parcela = Installment::factory()->for($tx, 'transaction')->create([
+        'numero' => 1, 'total' => 1, 'vencimento' => '2026-06-20',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::PAGO),
+        'data_pagamento' => '2026-06-20',
+    ]);
+
+    $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', $hoje), 'Internet');
+
+    // Já paga: some o "marcar pago", mas o id continua — é o alvo do "desmarcar".
+    expect($item['pagavel'])->toBeFalse()
+        ->and($item['pago'])->toBeTrue()
+        ->and(OpaqueId::decode($item['parcelaId']))->toBe($parcela->id);
+});
+
+it('não expõe alvo de pagamento em parcela de cartão (a fatura é que quita)', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-15', 'America/Sao_Paulo');
+    $card = Card::factory()->for($user)->create(['dia_vencimento' => 20]);
+    $tx = Transaction::factory()->for($user)->create([
+        'descricao' => 'Mercado',
+        'valor_total_cents' => 12000,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::CREDITO),
+        'card_id' => $card->id,
+    ]);
+    Installment::factory()->for($tx, 'transaction')->create([
+        'numero' => 1, 'total' => 1, 'vencimento' => '2026-06-20',
+        'status_id' => StatusPagamento::idFor(StatusPagamento::ABERTO),
+    ]);
+
+    $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', $hoje), 'Mercado');
+
+    expect($item['pagavel'])->toBeFalse()
+        ->and($item['parcelaId'])->toBeNull();
+});
+
+it('mantém o id da ocorrência PAGA para permitir desmarcar', function () {
+    // Antes o id era zerado quando a ocorrência não era pagável, o que tornava
+    // impossível desfazer um clique errado a partir do extrato.
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
+    $oc = ocorrenciaExtrato($user, 5000, '2026-06-10', 'Netflix', null, StatusPagamento::PAGO);
+
+    $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', $hoje), 'Netflix');
+
+    expect($item['pago'])->toBeTrue()
+        ->and($item['pagavel'])->toBeFalse()
+        ->and(OpaqueId::decode($item['ocorrenciaId']))->toBe($oc->id);
+});
+
+it('expõe a ocorrência em aberto como pagável e editável', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
+    $oc = ocorrenciaExtrato($user, 5000, '2026-06-10', 'Netflix');
+
+    $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-06', $hoje), 'Netflix');
+
+    expect($item['pagavel'])->toBeTrue()
+        ->and($item['pago'])->toBeFalse()
+        ->and($item['editavel'])->toBeTrue()
+        ->and(OpaqueId::decode($item['ocorrenciaId']))->toBe($oc->id);
+});
+
+it('expõe na PREVISTA o alvo possível: o molde + a competência da linha', function () {
+    // A projeção não existe no banco, então não há id de ocorrência — o alvo é o MOLDE mais a
+    // competência, o par que o domínio materializa antes de pagar (spec 13 D5).
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
+    $molde = Recurrence::factory()->for($user)->create([
+        'descricao' => 'Spotify',
+        'valor_cents' => 2190,
+        'dia' => 10,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::PIX),
+        'status' => Recurrence::STATUS_ATIVO,
+        'proxima_em' => '2026-07-01',
+    ]);
+
+    $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-07', $hoje), 'Spotify');
+
+    expect($item['prevista'])->toBeTrue()
+        ->and($item['pagavel'])->toBeTrue()
+        ->and($item['competencia'])->toBe('2026-07')
+        ->and(OpaqueId::decode($item['recorrenciaId']))->toBe($molde->id)
+        ->and($item['ocorrenciaId'])->toBeNull()
+        ->and($item['parcelaId'])->toBeNull()
+        // Não existe no banco: nada a desmarcar nem a editar "só este mês".
+        ->and($item['pago'])->toBeFalse()
+        ->and($item['editavel'])->toBeFalse();
+});
+
+it('não expõe alvo de pagamento na PREVISTA em cartão (a fatura é que quita)', function () {
+    $user = User::factory()->create();
+    $hoje = CarbonImmutable::parse('2026-06-25', 'America/Sao_Paulo');
+    $card = Card::factory()->for($user)->create(['dia_fechamento' => 28, 'dia_vencimento' => 10]);
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Streaming',
+        'valor_cents' => 2190,
+        'dia' => 1,
+        'card_id' => $card->id,
+        'payment_method_id' => PaymentMethod::idFor(PaymentMethod::CREDITO),
+        'status' => Recurrence::STATUS_ATIVO,
+        'proxima_em' => '2026-07-01',
+    ]);
+
+    $item = itemDoExtrato(app(ConsultarLancamentos::class)->para($user->id, '2026-07', $hoje), 'Streaming');
+
+    expect($item['prevista'])->toBeTrue()
+        ->and($item['pagavel'])->toBeFalse()
+        ->and($item['recorrenciaId'])->toBeNull();
 });

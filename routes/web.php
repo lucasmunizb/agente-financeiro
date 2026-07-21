@@ -85,10 +85,28 @@ Route::middleware(['auth', ExigeConsentimentoLgpd::class])->group(function () {
     // sem tocar nas irmãs. {parcela} opaco; escopo por usuário no domínio.
     Route::post('/lancamentos/parcela/{parcela}/pagar', [LancamentoController::class, 'pagarParcela'])->name('lancamentos.parcela.pagar');
 
+    // Desfazer a marcação de pagamento da parcela (decisão do usuário 2026-07-21): o clique
+    // errado precisa ter conserto pela interface — sem isso o valor fica errado no Disponível
+    // do mês. Devolve a parcela ao status derivado da data (ReverterPagamentoParcela); não é
+    // estorno do gasto. {parcela} opaco; escopo por usuário no domínio.
+    Route::post('/lancamentos/parcela/{parcela}/desmarcar', [LancamentoController::class, 'desmarcarParcela'])->name('lancamentos.parcela.desmarcar');
+
     // Marcar como paga uma OCORRÊNCIA de recorrência (spec 12): muda o status da própria
     // ocorrência (PagarOcorrencia) — não materializa lançamento algum. Só fora de cartão
     // (cartão liquida sozinho, D3). Idempotente. {ocorrencia} opaco; escopo no domínio.
     Route::post('/lancamentos/recorrencia/{ocorrencia}/pagar', [LancamentoController::class, 'pagarRecorrencia'])->name('lancamentos.recorrencia.pagar');
+
+    // Marcar como paga a conta fixa ainda PREVISTA (decisão do usuário 2026-07-21): a linha do
+    // quadro/extrato é projeção do molde e não tem ocorrência no banco. O alvo é o MOLDE
+    // ({recorrencia} opaco) + a competência que a linha representa, no corpo do POST: o domínio
+    // materializa aquela competência (MaterializarOcorrencia) e paga em seguida. Idempotente;
+    // só fora de cartão (D3); escopo por usuário no domínio.
+    Route::post('/lancamentos/recorrencia-prevista/{recorrencia}/pagar', [LancamentoController::class, 'pagarRecorrenciaPrevista'])->name('lancamentos.recorrencia-prevista.pagar');
+
+    // Desfazer a marcação da ocorrência (par do POST acima): volta a 'aberto' e limpa a data
+    // de pagamento (ReverterPagamentoOcorrencia). Idempotente; só fora de cartão — a cobrança
+    // em cartão liquida sozinha (D3) e o agendador a marcaria paga de novo.
+    Route::post('/lancamentos/recorrencia/{ocorrencia}/desmarcar', [LancamentoController::class, 'desmarcarRecorrencia'])->name('lancamentos.recorrencia.desmarcar');
 
     // Cancelar "esta e as próximas" (FE §7.8): marca o lançamento e as parcelas ainda não
     // finalizadas como 'cancelado', preservando as já pagas (CancelarGastoManual). Mantém a
@@ -149,6 +167,13 @@ Route::middleware(['auth', ExigeConsentimentoLgpd::class])->group(function () {
     // (CancelarRecorrencia); {recorrencia} opaco; escopo por usuário no domínio (404 alheio).
     Route::get('/recorrencias', [RecorrenciaController::class, 'index'])->name('recorrencias');
     Route::post('/recorrencias/{recorrencia}/cancelar', [RecorrenciaController::class, 'cancelar'])->name('recorrencias.cancelar');
+
+    // Editar UMA ocorrência — o escopo "só este mês" (spec 12 / EditarOcorrencia, que até
+    // 2026-07-21 não tinha rota alguma que chegasse nele). Dois passos (regra 7): a prévia
+    // mostra o que seria salvo sem gravar; o PUT grava. Não toca no molde da recorrência.
+    // {ocorrencia} opaco; escopo por usuário no controller (404 para item alheio).
+    Route::post('/recorrencias/ocorrencia/{ocorrencia}/previa', [RecorrenciaController::class, 'previaOcorrencia'])->name('recorrencias.ocorrencia.previa');
+    Route::put('/recorrencias/ocorrencia/{ocorrencia}', [RecorrenciaController::class, 'atualizarOcorrencia'])->name('recorrencias.ocorrencia.update');
 
     // Chat financeiro (spec §7.14). Reusa o motor do Telegram (ResponderConsulta):
     // index devolve o histórico do próprio usuário; store envia a pergunta (ou um PDF,

@@ -36,6 +36,29 @@ soma das parcelas = total, sem drift). _(Decisão do spec 01/F1 — ver doc 04 �
 - **Pagamento antecipado — após o fechamento:** vale para o **próximo mês**; registra como pagamento parcial com o dia do vencimento do cartão.
 - **Estornos, reembolsos e cancelamentos:** sempre registrados e separados por **FK** para a tabela `status_pagamento`.
 
+### "Marcar como pago" só existe FORA de cartão
+
+Regra transversal, válida em **toda superfície** (web, bot, API) e para **os dois tipos de
+conta** — parcela de lançamento e **ocorrência de recorrência**:
+
+| Conta | Como é quitada |
+|---|---|
+| Parcela / ocorrência **fora de cartão** (PIX, débito, dinheiro, boleto) | **Ação do usuário**: "marcar como paga" (e o par "desmarcar", que devolve o status **derivado da data**). |
+| Cobrança **em cartão** — compra parcelada **ou recorrência** | **Nunca na linha.** Quem quita é o pagamento da **fatura** (§4.2/§4.3). A recorrência em cartão ainda **liquida sozinha** pela `data_cobranca` (spec 12, D3). |
+
+Duas razões, e cada uma bastaria:
+
+1. **Dupla contagem.** A compra/cobrança individual já entra no total da fatura; marcá-la paga
+   na linha pagaria a mesma conta duas vezes.
+2. **Vaivém com o agendador.** Na recorrência em cartão, `LiquidarOcorrenciasDeCartao` marca a
+   ocorrência `pago` assim que `data_cobranca <= hoje`; qualquer marcação/desmarcação manual
+   seria desfeita na execução seguinte.
+
+Consequência de interface: a linha de cartão **não exibe** o botão (afordância que não leva a
+lugar nenhum é pior que sua ausência), e a borda **recusa** a operação mesmo se a requisição for
+forjada. Isso vale inclusive para a conta fixa **prevista** — materializar a ocorrência sob
+demanda para poder pagá-la é recusado quando o molde é de cartão.
+
 ---
 
 ## 4.4 · Status de pagamento
@@ -64,6 +87,30 @@ O componente de cartão é atribuído pelo **mês de vencimento** de cada gasto 
 - **Cartão ainda em aberto (não fechado):** se o vencimento da fatura aberta cai no **mês corrente**, os gastos **já entram** no cálculo — é a visão antecipada de "quanto ainda tem para gastar" antes mesmo do fechamento.
 - **Gastos que caem na fatura de um mês futuro** (ex.: compras feitas após o fechamento) **não entram** no mês corrente; entram no **mês do seu vencimento** e aparecem como **"gastos previstos do próximo mês"** (previsão/alerta). Cada gasto pertence a **um único** mês de vencimento — nunca é contado duas vezes.
 - **No dia do vencimento**, registra-se o **pagamento do boleto** da fatura fechada.
+
+### Mês de caixa: o que já foi pago pertence ao mês do pagamento
+
+> **Decisão do usuário em 2026-07-21.** Fora de cartão, o mês de um gasto **pago** é o mês em que
+> o **dinheiro saiu** (`data_pagamento`), não o do vencimento. Enquanto a conta **não** foi paga,
+> vale o vencimento (ali ela é previsão) — e **cartão nunca migra**: o mês continua sendo o da
+> fatura (§4.2/§4.3), porque a compra não se quita sozinha e a assinatura recorrente é liquidada
+> automaticamente na data da cobrança.
+
+| Situação | Mês em que pesa |
+|---|---|
+| Parcela/conta fixa **fora de cartão**, **paga** | mês da `data_pagamento` |
+| Parcela/conta fixa **fora de cartão**, em aberto | mês do vencimento (competência) |
+| Qualquer item **em cartão** | mês da **fatura** — sempre |
+
+Consequências assumidas: pagar adiantado a conta do mês que vem **antecipa** o peso para o mês
+corrente (e o mês seguinte deixa de contá-la); pagar em atraso **tira** o valor do mês vencido e
+o joga no mês do pagamento, então o retrato de um mês fechado muda quando a dívida dele é quitada
+depois. A regra vale para **números e listagem** juntos: o extrato mostra a linha no mesmo mês em
+que ela entra no total — nunca um sem o outro.
+
+Implementação única: `App\Domain\Shared\MesDeCaixa` (expressões de recorte usadas por
+`ConsumoDoMes`, `ConsultarGastos`, `ConsultarOcorrencias` e `ConsultarLancamentos`). Os quadros
+"a vencer"/"em atraso" não mudam: eles só listam o que **falta** pagar.
 
 Ressalvas:
 

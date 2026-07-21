@@ -57,11 +57,14 @@ it('navega para o mês pedido e mostra os números daquele mês', function () {
     competenciaGasto($user, 50000, '2026-05-12');   // maio → R$ 500,00
     competenciaGasto($user, 120000, '2026-06-20');  // junho → R$ 1.200,00
 
+    // Junho só aparece na visão de maio pelo card de previsão, rotulado como tal — nunca
+    // somado ao retrato do mês navegado.
     $this->actingAs($user)->get('/?mes=2026-05')
         ->assertOk()
         ->assertSee('Maio de 2026')
-        ->assertSee('R$ 500,00')        // gastos de maio
-        ->assertDontSee('R$ 1.200,00'); // junho não vaza para a visão de maio
+        ->assertSee('R$ 500,00')            // gastos de maio
+        ->assertSee('Previsto para junho')
+        ->assertSee('R$ 1.200,00');
 });
 
 it('cai no mês atual quando ?mes é inválido/forjado', function () {
@@ -89,9 +92,11 @@ it('no mês atual mostra os blocos relativos ao hoje', function () {
     $user = User::factory()->create();
     competenciaGasto($user, 30000, '2026-06-18'); // futura dentro de 7 dias
 
+    // O quadro "Contas" (a vencer / em atraso) é relativo ao hoje real: só existe no mês atual.
     $this->actingAs($user)->get('/')
         ->assertOk()
-        ->assertSee('A vencer (7 dias)');
+        ->assertSee('A vencer')
+        ->assertSee('vence 18 de junho');
 });
 
 it('oferece navegação para o mês anterior e o seguinte', function () {

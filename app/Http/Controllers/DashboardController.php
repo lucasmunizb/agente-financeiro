@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Dashboard\AgruparContasDeCartao;
 use App\Domain\Dashboard\DiasDeVencimentoNoMes;
 use App\Domain\Dashboard\ResumoDoMes;
 use App\Domain\Dashboard\ResumoDoMesResultado;
@@ -11,6 +12,8 @@ use App\Domain\Gastos\ConsultarGastos;
 use App\Domain\Shared\Money;
 use App\Models\Card;
 use App\Models\Category;
+use App\Models\Recurrence;
+use App\Models\RecurrenceOccurrence;
 use App\Models\Transaction;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -47,8 +50,14 @@ class DashboardController extends Controller
             ? $request->query('estado')
             : null;
 
-        $temTransacoes = Transaction::where('user_id', $userId)->exists();
-        $estado = $override ?? ($temTransacoes ? 'pronto' : 'vazio');
+        // "Vazio" é a conta que ainda não tem NADA — não a que só tem conta fixa. Desde a
+        // spec 12 a recorrência não escreve em `transactions`, então olhar só essa tabela
+        // escondia o dashboard inteiro de quem cadastrou apenas contas fixas (e com ele o
+        // quadro onde essas contas são pagas).
+        $temDados = Transaction::where('user_id', $userId)->exists()
+            || Recurrence::where('user_id', $userId)->where('status', Recurrence::STATUS_ATIVO)->exists()
+            || RecurrenceOccurrence::where('user_id', $userId)->exists();
+        $estado = $override ?? ($temDados ? 'pronto' : 'vazio');
 
         $hoje = CarbonImmutable::now('America/Sao_Paulo');
         $mesAlvo = $this->mesAlvo($request, $hoje);
@@ -106,11 +115,20 @@ class DashboardController extends Controller
     {
         // $hoje é a âncora (mês navegado); $agora é o "hoje" real. Em mês futuro eles diferem e
         // a projeção de recorrências previstas (spec 10b) entra nas próximas contas + disponível.
-        $resumo = $resumoDoMes->para($userId, $hoje, 30, $agora);
+        // Janela do quadro "Contas": 15 dias a partir de hoje no mês corrente — o horizonte de
+        // "o que preciso pagar agora". Em mês futuro a âncora é o dia 1º e a janela cobre o mês
+        // inteiro (a leitura ali é "como fica o mês", não "os próximos dias").
+        $janela = $ehMesAtual ? 15 : 30;
+        $resumo = $resumoDoMes->para($userId, $hoje, $janela, $agora);
         $mes = $resumo->mes;
 
         $disponivelCents = $resumo->disponivelCents();
         $totalGastosCents = $resumo->gastos->totalCents;
+
+        // Linhas já agrupadas por fatura: a contagem exibida ("4 contas") tem de bater com o
+        // que a lista mostra, então sai daqui — não da contagem crua do domínio.
+        $contasVencidas = $this->contasVencidas($resumo);
+        $proximasContas = $this->proximasContas($resumo, $hoje);
 
         return [
             'mesLabel' => $this->rotuloMes($hoje),
@@ -133,22 +151,22 @@ class DashboardController extends Controller
             'gastos' => Money::fromCents($totalGastosCents)->formatBRL(),
             'comparativo' => $this->comparativo($userId, $mes, $hoje, $totalGastosCents, $agora),
 
-            'aVencer7' => $this->aVencer7Dias($resumo, $hoje),
+            'previsto' => $this->previstoProximoMes($userId, $hoje, $agora),
 
             'fatura' => $this->faturaDestaque($resumo, $hoje, $userId),
 
             'donut' => $this->donut($resumo->gastos->porCategoria, $totalGastosCents),
 
             // Quadro de contas dividido (spec 06b): "em atraso" (já venceu) + "a vencer".
-            'contasVencidas' => $this->contasVencidas($resumo),
+            'contasVencidas' => $contasVencidas,
             'emAtraso' => [
                 'valor' => Money::fromCents($resumo->totalContasVencidasCents())->formatBRL(),
-                'contas' => count($resumo->contasVencidas->contas),
+                'contas' => count($contasVencidas),
             ],
-            'proximasContas' => $this->proximasContas($resumo, $hoje),
+            'proximasContas' => $proximasContas,
             'aVencer' => [
                 'valor' => Money::fromCents($resumo->totalProximasContasCents())->formatBRL(),
-                'contas' => count($resumo->proximasContas->contas),
+                'contas' => count($proximasContas),
             ],
         ];
     }
@@ -201,22 +219,26 @@ class DashboardController extends Controller
     }
 
     /**
-     * "A vencer (7 dias)": subconjunto das próximas contas com vencimento até hoje+7.
+     * "Previsto para <mês seguinte>": o que JÁ está registrado para a competência seguinte à
+     * navegada — parcelas de cartão cuja fatura vence lá, lançamentos fora de cartão com
+     * vencimento lá e as contas fixas (ocorrência real ou projeção do molde).
      *
-     * @return array{valor: string, contas: int}
+     * É a MESMA consulta do card "Gastos do mês" ({@see ConsultarGastos}) apontada para o mês
+     * seguinte: o número vem pronto e conferido do domínio, sem soma na borda (regra 4). Por
+     * isso segue a navegação — em julho o card mostra agosto — e não só o mês corrente.
+     *
+     * @return array{label: string, valor: string}
      */
-    private function aVencer7Dias(ResumoDoMesResultado $resumo, CarbonImmutable $hoje): array
+    private function previstoProximoMes(int $userId, CarbonImmutable $ancora, CarbonImmutable $agora): array
     {
-        $limite = $hoje->startOfDay()->addDays(7)->toDateString();
-
-        $noPrazo = array_filter(
-            $resumo->proximasContas->contas,
-            fn (array $conta): bool => $conta['vencimento'] <= $limite,
-        );
+        $proximo = $ancora->addMonthNoOverflow();
+        $totalCents = app(ConsultarGastos::class)
+            ->para($userId, $proximo->format('Y-m'), agora: $agora)
+            ->totalCents;
 
         return [
-            'valor' => Money::fromCents((int) array_sum(array_column($noPrazo, 'cents')))->formatBRL(),
-            'contas' => count($noPrazo),
+            'label' => 'Previsto para '.self::MESES[$proximo->month],
+            'valor' => Money::fromCents($totalCents)->formatBRL(),
         ];
     }
 
@@ -285,50 +307,113 @@ class DashboardController extends Controller
     }
 
     /**
-     * Linhas de "Próximas contas" (até 5), já formatadas. Urgência (≤7 dias) muda o tom.
-     * A flag `prevista` (recorrência projetada na visão de mês futuro, spec 10b) é propagada
-     * como dado — o selo/"~" é etapa de frontend (regra 3).
+     * Linhas de "Próximas contas" — TODAS as da janela (a tela rola; cortar em 5 escondia
+     * conta a pagar). Urgência (≤7 dias) muda o tom. As cobranças de cada cartão chegam já
+     * condensadas numa linha de fatura pelo {@see AgruparContasDeCartao} (a soma é do domínio,
+     * regra 4). A flag `prevista` (recorrência projetada, spec 10b) é propagada como dado —
+     * o selo é etapa de frontend (regra 3).
      *
-     * @return list<array{title: string, due: string, value: string, iconTone: string, prevista: bool, recorrente: bool}>
+     * @return list<array{title: string, due: string, value: string, iconTone: string, icon: string, prevista: bool, recorrente: bool, itens: int, cartao: bool}>
      */
     private function proximasContas(ResumoDoMesResultado $resumo, CarbonImmutable $hoje): array
     {
         $limite7 = $hoje->startOfDay()->addDays(7)->toDateString();
 
         return array_map(function (array $conta) use ($limite7): array {
-            $venc = CarbonImmutable::parse($conta['vencimento'], 'America/Sao_Paulo');
             $prevista = $conta['prevista'] ?? false;
 
-            return [
-                'title' => $conta['descricao'],
-                'due' => 'vence '.$this->dataExtenso($venc),
-                'value' => Money::fromCents($conta['cents'])->formatBRL(),
+            return $this->linhaDeConta($conta, 'vence ') + [
                 'iconTone' => $conta['vencimento'] <= $limite7 ? 'ocre' : 'primary',
                 'prevista' => $prevista,
                 // Prevista é sempre recorrência (projeção do molde); a real herda a flag.
                 'recorrente' => ($conta['recorrente'] ?? false) || $prevista,
             ];
-        }, array_slice($resumo->proximasContas->contas, 0, 5));
+        }, app(AgruparContasDeCartao::class)($resumo->proximasContas->contas));
     }
 
     /**
-     * Linhas de "Contas em atraso" (até 5), já formatadas — o que venceu e segue em
-     * aberto (spec 06b). Tom `error` (argila) em todas: atraso é o estado de alerta.
+     * Linhas de "Contas em atraso" — TODAS, já formatadas: o que venceu e segue em aberto
+     * (spec 06b). Tom `error` (argila) em todas: atraso é o estado de alerta. Fatura vencida
+     * também entra condensada numa linha só.
      *
-     * @return list<array{title: string, due: string, value: string, iconTone: string, recorrente: bool}>
+     * @return list<array{title: string, due: string, value: string, iconTone: string, icon: string, recorrente: bool, itens: int, cartao: bool}>
      */
     private function contasVencidas(ResumoDoMesResultado $resumo): array
     {
-        return array_map(function (array $conta): array {
-            $venc = CarbonImmutable::parse($conta['vencimento'], 'America/Sao_Paulo');
+        return array_map(fn (array $conta): array => $this->linhaDeConta($conta, 'venceu ') + [
+            'iconTone' => 'error',
+            'recorrente' => $conta['recorrente'] ?? false,
+        ], app(AgruparContasDeCartao::class)($resumo->contasVencidas->contas));
+    }
 
-            return [
-                'title' => $conta['descricao'],
-                'due' => 'venceu '.$this->dataExtenso($venc),
-                'value' => Money::fromCents($conta['cents'])->formatBRL(),
-                'iconTone' => 'error',
-                'recorrente' => $conta['recorrente'] ?? false,
-            ];
-        }, array_slice($resumo->contasVencidas->contas, 0, 5));
+    /**
+     * Parte comum das linhas dos dois quadros: rótulo, data por extenso e valor em pt-BR
+     * (regra 5 — formatação só na borda). A linha de cartão é a FATURA, não a compra: ganha o
+     * nome do cartão, o ícone de cartão e a quantidade de cobranças somadas.
+     *
+     * @param  array<string, mixed>  $conta
+     * @return array{title: string, due: string, value: string, icon: string, itens: int, cartao: bool}
+     */
+    private function linhaDeConta(array $conta, string $prefixo): array
+    {
+        $venc = CarbonImmutable::parse($conta['vencimento'], 'America/Sao_Paulo');
+        $ehCartao = $conta['cartao'] ?? false;
+
+        return [
+            'title' => $ehCartao ? 'Fatura '.$conta['descricao'] : $conta['descricao'],
+            'due' => $prefixo.$this->dataExtenso($venc),
+            'value' => Money::fromCents($conta['cents'])->formatBRL(),
+            'icon' => $ehCartao ? 'credit-card' : 'receipt',
+            'itens' => $conta['itens'] ?? 1,
+            'cartao' => $ehCartao,
+            // Ações da linha (decisão do usuário 2026-07-21): o quadro deixou de ser só
+            // leitura. Os quadros mostram apenas o que FALTA pagar, então aqui só existe
+            // "marcar pago" — nunca "desmarcar". Fatura de cartão não tem alvo (§4.3) e o
+            // agrupador já zera os ids da linha condensada.
+            'pagarUrl' => $this->alvoDePagamento($conta),
+            'editarUrl' => ($conta['transactionId'] ?? null) !== null
+                ? route('lancamentos.show', $conta['transactionId']).'?editar=1'
+                : null,
+            'hojeIso' => CarbonImmutable::now('America/Sao_Paulo')->toDateString(),
+            // Parcela de lançamento guarda a DATA do pagamento; ocorrência de recorrência
+            // registra o instante da confirmação e não pede data.
+            'exigeDataPagamento' => ($conta['parcelaId'] ?? null) !== null,
+            // Só a linha prevista precisa dizer QUAL competência está sendo quitada — nas
+            // demais o próprio id da rota já identifica a conta.
+            'competencia' => ($conta['recorrenciaId'] ?? null) !== null ? ($conta['competencia'] ?? null) : null,
+        ];
+    }
+
+    /**
+     * URL de "marcar como pago" da linha do quadro, ou null quando ela não é pagável.
+     *
+     * A linha é OU uma parcela de lançamento OU uma ocorrência de recorrência: a rota sai do
+     * id que veio preenchido (sempre opaco). Fatura condensada e cartão caem fora por não
+     * terem id — quem quita cartão é o pagamento da fatura.
+     *
+     * @param  array<string, mixed>  $conta
+     */
+    private function alvoDePagamento(array $conta): ?string
+    {
+        if (($conta['pagavel'] ?? false) !== true) {
+            return null;
+        }
+
+        if (($conta['ocorrenciaId'] ?? null) !== null) {
+            return route('lancamentos.recorrencia.pagar', $conta['ocorrenciaId']);
+        }
+
+        // Conta fixa ainda PREVISTA: não há ocorrência no banco, então o alvo é o molde — a
+        // competência vai no corpo do POST (campo oculto da linha) e o domínio materializa
+        // aquela competência antes de pagar.
+        if (($conta['recorrenciaId'] ?? null) !== null) {
+            return route('lancamentos.recorrencia-prevista.pagar', $conta['recorrenciaId']);
+        }
+
+        if (($conta['parcelaId'] ?? null) !== null) {
+            return route('lancamentos.parcela.pagar', $conta['parcelaId']);
+        }
+
+        return null;
     }
 }

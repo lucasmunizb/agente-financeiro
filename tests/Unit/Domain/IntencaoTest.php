@@ -19,5 +19,5 @@ it('converte texto em intenção, caindo em DESCONHECIDO no que não reconhece',
 
 it('lista os valores para alimentar o schema do classificador', function () {
     expect(Intencao::valores())
-        ->toEqualCanonicalizing(['registrar', 'consultar', 'editar', 'cancelar', 'importar', 'desconhecido']);
+        ->toEqualCanonicalizing(['registrar', 'pagar', 'consultar', 'editar', 'cancelar', 'importar', 'desconhecido']);
 });

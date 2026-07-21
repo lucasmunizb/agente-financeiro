@@ -1480,6 +1480,16 @@ Curtas, sem botões (salvo confirmação), pt-BR, mesma voz do §4.7. *Copy* de 
   aparecem **só no mês atual**; em meses históricos o dashboard é o retrato fechado do mês (disponível,
   gastos, comparativo vs. mês anterior, fatura, donut) e o donut ocupa a largura do quadro de contas.
   Cobertura nova: `tests/Feature/Dashboard/DashboardCompetenciaTest.php`.
+- **Quadro de contas — ações na linha (spec 13, F4): 🟢 implementado.** `x-dashboard.bill-row`
+  deixou de ser só leitura: a linha vira `<details>` e revela, **no fluxo da lista**, "Marcar
+  como paga" (com prévia do valor — regra 7) e "Editar". **Quem NÃO tem o botão, por regra de
+  negócio e não por acaso:** (a) a linha condensada de **fatura de cartão** e (b) **qualquer
+  cobrança em cartão — inclusive recorrência**: cartão se quita pela fatura (doc 03 §4.3) e a
+  recorrência em cartão liquida sozinha (spec 12, D3). A tela apenas **não oferece** a ação
+  quando o backend não manda alvo (`pagarUrl = null`); a barreira de verdade é o domínio
+  recusar. Nunca reintroduza o botão nessas linhas "por consistência visual" — ele pagaria a
+  mesma conta duas vezes. Cobertura:
+  `tests/Feature/Dashboard/DashboardQuadroDeContasTest.php`.
 - **Registrar gasto — modal rápido (§7.7b): 🟢 implementado em Blade (dados fake).**
   Componente `x-modal.registrar-gasto` (`resources/views/components/modal/registrar-gasto.blade.php`),
   fiel à tela do Stitch "Registrar gasto — Crédito": mesmos estilos de campo (`.input-field`)

@@ -19,7 +19,7 @@
      não é cálculo de dinheiro, então não há passo de prévia; a validação é do Form Request.
      Após erro, o servidor marca data-open e o categorias.js reabre o diálogo certo. --}}
 <dialog id="{{ $id }}" class="modal-dialog" @if ($open) data-open @endif aria-labelledby="{{ $id }}-title">
-    <div class="modal-card-enter notebook-card flex max-h-[92vh] w-full flex-col overflow-hidden rounded-card">
+    <div class="modal-card-enter notebook-card flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-card">
         <header class="flex items-center justify-between border-b border-linha px-gutter py-4">
             <h2 id="{{ $id }}-title" class="font-headline-md text-headline-md text-on-surface">{{ $titulo }}</h2>
             <button type="button" data-cat-close aria-label="Fechar"

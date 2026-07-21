@@ -109,6 +109,28 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
 
 ---
 
+## Bloco 13 — Quitar conta em qualquer superfície ✅
+
+> Spec: [`docs/specs/13-quitar-conta.md`](specs/13-quitar-conta.md).
+> Marcar pago existia, mas nunca no lugar em que o usuário percebe que precisa fazê-lo — e não
+> tinha volta. Agora extrato, dashboard e bot têm a ação; o pagamento é reversível.
+
+- [x] Testes + implementação: `ReverterPagamentoParcela` / `ReverterPagamentoOcorrencia`
+      (status de volta derivado da data; corrige a agregação "zero pagas → pago_parcial").
+- [x] Testes + implementação: rota de edição da ocorrência (`EditarOcorrencia` estava órfão).
+- [x] Testes + implementação: alvos de ação no extrato e nos quadros do dashboard, sem vazar id
+      para o payload da IA.
+- [x] Testes + implementação: intenção `pagar` no bot (`ResolverContaAPagar` determinístico;
+      a IA extrai só o termo).
+- [x] **(Etapa separada)** Dois botões na linha do extrato, ações na linha do dashboard,
+      redação do bot.
+- [ ] **Pendente:** golden set do classificador para a fronteira `registrar` × `pagar`
+      ("paguei 40 no mercado" vs "paguei a luz") — hoje separados só pelo prompt, e os fakes da
+      SDK não exercitam o modelo real.
+- [ ] **Bloqueado pelo Bloco 9:** quitar a **fatura do cartão** inteira (hoje a fatura é derivada).
+
+---
+
 ## Pós-MVP · Importação de PDF (1ª etapa) — ex-Bloco 7
 
 > Spec: [`docs/specs/11-importacao-pdf.md`](specs/11-importacao-pdf.md).

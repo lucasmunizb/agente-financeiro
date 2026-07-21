@@ -36,12 +36,16 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 | 04c | [Rotação de provedores de IA (fila LRU + cooldown)](04c-rotacao-provedores-ia.md) | ✅ | 04 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
 | 05 | [Chat financeiro (tools + guard)](05-chat-financeiro.md) | ✅ | 01, 03, 04 | [`02-governanca-ia.md`](../02-governanca-ia.md) |
 | 06 | [Dashboard (agregações do mês)](06-dashboard.md) | ✅ | 02, 03 | [`05-arquitetura.md`](../05-arquitetura.md) |
+| 06b | [Contas em atraso (partição do quadro do dashboard)](06b-contas-em-atraso.md) | ✅ | 06 | [`03-regras-financeiras.md`](../03-regras-financeiras.md) §4.4 |
 | **FE** | [**Frontend (Stitch) — todas as telas**](FE-frontend-stitch.md) | ⬜ | 02–06 | [`05-arquitetura.md`](../05-arquitetura.md) · [`06-telegram.md`](../06-telegram.md) |
 | 08 | [Segurança e LGPD — portão de fechamento](08-seguranca-lgpd.md) | ⬜ | todas | [`09-nfr-seguranca-lgpd.md`](../09-nfr-seguranca-lgpd.md) |
 | 09 | [Faturas materializadas (ciclo de fatura)](09-faturas-materializadas.md) | 🟠 | 01, 02 | [`04-modelo-dados.md`](../04-modelo-dados.md) (`invoices`) |
 | 10 | [Recorrência mensal (assinaturas/contas fixas)](10-recorrencia-mensal.md) | ✅ | 02, 04b | [`03-regras-financeiras.md`](../03-regras-financeiras.md) §4.6 · [`04-modelo-dados.md`](../04-modelo-dados.md) (`recurrences`) |
+| 10b | [Recorrência prevista no dashboard/extrato](10b-recorrencia-previsao-dashboard.md) | ✅ | 10 | [`03-regras-financeiras.md`](../03-regras-financeiras.md) §4.6 |
 | 10c | [Recorrência via bot/chat (extração pela IA)](10c-recorrencia-via-bot.md) | ✅ | 04, 04b, 10 | [`02-governanca-ia.md`](../02-governanca-ia.md) §3.1 |
 | 11 | [Importação de PDF (Itaú) — **1ª etapa do pós-MVP**](11-importacao-pdf.md) | 🟡 | 01 | [`07-importacao-pdf.md`](../07-importacao-pdf.md) |
+| 12 | [Recorrência como ocorrência mensal (fim da dupla contagem)](12-recorrencia-ocorrencias.md) | ✅ | 10, 10b, 10c | [`03-regras-financeiras.md`](../03-regras-financeiras.md) §4.2/§4.5/§4.6 |
+| 13 | [Quitar conta em qualquer superfície (pago · desmarcar · editar)](13-quitar-conta.md) | ✅ | 02, 06b, 12 | [`03-regras-financeiras.md`](../03-regras-financeiras.md) §4.3/§4.4 |
 
 **Legenda:** ✅ concluído · 🟡 em andamento · ⬜ planejado · 🟠 pendente (proposta a validar — não iniciar).
 
@@ -52,6 +56,11 @@ Modelo para criar/editar specs: [`_TEMPLATE.md`](_TEMPLATE.md).
 > **Spec 11 (Importação de PDF)** está **fora do MVP** — é a **1ª etapa do pós-MVP** (ordem 1
 > em [`ROADMAP-POS-MVP.md`](../ROADMAP-POS-MVP.md)). O número 11 é apenas o id do spec; a
 > ordem de execução vem do roadmap pós-MVP, não da numeração.
+
+> **Spec 13** fecha uma lacuna de **cobertura**, não de regra: marcar pago existia, mas nunca no
+> lugar em que o usuário percebe que precisa fazê-lo. Ela também torna o pagamento **reversível**
+> pela interface e leva a ação ao bot, com a IA extraindo apenas o termo da conta — valor e
+> vencimento seguem saindo do banco (regra 4).
 
 > A **fase FE** consolida **todo o frontend** adiado das etapas anteriores (regra 3) em um
 > único spec orientado ao **Stitch** — um prompt por tela + design system comum. Roda

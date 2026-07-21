@@ -7,6 +7,9 @@ namespace App\Domain\Lancamentos;
 use App\Domain\Gastos\ConsultarGastos;
 use App\Domain\Recorrencia\ConsultarOcorrencias;
 use App\Domain\Recorrencia\ProjetarRecorrencias;
+use App\Domain\Shared\MesDeCaixa;
+use App\Domain\Shared\OpaqueId;
+use App\Domain\Shared\PeriodoMensal;
 use App\Domain\Shared\SqlLike;
 use App\Models\Installment;
 use App\Models\PaymentMethod;
@@ -65,8 +68,10 @@ final class ConsultarLancamentos
         $pendenteId = StatusPagamento::idFor(StatusPagamento::PENDENTE_REVISAO);
         $busca = $busca !== null && trim($busca) !== '' ? trim($busca) : null;
 
-        $parcelas = Installment::query()
-            ->whereBetween('vencimento', [$inicio, $fim])
+        // Recorte pelo MÊS DE CAIXA (decisão do usuário 2026-07-21): a conta paga aparece no
+        // mês em que o dinheiro saiu, para o extrato bater com o total do mês. Fora disso
+        // (não paga, ou cartão) continua valendo o vencimento.
+        $parcelas = MesDeCaixa::parcelasNoMes(Installment::query(), PeriodoMensal::fromString($periodo))
             // Pendente de revisão nunca entra no extrato (ainda não confirmado — regra 7).
             ->when($pendenteId !== null, fn (Builder $q) => $q->where('status_id', '!=', $pendenteId))
             ->whereHas('transaction', function (Builder $q) use ($userId, $categoriaId, $formaId, $cartaoId, $busca) {
@@ -117,8 +122,18 @@ final class ConsultarLancamentos
             $total += $cents;
             $registros++;
 
-            $dia = $parcela->vencimento->toDateString();
-            $grupos[$dia] ??= ['data' => $parcela->vencimento->startOfDay(), 'itens' => []];
+            // O dia do extrato é o do CAIXA: uma conta paga em outro mês aparece no dia em que
+            // o dinheiro saiu — senão a linha cairia num grupo fora do mês exibido.
+            $diaDeCaixa = $parcela->data_pagamento ?? $parcela->vencimento;
+            $dia = $diaDeCaixa->toDateString();
+            $grupos[$dia] ??= ['data' => $diaDeCaixa->startOfDay(), 'itens' => []];
+            // Alvo das ações da linha (decisão do usuário 2026-07-21). Cartão fica de fora:
+            // a fatura é quem quita (§4.3), marcar a compra pagaria duas vezes. O id vai
+            // OPACO — nenhum id real em URL.
+            $ehCartao = $tx->card_id !== null;
+            $ehPago = $statusExibicao === self::STATUS_PAGO;
+            $temAlvo = ! $ehCartao && $statusExibicao !== self::STATUS_CANCELADO;
+
             $grupos[$dia]['itens'][] = [
                 'transactionId' => (int) $tx->id,
                 'descricao' => (string) $tx->descricao,
@@ -136,6 +151,17 @@ final class ConsultarLancamentos
                 'recorrente' => false,
                 'prevista' => false,
                 'ocorrenciaId' => null,
+                // Alvo de previsão não se aplica: esta linha já é real (payload homogêneo).
+                'recorrenciaId' => null,
+                'competencia' => null,
+                // Id da PARCELA — alvo tanto de "marcar pago" quanto de "desmarcar", por isso
+                // ele sobrevive ao pagamento (antes o alvo sumia e o clique errado não tinha
+                // conserto pela tela).
+                'parcelaId' => $temAlvo ? OpaqueId::encode((int) $parcela->id) : null,
+                'pagavel' => $temAlvo && ! $ehPago,
+                'pago' => $ehPago,
+                // Lançamento comum edita pelo detalhe; a linha só precisa do alvo de dinheiro.
+                'editavel' => false,
             ];
         }
 
@@ -153,8 +179,14 @@ final class ConsultarLancamentos
             $total += $cents;
             $registros++;
 
-            $dia = $venc->toDateString();
-            $grupos[$dia] ??= ['data' => $venc->startOfDay(), 'itens' => []];
+            // Mesmo critério da parcela: o dia do extrato é o do CAIXA. Em cartão a data de
+            // pagamento é a da liquidação automática (D3) e não vale — o mês é o da fatura.
+            $diaDeCaixa = ($ocorrencia['cartaoId'] ?? null) === null && ($ocorrencia['dataPagamento'] ?? null) !== null
+                ? CarbonImmutable::createFromFormat('!Y-m-d', (string) $ocorrencia['dataPagamento'], 'America/Sao_Paulo')
+                : $venc;
+
+            $dia = $diaDeCaixa->toDateString();
+            $grupos[$dia] ??= ['data' => $diaDeCaixa->startOfDay(), 'itens' => []];
             $grupos[$dia]['itens'][] = [
                 // Previsão não tem lançamento real: sem id (a linha não abre detalhe).
                 'transactionId' => null,
@@ -168,7 +200,18 @@ final class ConsultarLancamentos
                 'vencimento' => $venc,
                 'recorrente' => true,
                 'prevista' => true,
+                // Previsão não existe no banco: não há id de ocorrência — logo, nada a
+                // desmarcar nem a editar "só este mês" (editar exige a linha real).
                 'ocorrenciaId' => null,
+                'parcelaId' => null,
+                // Mas ela PODE ser paga (spec 13 D5): o alvo é o MOLDE (id opaco) mais a
+                // competência desta linha, que o domínio materializa antes de pagar. Cartão
+                // fica fora — a fatura é quem quita (§4.3/D3) —, e aí não há alvo algum.
+                'recorrenciaId' => ($ocorrencia['pagavel'] ?? false) ? $ocorrencia['recorrenciaId'] : null,
+                'competencia' => $ocorrencia['competencia'] ?? null,
+                'pagavel' => $ocorrencia['pagavel'] ?? false,
+                'pago' => false,
+                'editavel' => false,
             ];
         }
 
@@ -186,8 +229,14 @@ final class ConsultarLancamentos
             $total += $cents;
             $registros++;
 
-            $dia = $venc->toDateString();
-            $grupos[$dia] ??= ['data' => $venc->startOfDay(), 'itens' => []];
+            // Mesmo critério da parcela: o dia do extrato é o do CAIXA. Em cartão a data de
+            // pagamento é a da liquidação automática (D3) e não vale — o mês é o da fatura.
+            $diaDeCaixa = ($ocorrencia['cartaoId'] ?? null) === null && ($ocorrencia['dataPagamento'] ?? null) !== null
+                ? CarbonImmutable::createFromFormat('!Y-m-d', (string) $ocorrencia['dataPagamento'], 'America/Sao_Paulo')
+                : $venc;
+
+            $dia = $diaDeCaixa->toDateString();
+            $grupos[$dia] ??= ['data' => $diaDeCaixa->startOfDay(), 'itens' => []];
             $grupos[$dia]['itens'][] = [
                 'transactionId' => null,
                 'descricao' => (string) $ocorrencia['descricao'],
@@ -201,8 +250,17 @@ final class ConsultarLancamentos
                 'recorrente' => true,
                 // A ocorrência É real (existe no banco) — o selo "Previsto" fica só na projeção.
                 'prevista' => false,
-                // Alvo do "marcar como paga"; null quando é de cartão (liquida sozinha, D3).
-                'ocorrenciaId' => $ocorrencia['pagavel'] === true ? $ocorrencia['ocorrenciaId'] : null,
+                // Alvo das ações da linha. O id sobrevive ao pagamento — é ele que permite
+                // DESMARCAR. Some só em cartão, que liquida sozinho (D3) e não se edita aqui.
+                'ocorrenciaId' => $ocorrencia['cartaoId'] === null ? $ocorrencia['ocorrenciaId'] : null,
+                'parcelaId' => null,
+                // Já materializada: o alvo é a própria ocorrência (payload homogêneo).
+                'recorrenciaId' => null,
+                'competencia' => null,
+                'pagavel' => $ocorrencia['pagavel'] === true,
+                'pago' => $ocorrencia['status'] === self::STATUS_PAGO,
+                // Editar a ocorrência é o escopo "só este mês" (EditarOcorrencia, spec 12).
+                'editavel' => $ocorrencia['cartaoId'] === null,
             ];
         }
 

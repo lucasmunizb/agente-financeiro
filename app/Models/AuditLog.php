@@ -24,6 +24,9 @@ class AuditLog extends Model
 
     public const ACAO_PAGAR = 'pagar';
 
+    /** Estorno da MARCAÇÃO de pagamento (clique errado desfeito) — não é o estorno do gasto. */
+    public const ACAO_DESMARCAR_PAGAMENTO = 'desmarcar_pagamento';
+
     public const ACAO_EXCLUIR = 'excluir';
 
     public const ACAO_IMPORTAR = 'importar';

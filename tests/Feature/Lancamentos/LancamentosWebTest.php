@@ -81,6 +81,40 @@ it('no mês FUTURO lista as recorrências previstas com o selo "Previsto" (spec 
         ->assertSee('R$ 55,90');
 });
 
+it('oferece "marcar como paga" na recorrência PREVISTA do mês futuro (spec 13 D5)', function () {
+    $user = User::factory()->create();
+    $molde = Recurrence::factory()->for($user)->create([
+        'descricao' => 'Academia', 'valor_cents' => 12000, 'dia' => 5,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-01',
+    ]);
+
+    // A linha não tem ocorrência no banco: o alvo é o molde + a competência exibida.
+    $html = $this->actingAs($user)->get('/lancamentos?mes=2026-08')->assertOk()->getContent();
+
+    expect($html)->toContain('Academia')
+        ->and($html)->toContain('/lancamentos/recorrencia-prevista/')
+        ->and($html)->toContain('name="competencia" value="2026-08"');
+
+    // Ler não grava (regra 7): a ocorrência só nasce no POST.
+    expect(RecurrenceOccurrence::query()->count())->toBe(0)
+        ->and($molde->refresh()->proxima_em->toDateString())->toBe('2026-07-01');
+});
+
+it('não oferece a ação na PREVISTA em cartão (a fatura é que quita)', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234', 'dia_fechamento' => 28, 'dia_vencimento' => 10]);
+    Recurrence::factory()->for($user)->create([
+        'descricao' => 'Streaming', 'valor_cents' => 5590, 'dia' => 1,
+        'status' => Recurrence::STATUS_ATIVO, 'proxima_em' => '2026-07-01',
+        'card_id' => $card->id,
+    ]);
+
+    $html = $this->actingAs($user)->get('/lancamentos?mes=2026-08')->assertOk()->getContent();
+
+    expect($html)->toContain('Streaming')
+        ->and($html)->not->toContain('/lancamentos/recorrencia-prevista/');
+});
+
 /** A OCORRÊNCIA real de uma recorrência fora de cartão, no mês corrente (spec 12). */
 function ocorrenciaWeb(User $user, string $vencimento = '2026-06-10'): RecurrenceOccurrence
 {

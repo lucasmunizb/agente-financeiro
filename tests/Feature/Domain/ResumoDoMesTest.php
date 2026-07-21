@@ -436,3 +436,57 @@ it('a previsão respeita o escopo por usuário na visão futura (P8)', function 
         ->and($resumo->proximasContas->contas)->toHaveCount(1)
         ->and($resumo->proximasContas->contas[0]['descricao'])->toBe('Minha');
 });
+
+it('não lista no "a vencer" a recorrência prevista fora da janela, mas segue abatendo o disponível', function () {
+    $user = User::factory()->create();
+
+    resumoReceita($user, 400000, '2026-06-05');
+    resumoRecorrencia($user, 5590, 28, '2026-06-28', 'Netflix'); // dia 28: fora da janela de 5 dias
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'), 5);
+
+    // O quadro é "o que vence na janela"; o disponível é do MÊS inteiro (§4.5).
+    expect($resumo->proximasContas->contas)->toHaveCount(0)
+        ->and($resumo->totalProximasContasCents())->toBe(0)
+        ->and($resumo->disponivelCents())->toBe(394410);
+});
+
+it('não lista no "a vencer" a recorrência prevista que já venceu antes de hoje', function () {
+    $user = User::factory()->create();
+
+    resumoRecorrencia($user, 5590, 5, '2026-06-05', 'Netflix'); // dia 5, hoje é 15
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-15'));
+
+    // A de JUNHO ficou para trás; a próxima que a janela alcança é a de julho (05/07).
+    expect(array_column($resumo->proximasContas->contas, 'vencimento'))->toBe(['2026-07-05']);
+});
+
+it('traz as recorrências previstas do MÊS SEGUINTE quando a janela atravessa a virada do mês', function () {
+    $user = User::factory()->create();
+
+    // Hoje 21/06, janela de 15 dias ⇒ [21/06, 06/07]: a conta fixa do dia 5 de JULHO vence
+    // dentro da janela, mesmo sendo de outra competência.
+    resumoRecorrencia($user, 5590, 5, '2026-07-05', 'Netflix');
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-21'), 15);
+
+    expect($resumo->proximasContas->contas)->toHaveCount(1)
+        ->and($resumo->proximasContas->contas[0]['descricao'])->toBe('Netflix')
+        ->and($resumo->proximasContas->contas[0]['vencimento'])->toBe('2026-07-05')
+        ->and($resumo->proximasContas->contas[0]['prevista'])->toBeTrue()
+        ->and($resumo->totalProximasContasCents())->toBe(5590);
+});
+
+it('a previsão do mês seguinte não contamina o disponível do mês navegado', function () {
+    $user = User::factory()->create();
+
+    resumoReceita($user, 400000, '2026-06-05');
+    resumoRecorrencia($user, 5590, 5, '2026-07-05', 'Netflix'); // conta de julho
+
+    $resumo = app(ResumoDoMes::class)->para($user->id, hojeSP('2026-06-21'), 15);
+
+    // Aparece no quadro (vence na janela) mas NÃO abate junho: ela pesa em julho (§4.5).
+    expect($resumo->proximasContas->contas)->toHaveCount(1)
+        ->and($resumo->disponivelCents())->toBe(400000);
+});

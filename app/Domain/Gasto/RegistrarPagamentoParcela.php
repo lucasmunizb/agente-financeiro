@@ -7,7 +7,6 @@ namespace App\Domain\Gasto;
 use App\Models\AuditLog;
 use App\Models\Installment;
 use App\Models\StatusPagamento;
-use App\Models\Transaction;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -52,7 +51,7 @@ final class RegistrarPagamentoParcela
                 'data_pagamento' => $dataPagamento->toDateString(),
             ]);
 
-            $this->reavaliarStatusDaTransacao($parcela->transaction, $pago);
+            (new StatusAgregadoDaTransacao)->reavaliar($parcela->transaction);
 
             AuditLog::create([
                 'user_id' => $userId,
@@ -66,21 +65,5 @@ final class RegistrarPagamentoParcela
 
             return $parcela->fresh();
         });
-    }
-
-    /**
-     * Status agregado da transação, derivado das parcelas: todas pagas → pago;
-     * ao menos uma paga → pago_parcial. Determinístico (§4.4).
-     */
-    private function reavaliarStatusDaTransacao(Transaction $transaction, int $pago): void
-    {
-        $total = $transaction->installments()->count();
-        $pagas = $transaction->installments()->where('status_id', $pago)->count();
-
-        $novo = $pagas === $total
-            ? $pago
-            : StatusPagamento::idFor(StatusPagamento::PAGO_PARCIAL);
-
-        $transaction->update(['status_id' => $novo]);
     }
 }

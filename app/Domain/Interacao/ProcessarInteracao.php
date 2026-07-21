@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Interacao;
 
 use App\Ai\Agents\ClassificadorDeIntencao;
+use App\Ai\Agents\ExtratorDeContaPaga;
 use App\Ai\Agents\ExtratorDeGasto;
 use App\Domain\Chat\ResponderNoChat;
 use App\Domain\IA\ConfirmacaoDeGasto;
@@ -13,6 +14,10 @@ use App\Domain\IA\Esclarecimento\EsclarecimentosPendentes;
 use App\Domain\IA\GastoParcial;
 use App\Domain\IA\Intencao;
 use App\Domain\IA\PrepararConfirmacaoDeGasto;
+use App\Domain\Pagamento\ContaPagavel;
+use App\Domain\Pagamento\PagamentosPendentes;
+use App\Domain\Pagamento\PagarContaPagavel;
+use App\Domain\Pagamento\ResolverContaAPagar;
 use App\Domain\Telegram\Comando;
 use App\Domain\Telegram\ComandoRecebido;
 use App\Domain\Telegram\Confirmacao\ConfirmacoesPendentes;
@@ -52,6 +57,12 @@ final class ProcessarInteracao
         private readonly EsclarecimentosPendentes $esclarecimentos,
         private readonly InterpretadorDeConfirmacao $interpretador,
         private readonly ConfirmarGastoPendente $confirmar,
+        // "Paguei a luz" (decisão do usuário 2026-07-21): a IA só extrai o termo; quem é a
+        // conta, quanto vale e o gravar são determinísticos.
+        private readonly ExtratorDeContaPaga $extratorDeContaPaga = new ExtratorDeContaPaga,
+        private readonly ResolverContaAPagar $resolverConta = new ResolverContaAPagar,
+        private readonly PagarContaPagavel $pagarConta = new PagarContaPagavel,
+        private readonly PagamentosPendentes $pagamentosPendentes = new PagamentosPendentes,
     ) {}
 
     public function processar(User $user, ComandoRecebido $comando, ?Intencao $forcada = null): ResultadoDaInteracao
@@ -62,6 +73,15 @@ final class ProcessarInteracao
         $pendente = $this->pendentes->recuperar($user->id, $agora);
         if ($pendente !== null) {
             return $this->resolverConfirmacao($pendente, $comando, $user->id, $agora);
+        }
+
+        // Pagamento pendente ("paguei a luz"): a mensagem é a resposta — sim/não quando há
+        // uma conta só, ou o número da escolha quando o termo casou com várias. Precedência
+        // pela mesma razão da confirmação: "sim" nunca pode ser reclassificado como outra
+        // coisa.
+        $contasPendentes = $this->pagamentosPendentes->recuperar($user->id, $agora);
+        if ($contasPendentes !== []) {
+            return $this->resolverPagamentoPendente($contasPendentes, $comando, $user->id, $agora);
         }
 
         // Esclarecimento pendente: enquanto faltar campo, a mensagem PREENCHE os slots do
@@ -78,6 +98,7 @@ final class ProcessarInteracao
 
         return match ($intencao) {
             Intencao::REGISTRAR => $this->registrar($user->id, $texto, $agora),
+            Intencao::PAGAR => $this->pagar($user->id, $texto, $agora),
             Intencao::CONSULTAR => ResultadoDaInteracao::consulta($this->responder->responder($user, $texto)),
             default => ResultadoDaInteracao::naoEntendi(),
         };
@@ -129,6 +150,93 @@ final class ProcessarInteracao
         return $comando->comando === Comando::DESCONHECIDO
             ? $comando->textoOriginal
             : $comando->argumentos;
+    }
+
+    /**
+     * "Paguei a luz": a IA extrai só o TERMO; o domínio resolve quais contas casam. Nenhum
+     * número vem do modelo (regra 4). Nada é gravado aqui — o pendente espera o "sim"
+     * (regra 7).
+     */
+    private function pagar(int $userId, string $texto, CarbonImmutable $agora): ResultadoDaInteracao
+    {
+        $termo = $this->extratorDeContaPaga->extrair($texto);
+
+        $candidatos = $termo !== null ? $this->resolverConta->para($userId, $termo, $agora) : [];
+
+        if ($candidatos === []) {
+            return ResultadoDaInteracao::contaAPagarNaoEncontrada($termo);
+        }
+
+        // Guarda os candidatos JÁ resolvidos: no "sim", quita-se exatamente o que foi
+        // mostrado — não uma nova busca, que poderia render outra conta.
+        $this->pagamentosPendentes->guardar($userId, $candidatos, $agora);
+
+        return count($candidatos) === 1
+            ? ResultadoDaInteracao::pagamentoAConfirmar($candidatos[0])
+            : ResultadoDaInteracao::pagamentoAmbiguo($candidatos);
+    }
+
+    /**
+     * Turno seguinte do pagamento. Com vários candidatos, a mensagem é o NÚMERO da escolha
+     * (que reduz a lista a um e volta a pedir confirmação); com um só, é o sim/não. Resposta
+     * indefinida mantém o pendente e reapresenta — nunca grava no escuro (barreira 1).
+     *
+     * @param  list<ContaPagavel>  $candidatos
+     */
+    private function resolverPagamentoPendente(
+        array $candidatos,
+        ComandoRecebido $comando,
+        int $userId,
+        CarbonImmutable $agora,
+    ): ResultadoDaInteracao {
+        $resposta = $this->interpretador->interpretar($comando->textoOriginal);
+
+        if ($resposta === RespostaDeConfirmacao::NAO) {
+            $this->pagamentosPendentes->descartar($userId);
+
+            return ResultadoDaInteracao::confirmacaoCancelada();
+        }
+
+        if (count($candidatos) > 1) {
+            $escolhida = $this->escolhaPorNumero($candidatos, $comando->textoOriginal);
+
+            if ($escolhida === null) {
+                return ResultadoDaInteracao::pagamentoAmbiguo($candidatos);
+            }
+
+            $this->pagamentosPendentes->guardar($userId, [$escolhida], $agora);
+
+            return ResultadoDaInteracao::pagamentoAConfirmar($escolhida);
+        }
+
+        if ($resposta !== RespostaDeConfirmacao::SIM) {
+            return ResultadoDaInteracao::pagamentoAConfirmar($candidatos[0]);
+        }
+
+        $this->pagarConta->pagar($candidatos[0], $userId, $agora);
+        $this->pagamentosPendentes->descartar($userId);
+
+        return ResultadoDaInteracao::pagamentoRegistrado($candidatos[0]);
+    }
+
+    /**
+     * Índice 1..N digitado pelo usuário. Só número puro conta: "2" escolhe o segundo item,
+     * mas "paguei 2 contas" não — interpretar texto solto como escolha quitaria a conta
+     * errada.
+     *
+     * @param  list<ContaPagavel>  $candidatos
+     */
+    private function escolhaPorNumero(array $candidatos, string $texto): ?ContaPagavel
+    {
+        $texto = trim($texto);
+
+        if (preg_match('/^\d+$/', $texto) !== 1) {
+            return null;
+        }
+
+        $indice = (int) $texto - 1;
+
+        return $candidatos[$indice] ?? null;
     }
 
     private function registrar(int $userId, string $texto, CarbonImmutable $agora): ResultadoDaInteracao

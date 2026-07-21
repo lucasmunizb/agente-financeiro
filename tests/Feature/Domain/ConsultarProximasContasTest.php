@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domain\IA\Guard\PayloadDeResposta;
 use App\Domain\ProximasContas\ConsultarProximasContas;
 use App\Domain\ProximasContas\ResultadoConsultaProximasContas;
+use App\Models\Card;
 use App\Models\Installment;
 use App\Models\StatusPagamento;
 use App\Models\Transaction;
@@ -180,4 +181,20 @@ it('expõe um payload para o guard com o total e o valor de cada conta', functio
         ->and($payload->permiteValor(30000))->toBeTrue() // conta 1
         ->and($payload->permiteValor(20000))->toBeTrue() // conta 2
         ->and($payload->permiteValor(123456))->toBeFalse();
+});
+
+it('expõe o cartão da conta, para o quadro poder somar a fatura numa linha só', function () {
+    $user = User::factory()->create();
+    $card = Card::factory()->for($user)->create(['descricao' => 'Nubank', 'final_4' => '1234']);
+
+    contaAVencer($user, 30000, '2026-06-30', 'Mercado')->update(['card_id' => $card->id]);
+    contaAVencer($user, 15000, '2026-07-02', 'Aluguel'); // fora de cartão
+
+    $contas = collect(app(ConsultarProximasContas::class)->para($user->id, hoje(), 30)->contas)
+        ->keyBy('descricao');
+
+    expect($contas['Mercado']['cartaoId'])->toBe($card->id)
+        ->and($contas['Mercado']['cartaoDescricao'])->toBe('Nubank')
+        ->and($contas['Aluguel']['cartaoId'])->toBeNull()
+        ->and($contas['Aluguel']['cartaoDescricao'])->toBeNull();
 });

@@ -6,6 +6,7 @@ namespace App\Domain\Recorrencia;
 
 use App\Domain\Calendar\RelativeDate;
 use App\Domain\IA\Consulta\TraceDaConsulta;
+use App\Domain\Shared\OpaqueId;
 use App\Models\Recurrence;
 use App\Models\RecurrenceOccurrence;
 use Carbon\CarbonImmutable;
@@ -91,6 +92,13 @@ final class ProjetarRecorrencias
                 'cartaoId' => $recorrencia->card_id,
                 'cartaoDescricao' => $recorrencia->card?->descricao,
                 'recorrente' => true,
+                // Alvo da ação "marcar como paga" (spec 13, decisão 2026-07-21). A projeção não
+                // existe no banco: o alvo é o MOLDE (id OPACO) mais a competência que esta linha
+                // representa — o par que {@see MaterializarOcorrencia} transforma em ocorrência
+                // real antes do pagamento. Cartão fica de fora: a fatura é quem quita (D3).
+                'recorrenciaId' => OpaqueId::encode((int) $recorrencia->id),
+                'competencia' => $mesAlvo,
+                'pagavel' => $recorrencia->card_id === null,
             ];
         }
 

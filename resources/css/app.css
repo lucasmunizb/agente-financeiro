@@ -472,6 +472,11 @@ body.modal-aberto .paper-texture {
 .modal-backdrop {
     background-color: color-mix(in srgb, var(--color-surface-dim) 82%, transparent);
     animation: modal-backdrop-in 0.2s ease-out;
+    /* `inset-0` mede a viewport de LAYOUT, que no iOS é maior que a área visível: o card
+       centralizado nela nasce deslocado para baixo do chrome do navegador. dvh + área
+       segura mantêm o modal dentro do que o usuário realmente vê. */
+    height: 100dvh;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 @keyframes modal-backdrop-in {
     from {
@@ -502,8 +507,11 @@ body.modal-aberto .paper-texture {
    de modal nativos do elemento — menos JS (regra 3). O <dialog> é transparente/sem borda;
    o card interno (.notebook-card) desenha a superfície. */
 dialog.modal-dialog {
-    width: min(640px, calc(100vw - 2rem));
-    max-height: 92vh;
+    width: min(640px, calc(100dvw - 2rem));
+    /* dvh, não vh: no iOS o `vh` mede a viewport SEM a barra de endereço, então um modal
+       de 92vh nasce mais alto que a área visível — o cabeçalho fica cortado em cima e o
+       botão primário some atrás da barra de ferramentas (relato do usuário no iPhone). */
+    max-height: 92dvh;
     margin: auto;
     padding: 0;
     border: none;
@@ -514,6 +522,27 @@ dialog.modal-dialog {
 dialog.modal-dialog::backdrop {
     background-color: color-mix(in srgb, var(--color-surface-dim) 82%, transparent);
     animation: modal-backdrop-in 0.2s ease-out;
+}
+/* Celular: o diálogo encosta nas bordas com folga e respeita a área segura (notch e a
+   barra inferior do iOS), senão a última ação fica sob o chrome do navegador. */
+@media (max-width: 640px) {
+    dialog.modal-dialog {
+        width: calc(100dvw - 1.5rem);
+        max-height: calc(100dvh - 2rem - env(safe-area-inset-bottom));
+        margin-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+}
+
+/* iOS: campo com fonte menor que 16px faz o Safari dar ZOOM ao focar — e ele não volta
+   sozinho, deixando a tela "presa" ampliada (relato do usuário no iPhone 15). Em telas de
+   toque o piso é 16px; o desenho tabular/mono continua, só um degrau maior. Regra fora de
+   camada de propósito: precisa vencer as utilitárias do Tailwind (que vivem em @layer). */
+@media (pointer: coarse) {
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    textarea {
+        font-size: max(16px, 1em);
+    }
 }
 
 /* Grupo de campos condicionais (crédito × à vista) — desliza de cima. */

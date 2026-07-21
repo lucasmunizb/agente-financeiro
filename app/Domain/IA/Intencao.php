@@ -14,6 +14,8 @@ namespace App\Domain\IA;
 enum Intencao: string
 {
     case REGISTRAR = 'registrar';
+    /** Quitar uma conta que JÁ existe ("paguei a luz") — não confundir com registrar (gasto novo). */
+    case PAGAR = 'pagar';
     case CONSULTAR = 'consultar';
     case EDITAR = 'editar';
     case CANCELAR = 'cancelar';

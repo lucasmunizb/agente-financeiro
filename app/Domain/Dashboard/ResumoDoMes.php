@@ -77,17 +77,26 @@ final class ResumoDoMes
         // molde, quando ainda não — a projeção exclui por `NOT EXISTS` o que já é real, então
         // não há como a mesma conta entrar duas vezes.
         $inicioJanela = $ancora->setTimezone('America/Sao_Paulo')->startOfDay();
+        $fimJanela = $inicioJanela->addDays($janelaProximasContas);
         $previsao = $this->projetarRecorrencias->para($userId, $mes, $agora);
-        $aVencer = $this->naJanelaAPagar(
-            $userId,
-            $inicioJanela,
-            $inicioJanela->addDays($janelaProximasContas),
-            $agora,
-        );
+        $aVencer = $this->naJanelaAPagar($userId, $inicioJanela, $fimJanela, $agora);
         // Sem limite inferior, espelhando a consulta de vencidas: tudo que venceu antes da âncora.
         $emAtraso = $this->naJanelaAPagar($userId, null, $inicioJanela->subDay(), $agora);
 
-        $proximasContas = $this->mesclarPrevistas($proximasContas, $previsao, $aVencer);
+        $proximasContas = $this->mesclarPrevistas(
+            $proximasContas,
+            // A projeção é por COMPETÊNCIA (é assim que ela pesa no disponível), mas o quadro
+            // "a vencer" é uma JANELA de datas: a conta fixa do dia 28 não é "próxima conta"
+            // no dia 5, nem a do dia 5 continua a vencer no dia 15 (essa já é atraso). E a
+            // janela ATRAVESSA a virada do mês — no dia 21 ela alcança o dia 5 do mês seguinte —,
+            // por isso a previsão é buscada em todas as competências que a janela toca.
+            $this->naJanela(
+                $this->previstasDasCompetencias($userId, $previsao, $inicioJanela, $fimJanela, $agora),
+                $inicioJanela,
+                $fimJanela,
+            ),
+            $aVencer,
+        );
         $contasVencidas = $this->mesclarVencidasPrevistas($contasVencidas, $emAtraso);
         // As ocorrências REAIS do mês já foram abatidas dentro do ConsultarDisponivelDoMes
         // (agregação por competência); aqui só entra o que ainda é projeção.
@@ -119,11 +128,12 @@ final class ResumoDoMes
      * contas: marca as de lançamento com `prevista=false`, concatena, reordena por vencimento e
      * soma os totais. Nada a mesclar ⇒ só normaliza a flag (nada muda no total).
      *
+     * @param  list<array<string, mixed>>  $previstas  projeções do molde que vencem na janela
      * @param  list<array<string, mixed>>  $ocorrencias  ocorrências reais a pagar na janela
      */
     private function mesclarPrevistas(
         ResultadoConsultaProximasContas $reais,
-        ResultadoProjecaoRecorrencias $previsao,
+        array $previstas,
         array $ocorrencias,
     ): ResultadoConsultaProximasContas {
         $contas = array_map(
@@ -131,11 +141,11 @@ final class ResumoDoMes
             $reais->contas,
         );
 
-        $contas = [...$contas, ...$previsao->ocorrencias, ...$this->comoContas($ocorrencias)];
+        $contas = [...$contas, ...$previstas, ...$this->comoContas($ocorrencias)];
         usort($contas, static fn (array $a, array $b): int => $a['vencimento'] <=> $b['vencimento']);
 
         return new ResultadoConsultaProximasContas(
-            totalCents: $reais->totalCents + $previsao->totalCents + $this->somar($ocorrencias),
+            totalCents: $reais->totalCents + $this->somar($previstas) + $this->somar($ocorrencias),
             contas: array_values($contas),
             trace: $reais->trace,
         );
@@ -196,6 +206,56 @@ final class ResumoDoMes
             static fn (array $oc): array => $oc + ['prevista' => false, 'recorrente' => true],
             $ocorrencias,
         );
+    }
+
+    /**
+     * Projeções de recorrência de TODAS as competências que a janela toca. A janela do quadro é
+     * de dias, não de mês: no dia 21 com 15 dias ela chega ao dia 5 do mês seguinte, e a conta
+     * fixa que vence lá é justamente uma "próxima conta". A competência da âncora já veio
+     * calculada (é a mesma que abate o disponível) e é reaproveitada — as demais só alimentam o
+     * quadro, nunca o disponível do mês navegado.
+     *
+     * Cada projeção é única por (recorrência, competência) e a real é excluída por `NOT EXISTS`
+     * lá dentro, então não há dupla contagem ao concatenar meses.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function previstasDasCompetencias(
+        int $userId,
+        ResultadoProjecaoRecorrencias $daAncora,
+        CarbonImmutable $inicio,
+        CarbonImmutable $fim,
+        CarbonImmutable $agora,
+    ): array {
+        $previstas = $daAncora->ocorrencias;
+        $mesDaAncora = $inicio->format('Y-m');
+
+        for ($mes = $inicio->startOfMonth()->addMonthNoOverflow(); $mes->format('Y-m') <= $fim->format('Y-m'); $mes = $mes->addMonthNoOverflow()) {
+            if ($mes->format('Y-m') === $mesDaAncora) {
+                continue;
+            }
+
+            $previstas = [...$previstas, ...$this->projetarRecorrencias->para($userId, $mes->format('Y-m'), $agora)->ocorrencias];
+        }
+
+        return $previstas;
+    }
+
+    /**
+     * Recorte por data de vencimento (inclusive nas duas pontas) sobre linhas já normalizadas.
+     *
+     * @param  list<array<string, mixed>>  $contas
+     * @return list<array<string, mixed>>
+     */
+    private function naJanela(array $contas, CarbonImmutable $de, CarbonImmutable $ate): array
+    {
+        $deData = $de->toDateString();
+        $ateData = $ate->toDateString();
+
+        return array_values(array_filter(
+            $contas,
+            static fn (array $conta): bool => $conta['vencimento'] >= $deData && $conta['vencimento'] <= $ateData,
+        ));
     }
 
     /** @param  list<array<string, mixed>>  $ocorrencias */

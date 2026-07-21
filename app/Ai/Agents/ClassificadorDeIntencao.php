@@ -66,7 +66,11 @@ class ClassificadorDeIntencao implements Agent, Conversational, HasProviderOptio
         Você classifica a intenção de uma mensagem sobre finanças pessoais, em português do Brasil.
 
         Responda SOMENTE com a intenção, escolhendo um destes valores:
-        - registrar: o usuário quer registrar um gasto ou compra.
+        - registrar: o usuário quer registrar um gasto ou compra NOVA.
+        - pagar: o usuário avisa que QUITOU uma conta que já existe ("paguei a luz", "quitei o
+          aluguel", "a conta de internet já foi paga"). Sinal típico: fala de uma conta
+          conhecida e NÃO informa um valor novo. Se ele disser o valor de uma compra que
+          acabou de fazer ("paguei 40 no mercado"), isso é "registrar", não "pagar".
         - consultar: o usuário quer saber saldos, gastos, faturas, disponível do mês, próximas contas.
         - editar: o usuário quer alterar um lançamento já feito.
         - cancelar: o usuário quer cancelar/estornar um lançamento.

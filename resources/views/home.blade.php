@@ -72,20 +72,24 @@
                 @endif
             </x-dashboard.summary-card>
 
-            {{-- "A vencer (7 dias)" é relativo ao HOJE real: só no mês atual (regra "mesmomês"). --}}
-            @if ($vm['ehMesAtual'])
-                <x-dashboard.summary-card label="A vencer (7 dias)" :value="$vm['aVencer7']['valor']" tone="ocre">
-                    <x-slot:badge>
-                        <span class="font-body-sm text-label-sm font-medium text-ocre">{{ $vm['aVencer7']['contas'] }} {{ $vm['aVencer7']['contas'] === 1 ? 'conta' : 'contas' }}</span>
-                    </x-slot:badge>
-                </x-dashboard.summary-card>
-            @endif
-
             @if ($vm['fatura'])
                 <x-dashboard.summary-card label="Fatura do cartão" :value="$vm['fatura']['valor']" :sub="$vm['fatura']['sub']" />
             @else
                 <x-dashboard.summary-card label="Fatura do cartão" value="—" sub="Nenhum cartão cadastrado" />
             @endif
+
+            {{-- "Olhando adiante": o que já está registrado para o mês SEGUINTE ao navegado
+                 (fatura que vence lá + contas fixas fora de cartão + lançamentos daquele mês).
+                 Valor pronto do domínio — mesma consulta do card "Gastos do mês", apontada para
+                 a competência seguinte; a tela não soma nada (regra 4).
+
+                 Fica por ÚLTIMO de propósito: em 360px a grade é de 1 coluna e a ordem do DOM
+                 vira a ordem de leitura — o retrato deste mês tem de vir antes da previsão.
+                 Ele ocupou a vaga do antigo card "A vencer (7 dias)", que dizia o mesmo que o
+                 quadro "Contas" logo abaixo (total, contagem e lista datada): assim a grade
+                 fecha em 4 cards em QUALQUER competência, sem sobra nem card espremido. --}}
+            <x-dashboard.summary-card :label="$vm['previsto']['label']" :value="$vm['previsto']['valor']"
+                sub="Cartão, contas fixas e lançamentos já registrados" />
         </div>
         </div>
 
@@ -150,10 +154,20 @@
                 @if (! $temAtraso && ! $temAVencer)
                     <p class="py-8 text-center font-body-sm text-body-sm text-outline">Nenhuma conta em atraso ou a vencer nos próximos dias.</p>
                 @else
+                    {{-- Quadro completo (nada é cortado): o que não couber rola aqui dentro, com
+                         o atraso sempre no topo. `overscroll-contain` evita "roubar" a rolagem da
+                         página quando a lista chega ao fim. --}}
+                    {{-- Rolagem só na VERTICAL. `overflow-y` sozinho faz o eixo X virar `auto`
+                         por especificação, e a linha sangra 8px para fora (`-mx-2`) — daí a barra
+                         deitada. O `-mx-2 px-2` traz essa sangria para DENTRO da caixa de rolagem
+                         (mesmo alinhamento visual de antes) e o `overflow-x-hidden` fecha a porta. --}}
+                    <div class="-mx-2 max-h-[28rem] overflow-y-auto overflow-x-hidden overscroll-contain px-2">
                     {{-- Seção "Em atraso" — só aparece quando há algo vencido. --}}
                     @if ($temAtraso)
-                        <div class="mt-4">
-                            <div class="flex items-center justify-between border-b border-linha pb-2">
+                        <div>
+                            {{-- Cabeçalho grudado no topo: rolando a lista, o usuário nunca perde
+                                 de vista em que seção está nem o total dela. --}}
+                            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-linha bg-superficie pb-2 pt-4">
                                 <span class="inline-flex items-center gap-1.5 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-error">
                                     <x-icon name="alert" class="h-4 w-4" />
                                     Em atraso
@@ -163,16 +177,19 @@
                                 </span>
                             </div>
                             @foreach ($vm['contasVencidas'] as $conta)
-                                <x-dashboard.bill-row icon="alert" :icon-tone="$conta['iconTone']"
+                                <x-dashboard.bill-row :icon="$conta['cartao'] ? $conta['icon'] : 'alert'" :icon-tone="$conta['iconTone']"
                                     :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="atraso"
-                                    :recorrente="$conta['recorrente']" />
+                                    :recorrente="$conta['recorrente']" :itens="$conta['itens']"
+                                    :pagar-url="$conta['pagarUrl']" :editar-url="$conta['editarUrl']"
+                                    :exige-data-pagamento="$conta['exigeDataPagamento']" :hoje-iso="$conta['hojeIso']"
+                                    :competencia="$conta['competencia']" />
                             @endforeach
                         </div>
                     @endif
 
-                    {{-- Seção "A vencer". --}}
-                    <div class="{{ $temAtraso ? 'mt-8' : 'mt-4' }}">
-                        <div class="flex items-center justify-between border-b border-linha pb-2">
+                    {{-- Seção "A vencer" — tudo que vence nos próximos 15 dias. --}}
+                    <div class="{{ $temAtraso ? 'mt-8' : '' }}">
+                        <div class="sticky top-0 z-10 flex items-center justify-between border-b border-linha bg-superficie pb-2 pt-4">
                             <span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-on-surface-variant">
                                 A vencer
                             </span>
@@ -184,13 +201,17 @@
                         </div>
                         @if ($temAVencer)
                             @foreach ($vm['proximasContas'] as $conta)
-                                <x-dashboard.bill-row icon="receipt" :icon-tone="$conta['iconTone']"
+                                <x-dashboard.bill-row :icon="$conta['icon']" :icon-tone="$conta['iconTone']"
                                     :title="$conta['title']" :due="$conta['due']" :value="$conta['value']" status="a_vencer"
-                                    :recorrente="$conta['recorrente']" :prevista="$conta['prevista']" />
+                                    :recorrente="$conta['recorrente']" :prevista="$conta['prevista']" :itens="$conta['itens']"
+                                    :pagar-url="$conta['pagarUrl']" :editar-url="$conta['editarUrl']"
+                                    :exige-data-pagamento="$conta['exigeDataPagamento']" :hoje-iso="$conta['hojeIso']"
+                                    :competencia="$conta['competencia']" />
                             @endforeach
                         @else
                             <p class="py-6 text-center font-body-sm text-body-sm text-outline">Nenhuma conta a vencer nos próximos dias.</p>
                         @endif
+                    </div>
                     </div>
                 @endif
             </div>

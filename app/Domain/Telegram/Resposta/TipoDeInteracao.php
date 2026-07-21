@@ -25,6 +25,12 @@ use App\Domain\Importacao\PreImportacao;
  * pronta para revisão — carrega a {@see PreImportacao}),
  * IMPORTACAO_PROTEGIDA_POR_SENHA (PDF com senha — pedir versão sem senha, C2) e
  * IMPORTACAO_FALHOU (não foi possível ler a fatura — erro de parsing registrado).
+ *
+ * Quitar conta pelo bot (decisão do usuário 2026-07-21): PAGAMENTO_A_CONFIRMAR (uma conta foi
+ * identificada e espera o "sim" — nada gravado ainda, regra 7), PAGAMENTO_AMBIGUO (mais de uma
+ * conta casa com o que ele disse; quem desempata é ele, nunca o modelo),
+ * CONTA_A_PAGAR_NAO_ENCONTRADA (nada casou — o bot diz isso em vez de inventar uma conta) e
+ * PAGAMENTO_REGISTRADO (o "sim" quitou).
  */
 enum TipoDeInteracao
 {
@@ -39,4 +45,8 @@ enum TipoDeInteracao
     case IMPORTACAO_PRONTA;
     case IMPORTACAO_PROTEGIDA_POR_SENHA;
     case IMPORTACAO_FALHOU;
+    case PAGAMENTO_A_CONFIRMAR;
+    case PAGAMENTO_AMBIGUO;
+    case PAGAMENTO_REGISTRADO;
+    case CONTA_A_PAGAR_NAO_ENCONTRADA;
 }

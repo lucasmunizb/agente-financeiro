@@ -208,7 +208,12 @@
                                     :prevista="$item['prevista']"
                                     :show-url="$item['showUrl']"
                                     :editar-url="$item['editarUrl']"
-                                    :pagar-url="$item['pagarUrl']" />
+                                    :editar-ocorrencia="$item['editarOcorrencia']"
+                                    :pagar-url="$item['pagarUrl']"
+                                    :desmarcar-url="$item['desmarcarUrl']"
+                                    :exige-data-pagamento="$item['exigeDataPagamento']"
+                                    :competencia="$item['competencia']"
+                                    :hoje-iso="$hojeIso" />
                             @endforeach
                         </div>
                     </section>

@@ -111,7 +111,22 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           source: docker-stack.yml
           target: /opt/financeiro
-      - name: docker stack deploy (rolling update + migrate job)
+      # Deploy em 3 FASES, para que app/worker só troquem de versão DEPOIS de a
+      # migration ter concluído com sucesso:
+      #
+      #   Fase 1 — `stack deploy` com APP_RUNTIME_TAG = tag JÁ EM PRODUÇÃO. O spec
+      #            de app/worker sai idêntico ao que roda hoje, então o Swarm não
+      #            mexe neles; só a `migrate` (que usa APP_TAG) muda e é agendada.
+      #   Fase 2 — espera o job `migrate` chegar a um estado TERMINAL. Se não for
+      #            `complete`, aborta AQUI: produção segue 100% na versão antiga,
+      #            coerente com o schema antigo. Nada foi trocado.
+      #   Fase 3 — só então APP_RUNTIME_TAG = APP_TAG e o rolling update roda, com
+      #            auto-rollback do Swarm (update_config.failure_action) e espera
+      #            de convergência.
+      #
+      # Um único passo/SSH de propósito: as três fases compartilham a tag antiga
+      # descoberta no começo, e passar esse estado entre steps seria mais frágil.
+      - name: Deploy em fases (migration → espera → app/worker)
         uses: appleboy/ssh-action@v1
         env:
           APP_IMAGE: ${{ env.IMAGE }}
@@ -124,17 +139,144 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: APP_IMAGE,APP_TAG,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
           script_stop: true
+          command_timeout: 30m
           script: |
-            set -euo pipefail
+            set -eu
             cd /opt/financeiro
+            STACK=financeiro
+
             # login p/ o Swarm puxar a imagem PRIVADA (sem echo do token em log)
             echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            trap 'docker logout >/dev/null 2>&1 || true' EXIT
             export APP_IMAGE APP_TAG
-            # re-deploy: fixa a tag=SHA, roda o job `migrate` (com secrets) e faz
-            # rolling update do app (update_config: start-first) e do worker.
-            docker stack deploy --with-registry-auth --resolve-image always \
-              -c docker-stack.yml financeiro
-            docker logout
+
+            deploy_stack() {
+              APP_RUNTIME_TAG="$1" docker stack deploy \
+                --with-registry-auth --resolve-image always \
+                -c docker-stack.yml "$STACK"
+            }
+
+            # ---------- qual tag está em produção agora? ----------
+            # A imagem vem como "repo:tag@sha256:..." — tira o digest, pega a tag.
+            img=$(docker service inspect "${STACK}_app" \
+                    --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null || true)
+            img=${img%@*}
+            atual=${img##*:}
+            if [ -z "$img" ] || [ "$atual" = "$img" ]; then
+              # Primeiro deploy (serviço não existe) ou imagem sem tag: não há
+              # versão antiga para segurar, então tudo sobe junto. O app pode
+              # responder 500 nos segundos entre subir e a migration terminar.
+              echo "primeiro deploy — app/worker sobem junto com a migration"
+              atual="$APP_TAG"
+            fi
+            echo "tag em producao: $atual | tag nova: $APP_TAG"
+
+            # ================= FASE 1: migration =================
+            echo "===== FASE 1: migration (app/worker permanecem em $atual) ====="
+            deploy_stack "$atual"
+
+            # ================= FASE 2: esperar a migration =======
+            echo "===== FASE 2: aguardando o job migrate ====="
+            SVC="${STACK}_migrate"
+            # Cada `stack deploy` incrementa a JobIteration. Filtrar por ela é o que
+            # impede de ler como sucesso o `complete` de um DEPLOY ANTERIOR — as
+            # tasks antigas continuam listadas em `docker service ps`.
+            ITER=$(docker service inspect "$SVC" --format '{{.JobStatus.JobIteration.Index}}')
+            echo "iteracao do job: $ITER"
+            ok=0
+            i=0
+            # 120 x 5s = 10 min de teto (migration longa + retry do restart_policy).
+            while [ "$i" -lt 120 ]; do
+              i=$((i + 1))
+              ativas=0
+              ok=0
+              # `viu` evita o falso negativo da 1a volta: logo apos o `stack deploy`
+              # a task da nova iteracao ainda nao existe, e sem isso ativas=0 seria
+              # lido como "terminou" e o passo falharia de imediato.
+              viu=0
+              for t in $(docker service ps "$SVC" -q --no-trunc 2>/dev/null || true); do
+                info=$(docker inspect "$t" --format '{{.JobIteration.Index}} {{.Status.State}}' 2>/dev/null || true)
+                [ -n "$info" ] || continue
+                ti=${info%% *}
+                st=${info##* }
+                if [ "$ti" != "$ITER" ]; then
+                  continue
+                fi
+                viu=1
+                case "$st" in
+                  # Terminal com sucesso.
+                  complete) ok=1 ;;
+                  # Terminal sem sucesso: nao conta como ativa (o retry, se houver,
+                  # aparece como uma NOVA task da mesma iteracao).
+                  failed|rejected|orphaned|shutdown|remove) ;;
+                  # new/pending/assigned/preparing/starting/running/...
+                  *) ativas=$((ativas + 1)) ;;
+                esac
+              done
+              if [ "$viu" -eq 1 ] && [ "$ativas" -eq 0 ]; then
+                break
+              fi
+              # 24 x 5s = 2 min sem NENHUMA task da iteracao atual aparecer: o job
+              # nao foi agendado (imagem nao baixa, secret ausente, no sem recurso).
+              if [ "$viu" -eq 0 ] && [ "$i" -ge 24 ]; then
+                echo "nenhuma task da iteracao $ITER foi agendada em 2min."
+                docker service ps "$SVC" --no-trunc 2>&1 || true
+                exit 1
+              fi
+              sleep 5
+            done
+            echo "----- logs do $SVC -----"
+            docker service logs --tail 100 "$SVC" 2>&1 || true
+            echo "------------------------"
+            if [ "$ok" != "1" ]; then
+              echo "MIGRATION FALHOU (iteracao $ITER) — deploy abortado na fase 2."
+              echo "app/worker NAO foram tocados: producao segue em $atual."
+              exit 1
+            fi
+            echo "migration concluida com sucesso."
+
+            # ================= FASE 3: app/worker ================
+            echo "===== FASE 3: rolling update de app/worker -> $APP_TAG ====="
+            deploy_stack "$APP_TAG"
+
+            # Espera a convergência. `update_config.failure_action: rollback` faz o
+            # Swarm reverter sozinho se a task nova não sobreviver ao `monitor`;
+            # aqui detectamos isso (UpdateStatus=rollback_*) e falhamos o workflow
+            # com a produção já restaurada na versão anterior.
+            aguarda() {
+              svc="$1"
+              alvo=$(docker service inspect "$svc" --format '{{.Spec.Mode.Replicated.Replicas}}')
+              j=0
+              while [ "$j" -lt 72 ]; do   # 72 x 5s = 6 min
+                j=$((j + 1))
+                estado=$(docker service inspect "$svc" --format '{{.UpdateStatus.State}}' 2>/dev/null || true)
+                reps=$(docker service ls --format '{{.Name}} {{.Replicas}}' | awk -v s="$svc" '$1 == s {print $2}')
+                case "$estado" in
+                  rollback_started|rollback_paused|rollback_completed|paused)
+                    echo "$svc: update NAO pegou (UpdateStatus=$estado) — Swarm reverteu."
+                    docker service ps "$svc" --no-trunc 2>&1 | head -20 || true
+                    return 1
+                    ;;
+                esac
+                if [ "$reps" = "$alvo/$alvo" ] && [ "$estado" != "updating" ]; then
+                  echo "$svc: ok ($reps, UpdateStatus=${estado:-n/a})"
+                  return 0
+                fi
+                sleep 5
+              done
+              echo "$svc: timeout (replicas=$reps UpdateStatus=$estado)"
+              docker service ps "$svc" --no-trunc 2>&1 | head -20 || true
+              return 1
+            }
+            falhou=0
+            aguarda "${STACK}_app" || falhou=1
+            aguarda "${STACK}_worker" || falhou=1
+            if [ "$falhou" -ne 0 ]; then
+              echo "rolling update falhou. Se o Swarm nao reverteu sozinho:"
+              echo "  docker service rollback ${STACK}_app ${STACK}_worker"
+              exit 1
+            fi
+            echo "deploy concluido: $APP_TAG em producao."
 
   smoke:
     needs: deploy
