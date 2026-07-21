@@ -93,9 +93,14 @@ services:
   # `Database\Seeders\` quando não há barra invertida. Escrever o FQCN aqui exigiria
   # escapar `\` duas vezes (YAML → shlex do Docker → sh -c) e o nome chegaria
   # corrompido ("DatabaseSeedersReferenciaSeeder"), com o job falhando no deploy.
+  #
+  # O comando é o script docker/deploy-migrate.sh (embutido na imagem): ele roda
+  # migrate + seed e, se a migration falhar DEPOIS de ter aplicado parte do lote,
+  # executa `migrate:rollback --step=1` para devolver o banco ao schema anterior —
+  # que é o schema em que app/worker continuam rodando (o CI aborta na fase 2).
   migrate:
     image: ${APP_IMAGE:-docker.io/lucasmunizb/agente-financeiro}:${APP_TAG:-latest}
-    command: sh -c "php artisan migrate --force && php artisan db:seed --force --class=ReferenciaSeeder"
+    command: deploy-migrate
     environment:
       <<: *app-environment
     secrets: *app-secrets

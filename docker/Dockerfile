@@ -38,7 +38,9 @@ WORKDIR /app
 
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint
-RUN chmod +x /usr/local/bin/entrypoint
+# Job de migration do deploy (migrate + seed + rollback do lote se falhar).
+COPY docker/deploy-migrate.sh /usr/local/bin/deploy-migrate
+RUN chmod +x /usr/local/bin/entrypoint /usr/local/bin/deploy-migrate
 
 ENTRYPOINT ["entrypoint"]
 CMD ["frankenphp", "run", "-c", "/etc/caddy/Caddyfile"]
