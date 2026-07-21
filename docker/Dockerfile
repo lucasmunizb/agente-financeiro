@@ -69,6 +69,14 @@ FROM base AS prod
 # Tuning de opcache só em prod (validate_timestamps=0 quebraria o bind-mount de dev).
 COPY docker/php-prod.ini /usr/local/etc/php/conf.d/zz-prod.ini
 
+# Remove o toolchain C herdado da imagem base (usado só para compilar extensões
+# PHP no stage `base`). Em runtime nada compila, e é ele que arrasta o
+# `linux-libc-dev` — headers do kernel que geram HIGH recorrente no Trivy
+# (CVE de kernel não aplicável: o contêiner usa o kernel do host). Fica só em
+# prod; `base` (dev/CI) mantém o compilador para instalar extensões.
+RUN apt-get purge -y --auto-remove linux-libc-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY . /app
 # Assets compilados vêm do stage Node (public/build é gitignored, não está no
 # contexto num checkout limpo). Precisa vir DEPOIS do `COPY . /app`.
