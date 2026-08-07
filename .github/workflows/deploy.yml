@@ -155,14 +155,19 @@ jobs:
         # binário da API do GitHub e falha silenciosamente por rate-limit —
         # trivy-action#516 / setup-trivy#30). A imagem já está carregada
         # localmente (load: true), então escaneamos via socket do Docker.
+        # `.trivyignore.yaml` carrega as exceções TEMPORÁRIAS (cada uma com
+        # justificativa e `expired_at`). Vencida a data, o CVE volta a falhar o
+        # build — é o mecanismo que impede a exceção de virar permanente.
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/.trivyignore.yaml":/.trivyignore.yaml:ro \
             -e TRIVY_GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             aquasec/trivy:0.65.0 image \
               --severity HIGH,CRITICAL \
               --exit-code 1 \
               --ignore-unfixed \
+              --ignorefile /.trivyignore.yaml \
               ${{ env.IMAGE }}:${{ github.sha }}
       - name: Push (SHA imutável + latest móvel)
         run: |

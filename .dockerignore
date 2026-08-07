@@ -23,3 +23,6 @@ phpunit.xml
 # parar na imagem de produção.
 build
 phpstan*.neon
+# Exceções do Trivy: usadas pelo CI (montadas no contêiner do scanner), não
+# pertencem à imagem.
+.trivyignore.yaml

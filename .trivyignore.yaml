@@ -1,0 +1,40 @@
+# =====================================================================
+# Exceções do gate de segurança (Trivy) — .github/workflows/deploy.yml
+#
+# REGRA: toda entrada aqui é TEMPORÁRIA e precisa de `expired_at`. Quando a
+# data vence, o Trivy volta a reportar o CVE e o CI falha — é isso que força a
+# revisão periódica. Nunca adicione uma exceção sem justificativa de
+# não-alcançabilidade e sem data.
+# =====================================================================
+vulnerabilities:
+  # ── Binário do FrankenPHP (Go) ─────────────────────────────────────
+  # Ambos são deps transitivas compiladas dentro de /usr/local/bin/frankenphp.
+  # Não temos como atualizá-las sem recompilar o binário: a v1.12.7 (a mais
+  # recente, lançada em 2026-08-07) ainda embarca kin-openapi v0.140.0 e
+  # grpc v1.81.1. Não há release corrigida upstream.
+  - id: GHSA-r277-6w6q-xmqw
+    paths:
+      - usr/local/bin/frankenphp
+    statement: |
+      kin-openapi ValidationHandler.Load() fail-open (CRITICAL).
+      Não alcançável nesta aplicação: docker/Caddyfile usa apenas a diretiva
+      `php_server`; nenhum middleware de validação OpenAPI é configurado, logo
+      o ValidationHandler nunca é instanciado e o NoopAuthenticationFunc
+      padrão nunca entra no caminho de request.
+      Sem correção upstream (FrankenPHP v1.12.7 = mais recente).
+      Revisar quando sair uma release nova do FrankenPHP.
+    expired_at: 2026-09-07
+
+  - id: GHSA-hrxh-6v49-42gf
+    paths:
+      - usr/local/bin/frankenphp
+    statement: |
+      gRPC-Go: xDS RBAC e vulnerabilidades HTTP/2 (HIGH).
+      Não alcançável nesta aplicação: não expomos nenhum servidor gRPC nem
+      usamos xDS/service mesh. O gRPC-Go entra só como dep transitiva dos
+      módulos do Caddy embutidos no binário, que não são ativados pelo
+      docker/Caddyfile. O tráfego HTTP/2 da app é servido pelo stack HTTP do
+      Caddy, não pelo do gRPC-Go.
+      Sem correção upstream (FrankenPHP v1.12.7 = mais recente).
+      Revisar quando sair uma release nova do FrankenPHP.
+    expired_at: 2026-09-07
