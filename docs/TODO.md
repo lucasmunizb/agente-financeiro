@@ -65,13 +65,13 @@ Sequência prática, **sempre test-first**. Cada item de backend só é dado com
   - [x] `consultar_fatura_cartao` (cartao, competencia).
 - [x] Testes + implementação: guard pós-geração (nenhum número fora do payload). _(`GuardPosGeracao` + orquestração `app/Domain/IA/Consulta/ResponderConsulta`: agente `AssistenteDeConsulta` chama as tools, o `ColetorDeConsultas` reúne o conjunto-verdade (payload + trace), o guard valida cada número/data; divergência regenera, esgotou cai em fallback sem números. `PayloadDeResposta::combinar` funde os payloads das tools chamadas)_
 - [x] Testes + implementação: resposta com fonte/trace. _(`RespostaDaConsulta` carrega as `fontes` (trace de cada tool) — barreira 5; apresentação = FE)_
-- [ ] **(Etapa separada)** Apresentação das respostas no bot/web.
+- [x] **(Etapa separada)** Apresentação das respostas no bot/web. _(chat web em `/chat/mensagens` + `resources/views/components/chat/`; redação das respostas do bot pelo `RoteadorDeMensagem`/`Resposta`)_
 
-## Bloco 6 — Dashboard
+## Bloco 6 — Dashboard ✅
 
-- [ ] Testes + implementação: agregações do mês (gastos, próximas contas, cartão atual).
-- [ ] Job de expurgo de mensagens (60 dias).
-- [ ] **(Etapa separada)** Telas e gráficos do dashboard.
+- [x] Testes + implementação: agregações do mês (gastos, próximas contas, cartão atual). _(`app/Domain/Dashboard/`: `ResumoDoMes` + `ResumoDoMesResultado`, `AgruparContasDeCartao`, `DiasDeVencimentoNoMes`; testes em `tests/Feature/Dashboard/`. Competência por `?mes=YYYY-MM`; contas em atraso no Bloco 06b)_
+- [x] Job de expurgo de mensagens (60 dias). _(`ExpurgarConversasCommand` / `ai:expurgar-conversas`, agendado diário 03:30 — apaga conversas e mensagens com `updated_at` além de 60 dias)_
+- [x] **(Etapa separada)** Telas e gráficos do dashboard. _(`resources/views/home.blade.php` + `resources/views/components/dashboard/`: régua do mês, cartões de resumo, quadro de contas, estados vazio/carregando)_
 
 > **Importação de PDF removida do MVP.** A importação de fatura (alto valor, alto risco) saiu
 > do MVP e virou a **1ª etapa do pós-MVP** — ver **Pós-MVP · Importação de PDF** no fim deste
