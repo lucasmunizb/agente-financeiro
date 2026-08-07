@@ -1,0 +1,29 @@
+# =====================================================================
+# Núcleo crítico no level 9 (o máximo). INFORMATIVO — sem baseline e sem
+# portão: o número é termômetro, não trava o deploy.
+#
+# app/Domain = motor financeiro (regra inviolável 4/5: dinheiro é sempre
+# determinístico e em centavos inteiros). app/Ai = a camada que fala com o
+# LLM. São os dois pontos onde um tipo errado vira dinheiro errado ou
+# alucinação — então aqui a régua é mais alta que a do phpstan.neon.
+#
+# Executado em contêiner: `make stan-domain` (regra 9).
+# =====================================================================
+includes:
+    - phpstan-base.neon
+
+parameters:
+    # Sobrescreve o level 6 da base.
+    level: 9
+
+    # O `!` é obrigatório: sem ele o NEON MESCLA listas e estes caminhos
+    # seriam SOMADOS aos da base (app, database, routes) — o level 9 passaria
+    # a varrer o projeto inteiro e o número perderia o sentido.
+    paths!:
+        - app/Domain
+        - app/Ai
+
+    # tmpDir próprio pelo mesmo motivo do phpstan-debt.neon: cache de
+    # resultado é por config, e compartilhar causa varredura completa a cada
+    # alternância entre os alvos.
+    tmpDir: build/phpstan-domain

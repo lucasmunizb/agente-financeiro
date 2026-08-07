@@ -44,7 +44,14 @@
       "mcp__stitch__edit_screens",
       "mcp__stitch__get_screen",
       "Bash(curl -s -L \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzc1ZDVlOGMxZjIyZjRhYzdiZDcwZGIxODgwMGI4ZTk2EgsSBxCY9N7BlBkYAZIBIwoKcHJvamVjdF9pZBIVQhM5OTIxODgwMTU3MDMwNTMyNjA1&filename=&opi=96797242\" -o modal-v2.html)",
-      "Bash(curl -s -L \"https://lh3.googleusercontent.com/aida/AP1WRLssz0PTYNVXLovAoRooOhyKHMoJBCCkaAIo4vVD43QFQH8Ul4v09qrpQe87AGnAbYwGhQTZmQNwoHm5GLtXI8AnE9dLPZRoRz5joh3d1piI1hjjUZycU2CjKWW_Paa5n5BzfcerLR8UBl_KFm-MrUsd6Lhny6BNohhF_YzN5surxsAD_cDSiLut0zAaX6CV94vffrULB_4VLA52S_JNx3soxqPF2FRgW4oU16OQCqIM-mYpM8cQIspoOw\" -o modal-v2.png)"
+      "Bash(curl -s -L \"https://lh3.googleusercontent.com/aida/AP1WRLssz0PTYNVXLovAoRooOhyKHMoJBCCkaAIo4vVD43QFQH8Ul4v09qrpQe87AGnAbYwGhQTZmQNwoHm5GLtXI8AnE9dLPZRoRz5joh3d1piI1hjjUZycU2CjKWW_Paa5n5BzfcerLR8UBl_KFm-MrUsd6Lhny6BNohhF_YzN5surxsAD_cDSiLut0zAaX6CV94vffrULB_4VLA52S_JNx3soxqPF2FRgW4oU16OQCqIM-mYpM8cQIspoOw\" -o modal-v2.png)",
+      "Bash(docker build *)",
+      "Bash(docker image *)",
+      "Bash(perl -0pi -e 's{    /\\\\*\\\\*\\\\n     \\\\* \\\\@return array<string, string>\\\\n     \\\\*/\\\\n    protected function casts}{    protected function casts}' app/Models/Income.php)",
+      "Bash(rtk du *)",
+      "Bash(make stan *)",
+      "Bash(make stan-domain *)",
+      "Bash(make coverage *)"
     ]
   }
 }

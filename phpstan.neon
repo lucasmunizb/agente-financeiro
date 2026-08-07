@@ -1,0 +1,23 @@
+# =====================================================================
+# PORTÃO do CI (level 6, app + database + routes).
+#
+# Roda com a dívida congelada em phpstan-baseline.neon: não reprova por erro
+# ANTIGO, só por erro NOVO. Para VER a dívida e ir corrigindo, use a config
+# irmã sem baseline: `make stan-debt` (phpstan-debt.neon).
+#
+# Executado em contêiner: `make stan` (regra 9 — nada no host).
+# =====================================================================
+includes:
+    - phpstan-base.neon
+
+    # Dívida CONGELADA: os 147 erros que existiam quando a análise entrou no
+    # projeto (137 entradas). Ficam silenciados para que o level 6 possa ser
+    # portão já. Não é perdão: é linha de base. Ao corrigir um trecho, apague a
+    # entrada correspondente daqui (ou rode `make stan-baseline`); o baseline
+    # só deve encolher.
+    #
+    # Composição medida: 60 são alias de agregado do selectRaw em
+    # AssinaturaDeAtualizacoes (falso-positivo do Eloquent, nunca vão sumir
+    # sozinhos) e 33 são generics de Builder faltando no docblock. O que
+    # realmente vale atacar está em ConsultarLancamentos (shape defasado).
+    - phpstan-baseline.neon

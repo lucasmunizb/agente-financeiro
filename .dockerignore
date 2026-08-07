@@ -18,3 +18,8 @@ bootstrap/cache/*.php
 storage/framework
 tests
 phpunit.xml
+# Análise estática e cobertura: config e artefatos são de dev/CI. Sem esta
+# linha o cache do PHPStan (build/phpstan, ~67MB) entra no COPY . /app e vai
+# parar na imagem de produção.
+build
+phpstan*.neon

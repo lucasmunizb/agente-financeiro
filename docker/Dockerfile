@@ -17,6 +17,13 @@ RUN install-php-extensions \
         opcache \
         pcntl
 
+# PCOV — cobertura de testes. Fica no stage `base` (dev/CI) porque é lá que a
+# suíte roda. Instalado DESATIVADO: com pcov.enabled=1 o driver instrumenta todo
+# arquivo carregado, o que encarece qualquer execução de PHP. Quem quer medir
+# liga por invocação (`php -d pcov.enabled=1 …`, ver `make coverage`).
+RUN pecl install pcov && docker-php-ext-enable pcov
+RUN echo "pcov.enabled=0" > /usr/local/etc/php/conf.d/99-pcov.ini
+
 # Bibliotecas de sistema: OCR (Tesseract pt) embutido no worker, utilitários
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

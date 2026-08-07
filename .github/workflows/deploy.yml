@@ -59,6 +59,59 @@ jobs:
           load: true
           cache-from: type=gha,scope=base
           cache-to: type=gha,scope=base,mode=max
+      # As dev deps (phpstan/larastan, pest) são instaladas UMA vez e reusadas
+      # pelos três passos abaixo, que compartilham o bind-mount de $PWD.
+      - name: Instalar dependências (dev inclusas)
+        run: |
+          docker run --rm -v "$PWD":/app -w /app financeiro-ci:latest \
+            composer install --no-interaction --prefer-dist
+
+      # ── PORTÃO. Roda com phpstan-baseline.neon, que congela os 147 erros
+      # herdados; então isto NÃO reprova por dívida antiga — reprova por erro
+      # NOVO. Verificado injetando um return.type inválido: exit 1. Se um dia
+      # precisar destravar um deploy urgente, regenere o baseline
+      # (`make stan-baseline`) em vez de pôr continue-on-error de volta: assim
+      # a dívida fica registrada e visível no diff, não invisível.
+      - name: PHPStan (level 6 — app + database + routes)
+        run: |
+          docker run --rm -v "$PWD":/app -w /app financeiro-ci:latest \
+            vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+      # ── INFORMATIVO: imprime os 147 erros que o passo acima silencia via
+      # baseline. Sem isto a dívida fica invisível no CI (o portão só diz
+      # "No errors") e não há de onde tirar a lista do que corrigir.
+      # Roda mesmo com o portão verde; `|| true` porque sai 1 enquanto houver
+      # dívida — o passo é relatório, não veredito.
+      - name: PHPStan — dívida congelada (level 6, informativo)
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD":/app -w /app financeiro-ci:latest \
+            vendor/bin/phpstan analyse -c phpstan-debt.neon \
+              --memory-limit=1G --no-progress || true
+
+      # ── INFORMATIVO. 292 erros, majoritariamente `mixed` sem narrowing no
+      # núcleo Domain/Ai. Sem baseline de propósito: o número é o termômetro.
+      - name: PHPStan (level 9 — app/Domain + app/Ai)
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD":/app -w /app financeiro-ci:latest \
+            vendor/bin/phpstan analyse -c phpstan-domain.neon --memory-limit=1G --no-progress
+
+      # ── Cobertura — INFORMATIVO por enquanto. Quando o limiar for decidido,
+      # remova o continue-on-error e acrescente --min=<N> ao pest.
+      # Precisa do Postgres (a suíte é de integração), logo --network host.
+      - name: Cobertura (PCOV)
+        continue-on-error: true
+        run: |
+          APP_KEY="base64:$(openssl rand -base64 32)"
+          docker run --rm --network host -v "$PWD":/app -w /app \
+            -e APP_ENV=testing -e APP_KEY="$APP_KEY" \
+            -e DB_CONNECTION=pgsql -e DB_HOST=127.0.0.1 -e DB_PORT=5432 \
+            -e DB_DATABASE=financeiro_test \
+            -e DB_USERNAME=financeiro -e DB_PASSWORD=secret \
+            financeiro-ci:latest \
+            php -d pcov.enabled=1 -d memory_limit=1G vendor/bin/pest --coverage
+
       - name: Rodar a suíte (gate TDD)
         run: |
           APP_KEY="base64:$(openssl rand -base64 32)"
@@ -66,7 +119,7 @@ jobs:
             -e APP_ENV=testing -e APP_KEY="$APP_KEY" \
             -e DB_CONNECTION=pgsql -e DB_HOST=127.0.0.1 -e DB_PORT=5432 \
             -e DB_USERNAME=financeiro -e DB_PASSWORD=secret \
-            financeiro-ci:latest sh -c 'composer install --no-interaction --prefer-dist && php artisan test'
+            financeiro-ci:latest php artisan test
 
   build-scan-push:
     needs: test

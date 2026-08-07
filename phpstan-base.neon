@@ -1,0 +1,30 @@
+# =====================================================================
+# Parâmetros COMPARTILHADOS pelas análises de level 6. Existe para que as
+# flags de comportamento do Larastan fiquem num lugar só: se `phpstan.neon`
+# (portão) e `phpstan-debt.neon` (listagem da dívida) divergissem, o portão
+# passaria a medir uma coisa e o relatório outra — sem ninguém perceber.
+#
+# NÃO rode este arquivo direto; ele não é uma config completa de uso.
+# =====================================================================
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+
+    paths:
+        - app
+        - database
+        - routes
+
+    tmpDir: build/phpstan
+
+    checkModelProperties: true
+
+    # Os models deste projeto declaram os casts pelo MÉTODO `casts()` (estilo
+    # Laravel 11+), não pela propriedade `$casts`. O Larastan só lê o método se
+    # este flag estiver ligado — desligado (padrão), ele ignora todos os casts e
+    # devolve o tipo cru da coluna: `data`/`vencimento` viram `string` em vez de
+    # CarbonImmutable, e `->toDateString()` vira erro em ~35 pontos. Ruído de
+    # configuração, não defeito de código.
+    parseModelCastsMethod: true

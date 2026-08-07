@@ -1,0 +1,21 @@
+# =====================================================================
+# A DÍVIDA, listada. Mesma análise do portão (phpstan.neon), porém SEM o
+# phpstan-baseline.neon — então imprime os 147 erros que o portão silencia.
+#
+# É daqui que sai a lista de trabalho: `make stan-debt`. Sai com código 1
+# enquanto houver dívida, por isso roda como informativo no CI e no ci-local.
+#
+# Fluxo para abater dívida:
+#   1. `make stan-debt`      → escolhe um arquivo e corrige
+#   2. `make test`           → confirma que não quebrou nada
+#   3. `make stan-baseline`  → o baseline encolhe; confira o diff
+# =====================================================================
+includes:
+    - phpstan-base.neon
+
+parameters:
+    # tmpDir próprio: o cache de resultado do PHPStan é invalidado quando a
+    # config muda. Compartilhar build/phpstan com o portão faria as duas
+    # análises se invalidarem em revezamento, forçando varredura completa toda
+    # vez que você alternasse entre `make stan` e `make stan-debt`.
+    tmpDir: build/phpstan-debt

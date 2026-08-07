@@ -17,6 +17,18 @@
             <directory>app</directory>
         </include>
     </source>
+    <!--
+        Cobertura sobre o <source> acima. Só produz número quando um driver está
+        ativo (PCOV; ver `make coverage`) — sem driver o PHPUnit apenas avisa e a
+        suíte roda normal, então isto não onera `make test`. O clover em
+        build/coverage alimenta o CI; build/ é gitignored.
+    -->
+    <coverage>
+        <report>
+            <text outputFile="php://stdout" showOnlySummary="true"/>
+            <clover outputFile="build/coverage/clover.xml"/>
+        </report>
+    </coverage>
     <php>
         <!--
             force="true" nos vars de comportamento da aplicação: o contêiner do

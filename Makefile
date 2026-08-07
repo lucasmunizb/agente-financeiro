@@ -22,7 +22,8 @@ WEBHOOK_PATH := /telegram/webhook
 .PHONY: help setup bootstrap up down build rebuild restart ps logs logs-app \
         logs-worker shell worker-shell test migrate fresh seed key artisan \
         composer pest pint pint-test tinker stop npm assets vite db-test \
-        webhook-up webhook-down ci-local ci-test ci-build ci-scan
+        webhook-up webhook-down ci-local ci-test ci-build ci-scan \
+        stan stan-debt stan-debt-resumo stan-baseline stan-domain coverage
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -95,6 +96,49 @@ tinker: ## Abre o tinker
 pest: db-test ## Roda o Pest diretamente
 	$(EXEC_TEST) ./vendor/bin/pest
 
+# ---------------------------------------------------------------------
+# Qualidade — análise estática (PHPStan/Larastan) e cobertura (PCOV).
+# Ambos rodam DENTRO do contêiner (regra 9). Artefatos vão para build/,
+# que é gitignored.
+# ---------------------------------------------------------------------
+stan: ## Análise estática (level 6) — PORTÃO: reprova só por erro NOVO
+	$(EXEC_T) vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+# A LISTA DE TRABALHO. Mesma análise do portão, sem o baseline: mostra os 147
+# erros que `make stan` silencia. É o alvo para usar ao sentar para corrigir.
+stan-debt: ## Lista a dívida congelada do level 6 (os erros que o portão ignora)
+	$(EXEC_T) vendor/bin/phpstan analyse -c phpstan-debt.neon --memory-limit=1G --no-progress
+
+# Resumo por TIPO de erro, do mais frequente ao menos — para escolher por onde
+# começar (um tipo repetido 60x costuma ser uma correção só, aplicada em massa).
+stan-debt-resumo: ## Agrupa a dívida do level 6 por tipo de erro, com contagem
+	@$(EXEC_T) sh -lc 'vendor/bin/phpstan analyse -c phpstan-debt.neon --memory-limit=1G \
+	  --no-progress --error-format=json 2>/dev/null | php -r "\
+	    \$$j = json_decode(stream_get_contents(STDIN), true); \
+	    \$$b = []; \$$ex = []; \
+	    foreach (\$$j[\"files\"] as \$$f => \$$d) { foreach (\$$d[\"messages\"] as \$$m) { \
+	      \$$id = \$$m[\"identifier\"] ?? \"(sem identifier)\"; \
+	      \$$b[\$$id] = (\$$b[\$$id] ?? 0) + 1; \$$ex[\$$id] = \$$ex[\$$id] ?? \$$m[\"message\"]; } } \
+	    arsort(\$$b); \
+	    printf(\"%-38s %6s   %s\n\", \"TIPO\", \"QTD\", \"EXEMPLO\"); \
+	    foreach (\$$b as \$$id => \$$n) printf(\"%-38s %6d   %s\n\", \$$id, \$$n, substr(\$$ex[\$$id], 0, 70)); \
+	    printf(\"%-38s %6d\n\", \"TOTAL\", \$$j[\"totals\"][\"file_errors\"]);"'
+
+# Regenera a linha de base. Use ao CORRIGIR erros (o baseline encolhe). Se usar
+# para absorver erro novo, confira o diff antes de commitar: cada entrada
+# acrescentada é dívida que o portão deixará de pegar.
+stan-baseline: ## Regenera phpstan-baseline.neon (a dívida congelada do level 6)
+	$(EXEC_T) vendor/bin/phpstan analyse --memory-limit=1G --no-progress --generate-baseline
+
+stan-domain: ## Análise estática (level 9) só no núcleo: app/Domain + app/Ai
+	$(EXEC_T) vendor/bin/phpstan analyse -c phpstan-domain.neon --memory-limit=1G --no-progress
+
+# PCOV vem instalado no stage `base` mas DESATIVADO (pcov.enabled=0), para não
+# onerar `make test`. Aqui ligamos só nesta invocação. O memory_limit maior é
+# necessário: o driver mantém o mapa de cobertura de ~5,4k statements em memória.
+coverage: db-test ## Roda a suíte com cobertura (PCOV) e gera build/coverage/clover.xml
+	$(EXEC_TEST) php -d pcov.enabled=1 -d memory_limit=1G vendor/bin/pest --coverage
+
 pint: ## Formata o código (Laravel Pint)
 	$(EXEC_T) ./vendor/bin/pint
 
@@ -164,7 +208,16 @@ webhook-down: ## Remove o webhook do Telegram e derruba o túnel
 # checkout do runner). Pega falhas antes do push. Ver scripts/ci-local.sh.
 # Deploy + smoke tocam produção e são promovidos só por você via git push.
 # ---------------------------------------------------------------------
-ci-local: ## Roda o pipeline local inteiro (test + build + scan) sem tocar produção
+# Espelha o job `test` do deploy.yml, na mesma ordem e com a mesma severidade:
+#   stan (level 6)  → PORTÃO   (tem baseline; só reprova por erro NOVO)
+#   coverage        → informativo (|| true) enquanto não houver --min decidido
+# Quando fixar o limiar de cobertura, tire o `|| true` daqui E o
+# continue-on-error de lá — nos DOIS lugares, senão o CI local para de espelhar
+# o remoto e você descobre a quebra só depois do push.
+ci-local: ## Roda o pipeline local inteiro (stan + coverage + test + build + scan)
+	@$(MAKE) --no-print-directory stan
+	@$(MAKE) --no-print-directory stan-debt-resumo || true
+	@$(MAKE) --no-print-directory coverage || true
 	@bash scripts/ci-local.sh all
 
 ci-test: ## CI local: só o gate de teste (contra árvore limpa do git)

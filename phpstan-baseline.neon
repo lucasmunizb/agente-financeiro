@@ -1,0 +1,823 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Ai/Agents/SugeridorDeCategoria.php
+
+		-
+			message: '#^Method App\\Ai\\Tools\\ConsultarDisponivelMes\:\:description\(\) never returns Stringable so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/ConsultarDisponivelMes.php
+
+		-
+			message: '#^Method App\\Ai\\Tools\\ConsultarDisponivelMes\:\:handle\(\) never returns Stringable so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/ConsultarDisponivelMes.php
+
+		-
+			message: '#^Method App\\Ai\\Tools\\ConsultarFaturaCartao\:\:description\(\) never returns Stringable so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/ConsultarFaturaCartao.php
+
+		-
+			message: '#^Method App\\Ai\\Tools\\ConsultarFaturaCartao\:\:handle\(\) never returns Stringable so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/ConsultarFaturaCartao.php
+
+		-
+			message: '#^Method App\\Ai\\Tools\\ConsultarGastos\:\:description\(\) never returns Stringable so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/ConsultarGastos.php
+
+		-
+			message: '#^Method App\\Ai\\Tools\\ConsultarGastos\:\:handle\(\) never returns Stringable so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/ConsultarGastos.php
+
+		-
+			message: '#^Method App\\Ai\\Tools\\ConsultarProximasContas\:\:description\(\) never returns Stringable so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/ConsultarProximasContas.php
+
+		-
+			message: '#^Method App\\Ai\\Tools\\ConsultarProximasContas\:\:handle\(\) never returns Stringable so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Ai/Tools/ConsultarProximasContas.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Installment\:\:\$maxid\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Installment\:\:\$n\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Installment\:\:\$soma\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\PendingConfirmation\:\:\$maxid\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\PendingConfirmation\:\:\$n\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\PendingConfirmation\:\:\$pendentes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Recurrence\:\:\$ativos\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Recurrence\:\:\$dias\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Recurrence\:\:\$maxid\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Recurrence\:\:\$n\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Recurrence\:\:\$soma\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\RecurrenceOccurrence\:\:\$maxid\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\RecurrenceOccurrence\:\:\$n\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\RecurrenceOccurrence\:\:\$soma\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$maxid\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$n\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Transaction\:\:\$soma\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Atualizacoes/AssinaturaDeAtualizacoes.php
+
+		-
+			message: '#^Method App\\Domain\\Conta\\ExportarDadosDoUsuario\:\:exportar\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Domain/Conta/ExportarDadosDoUsuario.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$card\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/ContasVencidas/ConsultarContasVencidas.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$card_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Domain/ContasVencidas/ConsultarContasVencidas.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 2
+			path: app/Domain/Dashboard/ResumoDoMes.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$categoria_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/FaturaCartao/ConsultarFaturaCartao.php
+
+		-
+			message: '#^Parameter \#1 \$array of function usort contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Domain/FaturaCartao/ConsultarFaturaCartao.php
+
+		-
+			message: '#^Parameter \#2 \$callback of function usort contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Domain/FaturaCartao/ConsultarFaturaCartao.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gasto/RegistrarGastoManual.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$card_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gasto/RegistrarPagamentoParcela.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gasto/RegistrarPagamentoParcela.php
+
+		-
+			message: '#^Parameter \#1 \$transaction of method App\\Domain\\Gasto\\StatusAgregadoDaTransacao\:\:reavaliar\(\) expects App\\Models\\Transaction, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Domain/Gasto/RegistrarPagamentoParcela.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$card_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gasto/ReverterPagamentoParcela.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gasto/ReverterPagamentoParcela.php
+
+		-
+			message: '#^Parameter \#1 \$transaction of method App\\Domain\\Gasto\\StatusAgregadoDaTransacao\:\:reavaliar\(\) expects App\\Models\\Transaction, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Domain/Gasto/ReverterPagamentoParcela.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$numero\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gastos/ConsultarGastos.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$total\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gastos/ConsultarGastos.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$transaction\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gastos/ConsultarGastos.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vencimento\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Gastos/ConsultarGastos.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:valor\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Domain/Gastos/ConsultarGastos.php
+
+		-
+			message: '#^Method App\\Domain\\Gastos\\ConsultarGastos\:\:aplicarStatus\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Domain/Gastos/ConsultarGastos.php
+
+		-
+			message: '#^Parameter \#1 \$array of function usort contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Domain/Gastos/ConsultarGastos.php
+
+		-
+			message: '#^Parameter \#2 \$callback of function usort contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Domain/Gastos/ConsultarGastos.php
+
+		-
+			message: '#^Method App\\Domain\\IA\\Guard\\GuardPosGeracao\:\:centavosDe\(\) has parameter \$match with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Domain/IA/Guard/GuardPosGeracao.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-falsy\-string&numeric\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Domain/IA/Guard/GuardPosGeracao.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Cache\\Repository\:\:lock\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Domain/IA/Rotacao/RotacionadorDeProvedores.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cor\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$descricao\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$final_4\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$nome\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$numero\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tipo\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$total\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vencimento\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:valor\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentoDetalhe.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$numero\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$total\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$transaction\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vencimento\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:valor\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Offset ''competencia'' on array\{descricao\: string, vencimento\: string, cents\: int, prevista\: true, categoriaId\: int\|null, categoria\: array\{nome\: string, cor\: string\|null\}\|null, forma\: string\|null, cartaoId\: int\|null, \.\.\.\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Offset ''dataPagamento'' on array\{descricao\: string, vencimento\: string, cents\: int, prevista\: true, categoriaId\: int\|null, categoria\: array\{nome\: string, cor\: string\|null\}\|null, forma\: string\|null, cartaoId\: int\|null, \.\.\.\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Offset ''pagavel'' on array\{descricao\: string, vencimento\: string, cents\: int, prevista\: true, categoriaId\: int\|null, categoria\: array\{nome\: string, cor\: string\|null\}\|null, forma\: string\|null, cartaoId\: int\|null, \.\.\.\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_values contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Parameter \#1 \$array of function uasort contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Parameter \#2 \$callback of function uasort contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Return type of call to function array_values contains unresolvable type\.$#'
+			identifier: function.unresolvableReturnType
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Ternary operator condition is always false\.$#'
+			identifier: ternary.alwaysFalse
+			count: 1
+			path: app/Domain/Lancamentos/ConsultarLancamentos.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:valor\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Domain/Orcamento/ConsumoDoMes.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$descricao\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/Pagamento/ResolverContaAPagar.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$card\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Domain/ProximasContas/ConsultarProximasContas.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$card_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Domain/ProximasContas/ConsultarProximasContas.php
+
+		-
+			message: '#^Method App\\Domain\\Recorrencia\\ConsultarOcorrencias\:\:base\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Domain/Recorrencia/ConsultarOcorrencias.php
+
+		-
+			message: '#^Parameter \#1 \$ocorrencias of method App\\Domain\\Recorrencia\\ConsultarOcorrencias\:\:normalizar\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\RecurrenceOccurrence\>, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Domain/Recorrencia/ConsultarOcorrencias.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Domain/Recorrencia/ConverterLancamentoEmRecorrencia.php
+
+		-
+			message: '#^Method App\\Domain\\Shared\\MesDeCaixa\:\:ocorrenciasNoMes\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Domain/Shared/MesDeCaixa.php
+
+		-
+			message: '#^Method App\\Domain\\Shared\\MesDeCaixa\:\:ocorrenciasNoMes\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Domain/Shared/MesDeCaixa.php
+
+		-
+			message: '#^Method App\\Domain\\Shared\\MesDeCaixa\:\:parcelasNoMes\(\) has parameter \$query with generic class Illuminate\\Database\\Eloquent\\Builder but does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Domain/Shared/MesDeCaixa.php
+
+		-
+			message: '#^Method App\\Domain\\Shared\\MesDeCaixa\:\:parcelasNoMes\(\) return type with generic class Illuminate\\Database\\Eloquent\\Builder does not specify its types\: TModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Domain/Shared/MesDeCaixa.php
+
+		-
+			message: '#^Method App\\Domain\\Telegram\\AutenticarTelegram\:\:resolver\(\) should return App\\Models\\User\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Domain/Telegram/AutenticarTelegram.php
+
+		-
+			message: '#^Method App\\Domain\\Telegram\\RoteadorDeComandos\:\:autenticado\(\) has parameter \$update with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Domain/Telegram/RoteadorDeComandos.php
+
+		-
+			message: '#^Method App\\Domain\\Telegram\\RoteadorDeComandos\:\:naoVinculado\(\) has parameter \$update with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Domain/Telegram/RoteadorDeComandos.php
+
+		-
+			message: '#^Method App\\Domain\\Telegram\\RoteadorDeMensagem\:\:autenticado\(\) has parameter \$update with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Domain/Telegram/RoteadorDeMensagem.php
+
+		-
+			message: '#^Method App\\Domain\\Telegram\\RoteadorDeMensagem\:\:naoVinculado\(\) has parameter \$update with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Domain/Telegram/RoteadorDeMensagem.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/LancamentoController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tipo\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/LancamentoController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vencimento\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/LancamentoController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LancamentoController\:\:opcoesDoUsuario\(\) should return array\<string, Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\> but returns array\{cartoes\: Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Card\>, categorias\: Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Category\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/LancamentoController.php
+
+		-
+			message: '#^Parameter \#2 \$colecao of method App\\Http\\Controllers\\LancamentoController\:\:idPertencente\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Card\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/LancamentoController.php
+
+		-
+			message: '#^Parameter \#2 \$colecao of method App\\Http\\Controllers\\LancamentoController\:\:idPertencente\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Category\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/LancamentoController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>tipo" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/LancamentoController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tipo\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/LancamentoFormController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$vencimento\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/LancamentoFormController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\LancamentoFormController\:\:opcoesDoUsuario\(\) should return array\<string, Illuminate\\Support\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\> but returns array\{cartoes\: Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Card\>, categorias\: Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Category\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/LancamentoFormController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>tipo" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/LancamentoFormController.php
+
+		-
+			message: '#^Call to method App\\Domain\\Shared\\Money\:\:cents\(\) on a separate line has no effect\.$#'
+			identifier: method.resultUnused
+			count: 1
+			path: app/Http/Requests/CriarCartaoRequest.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\EnviarMensagemChatRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Requests/EnviarMensagemChatRequest.php
+
+		-
+			message: '#^Method App\\Models\\Account\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Account.php
+
+		-
+			message: '#^Method App\\Models\\AuditLog\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/AuditLog.php
+
+		-
+			message: '#^Method App\\Models\\Bank\:\:pdfParseErrors\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Bank.php
+
+		-
+			message: '#^Method App\\Models\\Budget\:\:categoria\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Budget.php
+
+		-
+			message: '#^Method App\\Models\\Budget\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Budget.php
+
+		-
+			message: '#^Method App\\Models\\Card\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Card.php
+
+		-
+			message: '#^Method App\\Models\\Category\:\:aliases\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Category.php
+
+		-
+			message: '#^Method App\\Models\\Category\:\:keywords\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Category.php
+
+		-
+			message: '#^Method App\\Models\\Category\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Category.php
+
+		-
+			message: '#^Method App\\Models\\CategoryKeyword\:\:category\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/CategoryKeyword.php
+
+		-
+			message: '#^Method App\\Models\\ChatMessage\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/ChatMessage.php
+
+		-
+			message: '#^Method App\\Models\\Income\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Income.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$valor_total_cents\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Installment.php
+
+		-
+			message: '#^Method App\\Models\\Installment\:\:status\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Installment.php
+
+		-
+			message: '#^Method App\\Models\\Installment\:\:transaction\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Installment.php
+
+		-
+			message: '#^Method App\\Models\\InvoiceImport\:\:card\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/InvoiceImport.php
+
+		-
+			message: '#^Method App\\Models\\InvoiceImport\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/InvoiceImport.php
+
+		-
+			message: '#^Method App\\Models\\MerchantAlias\:\:category\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/MerchantAlias.php
+
+		-
+			message: '#^Method App\\Models\\MerchantAlias\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/MerchantAlias.php
+
+		-
+			message: '#^Method App\\Models\\PdfParseError\:\:banks\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany does not specify its types\: TRelatedModel, TDeclaringModel, TPivotModel, TAccessor \(2\-4 required\)$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/PdfParseError.php
+
+		-
+			message: '#^Method App\\Models\\TelegramLink\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/TelegramLink.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:account\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:card\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:categoria\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:installments\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:paymentMethod\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:status\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Method App\\Models\\Transaction\:\:user\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/Transaction.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Return type \(array\<string, mixed\>\) of method Database\\Factories\\UserFactory\:\:definition\(\) should be compatible with return type \(array\<model property of App\\Models\\User, mixed\>\) of method Illuminate\\Database\\Eloquent\\Factories\\Factory\<App\\Models\\User\>\:\:definition\(\)$#'
+			identifier: method.childReturnType
+			count: 1
+			path: database/factories/UserFactory.php
