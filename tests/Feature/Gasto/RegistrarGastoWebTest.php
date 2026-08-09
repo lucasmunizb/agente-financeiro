@@ -428,12 +428,12 @@ it('não aceita categoria de outro usuário', function () {
     ])->assertStatus(422)->assertJsonValidationErrors(['categoria_id']);
 });
 
-it('rejeita parcelas fora do intervalo 1..24', function () {
+it('rejeita parcelas fora do intervalo 1..999', function () {
     $user = User::factory()->create();
     $card = Card::factory()->for($user)->create();
 
     $this->actingAs($user)->postJson('/gastos', [
-        'descricao' => 'x', 'valor' => '10,00', 'forma' => 'credito', 'card_id' => $card->id, 'parcelas' => 25,
+        'descricao' => 'x', 'valor' => '10,00', 'forma' => 'credito', 'card_id' => $card->id, 'parcelas' => 1000,
     ])->assertStatus(422)->assertJsonValidationErrors(['parcelas']);
 });
 
