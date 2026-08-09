@@ -62,7 +62,7 @@ class RegistrarGastoRequest extends FormRequest
                 'nullable', 'integer',
                 Rule::exists('cards', 'id')->where('user_id', $userId)->whereNull('deleted_at'),
             ],
-            'parcelas' => ['nullable', 'integer', 'min:1', 'max:24'],
+            'parcelas' => ['nullable', 'integer', 'min:1', 'max:999'],
 
             // Fora de cartão vence na data informada; no crédito o vencimento é
             // calculado pelo cartão (campo ignorado).
